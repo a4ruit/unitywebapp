@@ -63,7 +63,7 @@ document.querySelectorAll('.app-card').forEach(card => {
 
     // Send camera transition command to Unity
     send(cameraCmd);
-    send('spawn_cube');
+
     console.log(`Sent: ${cameraCmd} → ${card.dataset.label}`);
 
     // Fade to black then navigate to sub-app
