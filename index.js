@@ -3,8 +3,11 @@ const http = require('http');
 const WebSocket = require('ws');
 
 const app = express();
-const server = http.createServer(app);  // ← server gets created HERE
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+// Serve frontend files
+app.use(express.static('project'));
 
 wss.on('connection', (ws) => {
     console.log('Client connected');
@@ -12,7 +15,6 @@ wss.on('connection', (ws) => {
 
     ws.on('message', (message) => {
         console.log('Received:', message.toString());
-        // broadcast to all clients
         wss.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
                 client.send(message.toString());
