@@ -18,27 +18,17 @@ html, body { height:100%; width:100%; overflow:hidden; background:var(--bg); fon
 
 .bg-grid {
   position:fixed; inset:0;
-  background-image:
-    linear-gradient(rgba(0,255,204,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0,255,204,0.03) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(0,255,204,0.03) 1px,transparent 1px), linear-gradient(90deg,rgba(0,255,204,0.03) 1px,transparent 1px);
   background-size:40px 40px;
   animation:gridMove 20s linear infinite;
   pointer-events:none;
 }
-@keyframes gridMove { 100% { background-position:40px 40px; } }
+@keyframes gridMove { 100%{ background-position:40px 40px; } }
 
-.shell {
-  height:100dvh; display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  position:relative; padding:0 20px;
-}
+.shell { height:100dvh; display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; padding:0 20px; }
 
 /* Status bar */
-.status-bar {
-  position:absolute; top:20px; left:0; right:0;
-  display:flex; align-items:center; justify-content:space-between;
-  padding:0 24px;
-}
+.status-bar { position:absolute; top:20px; left:0; right:0; display:flex; align-items:center; justify-content:space-between; padding:0 24px; }
 .wordmark { font-family:'Share Tech Mono',monospace; font-size:10px; letter-spacing:0.2em; color:var(--muted); }
 .ws-indicator { display:flex; align-items:center; gap:6px; font-family:'Share Tech Mono',monospace; font-size:10px; color:var(--muted); }
 .ws-dot { width:6px; height:6px; border-radius:50%; background:#ef4444; transition:background 0.4s; }
@@ -49,201 +39,175 @@ html, body { height:100%; width:100%; overflow:hidden; background:var(--bg); fon
 .screen { width:100%; max-width:420px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:24px; }
 .screen.hidden { display:none; }
 
-/* ── PACK SCREEN ─────────────────────────────────── */
+/* ── PACK SCREEN ──────────────────────────────────── */
 
-.pack-scene {
-  position:relative;
-  width:200px; height:300px;
-  display:flex; align-items:center; justify-content:center;
-}
+.pack-scene { position:relative; width:200px; height:310px; display:flex; align-items:center; justify-content:center; }
 
-/* Peeking cards behind the pack */
-.pack-stack {
-  position:absolute; inset:0;
-  display:flex; align-items:center; justify-content:center;
-}
+/* Stack — hidden by default, revealed after swipe */
+.pack-stack { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
 
 .peek-card {
   position:absolute;
   width:200px; height:290px;
   border-radius:16px;
   border:1px solid var(--border);
-}
-.peek-0 { /* legendary — furthest back */
-  background: linear-gradient(135deg, #2a1f10, #1a1200);
-  border-color: rgba(255,183,77,0.35);
-  transform: translateY(10px) rotate(-4deg) scale(0.95);
-  box-shadow: 0 0 20px rgba(255,183,77,0.12);
-  z-index:1;
-}
-.peek-1 { /* rare */
-  background: linear-gradient(135deg, #1a1020, #0d0a12);
-  border-color: rgba(206,147,216,0.25);
-  transform: translateY(6px) rotate(-2deg) scale(0.97);
-  z-index:2;
-}
-.peek-2 { /* uncommon */
-  background: linear-gradient(135deg, #0e1a20, #080f14);
-  border-color: rgba(79,195,247,0.18);
-  transform: translateY(3px) rotate(-1deg) scale(0.99);
-  z-index:3;
+  opacity:0; /* hidden until stack-reveal */
+  transition: opacity 0.3s, transform 0.4s;
 }
 
+/* Stack reveal — added by JS after pack swipe */
+.pack-stack.stack-reveal .peek-card { opacity: 1; }
+
+.peek-card[data-rarity="legendary"] {
+  background:linear-gradient(135deg,#2a1f10,#1a1200);
+  border-color:rgba(255,183,77,0.4);
+  transform:translateY(14px) rotate(-5deg) scale(0.93);
+  box-shadow:0 0 24px rgba(255,183,77,0.15);
+  z-index:1;
+}
+.peek-card[data-rarity="rare"] {
+  background:linear-gradient(135deg,#1a1020,#0d0a12);
+  border-color:rgba(206,147,216,0.3);
+  transform:translateY(8px) rotate(-2.5deg) scale(0.96);
+  z-index:2;
+}
+.peek-card[data-rarity="uncommon"] {
+  background:linear-gradient(135deg,#0e1a20,#080f14);
+  border-color:rgba(79,195,247,0.22);
+  transform:translateY(4px) rotate(-1deg) scale(0.98);
+  z-index:3;
+}
+.peek-card[data-rarity="common"] {
+  background:var(--surface);
+  border-color:rgba(122,133,153,0.18);
+  transform:translateY(2px) rotate(-0.5deg) scale(0.99);
+  z-index:4;
+}
+
+/* Pack */
 .pack {
-  position:relative;
-  width:200px; height:290px;
-  border-radius:16px;
-  background: linear-gradient(135deg, #1a1f2e 0%, #0d1117 50%, #1a1f2e 100%);
+  position:relative; width:200px; height:290px; border-radius:16px;
+  background:linear-gradient(135deg,#1a1f2e 0%,#0d1117 50%,#1a1f2e 100%);
   border:1px solid rgba(0,255,204,0.2);
   display:flex; align-items:center; justify-content:center;
   overflow:hidden;
-  box-shadow:0 0 40px rgba(0,255,204,0.06), inset 0 0 40px rgba(0,0,0,0.4);
-  cursor:grab;
-  z-index:5;
-  transition:transform 0.2s ease;
+  box-shadow:0 0 40px rgba(0,255,204,0.06),inset 0 0 40px rgba(0,0,0,0.4);
+  cursor:grab; z-index:5;
   user-select:none;
 }
 .pack:active { cursor:grabbing; }
 
-.pack-front {
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  gap:8px; width:100%; height:100%;
-  padding-bottom:32px;
-}
-
+.pack-front { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; width:100%; height:100%; padding-bottom:36px; }
 .pack-logo { font-size:44px; color:var(--accent); text-shadow:0 0 20px rgba(0,255,204,0.6); animation:float 3s ease-in-out infinite; }
 @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
-
 .pack-title { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:0.15em; }
 .pack-subtitle { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:0.12em; }
 
 .pack-sheen {
   position:absolute; inset:0;
-  background:linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.04) 50%, transparent 60%);
-  background-size:200% 100%;
-  animation:sheen 3s ease-in-out infinite;
+  background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,0.04) 50%,transparent 60%);
+  background-size:200% 100%; animation:sheen 3s ease-in-out infinite;
 }
 @keyframes sheen { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
 
-/* Swipe zone indicator at top of pack */
 .swipe-zone-indicator {
   position:absolute; top:12px;
-  font-family:'Share Tech Mono',monospace;
-  font-size:9px; letter-spacing:0.12em; color:rgba(0,255,204,0.35);
+  font-family:'Share Tech Mono',monospace; font-size:9px;
+  letter-spacing:0.12em; color:rgba(0,255,204,0.35);
   animation:blink 2s ease-in-out infinite;
 }
-
 .pack-hint { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; }
 
-/* Pack fly-off animations */
-.pack.fly-left  { animation:flyLeft  0.38s ease-in forwards; }
-.pack.fly-right { animation:flyRight 0.38s ease-in forwards; }
+.pack.fly-left  { animation:flyLeft  0.4s ease-in forwards; }
+.pack.fly-right { animation:flyRight 0.4s ease-in forwards; }
 @keyframes flyLeft  { to { transform:translateX(-160%) rotate(-20deg); opacity:0; } }
 @keyframes flyRight { to { transform:translateX(160%)  rotate(20deg);  opacity:0; } }
 
-/* ── REVEAL SCREEN ───────────────────────────────── */
+/* ── REVEAL SCREEN ────────────────────────────────── */
 
 .reveal-header { display:flex; align-items:center; justify-content:center; }
 .reveal-counter { font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:0.2em; color:var(--muted); }
 
-.reveal-stack-wrap {
-  position:relative;
-  width:220px; height:320px;
-  display:flex; align-items:flex-end; justify-content:center;
-}
-
-.reveal-stack {
-  position:relative;
-  width:200px; height:290px;
-}
-
-/* Individual reveal cards */
+/* Single card — full size, centred */
 .rev-card {
-  position:absolute;
-  left:0; right:0;
-  width:200px; height:280px;
-  border-radius:18px;
-  border:1px solid var(--border);
+  width:220px; min-height:300px;
+  border-radius:20px; border:1px solid var(--border);
   background:var(--surface);
-  overflow:hidden;
-  cursor:grab;
-  user-select:none;
-  transition:box-shadow 0.3s;
-}
-.rev-card:active { cursor:grabbing; }
-
-.rev-card[data-rarity="common"]    { border-color:rgba(122,133,153,0.25); }
-.rev-card[data-rarity="uncommon"]  { border-color:rgba(79,195,247,0.4); }
-.rev-card[data-rarity="rare"]      { border-color:rgba(206,147,216,0.5); box-shadow:0 0 20px rgba(206,147,216,0.1); }
-.rev-card[data-rarity="legendary"] { border-color:rgba(255,183,77,0.65); box-shadow:0 0 30px rgba(255,183,77,0.18); animation:legendaryPulse 2s ease-in-out infinite; }
-@keyframes legendaryPulse { 0%,100%{box-shadow:0 0 20px rgba(255,183,77,0.12)} 50%{box-shadow:0 0 40px rgba(255,183,77,0.3)} }
-
-.rev-card-inner {
-  display:flex; flex-direction:column;
-  align-items:center; justify-content:center;
-  gap:12px; padding:28px 20px;
-  height:100%;
+  display:flex; align-items:center; justify-content:center;
+  overflow:hidden; cursor:pointer;
+  position:relative;
+  opacity:0;
 }
 
-.rev-shape-wrap { width:80px; height:80px; display:flex; align-items:center; justify-content:center; }
+.rev-card[data-rarity="common"]    { border-color:rgba(122,133,153,0.3); }
+.rev-card[data-rarity="uncommon"]  { border-color:rgba(79,195,247,0.45); }
+.rev-card[data-rarity="rare"]      { border-color:rgba(206,147,216,0.55); box-shadow:0 0 24px rgba(206,147,216,0.12); }
+.rev-card[data-rarity="legendary"] { border-color:rgba(255,183,77,0.7);  box-shadow:0 0 36px rgba(255,183,77,0.2); animation:legendaryPulse 2s ease-in-out infinite; }
+@keyframes legendaryPulse { 0%,100%{box-shadow:0 0 24px rgba(255,183,77,0.12)} 50%{box-shadow:0 0 50px rgba(255,183,77,0.35)} }
 
-.rev-card.dismiss-left  { animation:dismissLeft  0.34s ease-in forwards; }
-.rev-card.dismiss-right { animation:dismissRight 0.34s ease-in forwards; }
-@keyframes dismissLeft  { to { transform:translateX(-160%) rotate(-18deg); opacity:0; } }
-@keyframes dismissRight { to { transform:translateX(160%)  rotate(18deg);  opacity:0; } }
+/* Foil sheen on every reveal card */
+.rev-card::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(105deg,transparent 30%,rgba(255,255,255,0.04) 50%,transparent 70%);
+  background-size:200% 100%; animation:sheen 3s ease-in-out infinite;
+  pointer-events:none;
+}
 
-.rev-card-name   { font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:0.08em; }
+.rev-card-inner { display:flex; flex-direction:column; align-items:center; gap:14px; padding:36px 24px; width:100%; }
+.rev-shape-wrap { width:90px; height:90px; display:flex; align-items:center; justify-content:center; margin:8px 0; }
+
+.rev-card-name   { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:0.08em; }
 .rev-card[data-rarity="common"]    .rev-card-name { color:var(--common); }
 .rev-card[data-rarity="uncommon"]  .rev-card-name { color:var(--uncommon); }
 .rev-card[data-rarity="rare"]      .rev-card-name { color:var(--rare); }
 .rev-card[data-rarity="legendary"] .rev-card-name { color:var(--legendary); }
+.rev-card-rarity { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; margin-top:-10px; }
+.rev-card-desc   { font-size:12px; color:var(--muted); text-align:center; line-height:1.5; font-weight:300; }
 
-.rev-card-rarity { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; margin-top:-8px; }
-.rev-card-desc   { font-size:11px; color:var(--muted); text-align:center; line-height:1.5; font-weight:300; }
+/* Entrance */
+.rev-card.rev-enter { animation:revIn 0.42s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+@keyframes revIn { from{opacity:0;transform:translateY(28px) scale(0.9)} to{opacity:1;transform:translateY(0) scale(1)} }
+
+/* Exit — flicks up and fades */
+.rev-card.rev-exit { animation:revOut 0.26s ease-in forwards; }
+@keyframes revOut { to{opacity:0;transform:translateY(-40px) scale(0.92)} }
 
 .reveal-hint { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:0.15em; color:var(--muted); text-transform:uppercase; animation:blink 2s ease-in-out infinite; }
 
-/* ── CHOOSE SCREEN ───────────────────────────────── */
+/* ── CHOOSE SCREEN ────────────────────────────────── */
 
 .choose-header { text-align:center; }
 .choose-title { display:block; font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:0.1em; }
 .choose-sub   { font-family:'Share Tech Mono',monospace; font-size:9px; color:var(--muted); letter-spacing:0.1em; }
 
-.choice-grid {
-  display:grid; grid-template-columns:1fr 1fr;
-  gap:12px; width:100%;
-}
+.choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; width:100%; }
 
 .choice-card {
-  position:relative;
-  border-radius:14px; border:1px solid var(--border);
-  background:var(--surface);
-  padding:18px 12px 14px;
-  display:flex; flex-direction:column;
-  align-items:center; gap:8px;
+  position:relative; border-radius:14px; border:1px solid var(--border);
+  background:var(--surface); padding:18px 12px 14px;
+  display:flex; flex-direction:column; align-items:center; gap:8px;
   cursor:pointer; overflow:hidden;
-  transition:transform 0.12s, border-color 0.2s;
+  transition:transform 0.12s;
   opacity:0; transform:translateY(16px);
   animation:cardUp 0.35s ease forwards;
 }
-@keyframes cardUp { to { opacity:1; transform:translateY(0); } }
+@keyframes cardUp { to{opacity:1;transform:translateY(0)} }
 .choice-card:active { transform:scale(0.94); }
 
 .choice-card[data-rarity="common"]    { border-color:rgba(122,133,153,0.3); }
 .choice-card[data-rarity="uncommon"]  { border-color:rgba(79,195,247,0.4); }
 .choice-card[data-rarity="rare"]      { border-color:rgba(206,147,216,0.55); box-shadow:0 0 16px rgba(206,147,216,0.1); }
-.choice-card[data-rarity="legendary"] { border-color:rgba(255,183,77,0.65); box-shadow:0 0 24px rgba(255,183,77,0.15); animation:cardUp 0.35s ease forwards, legendaryPulse 2s ease-in-out 0.4s infinite; }
+.choice-card[data-rarity="legendary"] { border-color:rgba(255,183,77,0.65); animation:cardUp 0.35s ease forwards,legendaryPulse 2s ease-in-out 0.4s infinite; }
 
 .choice-shape-wrap { width:56px; height:56px; display:flex; align-items:center; justify-content:center; }
-.choice-card-name   { font-family:'Bebas Neue',sans-serif; font-size:14px; letter-spacing:0.06em; text-align:center; }
+.choice-card-name  { font-family:'Bebas Neue',sans-serif; font-size:14px; letter-spacing:0.06em; text-align:center; }
 .choice-card[data-rarity="common"]    .choice-card-name { color:var(--common); }
 .choice-card[data-rarity="uncommon"]  .choice-card-name { color:var(--uncommon); }
 .choice-card[data-rarity="rare"]      .choice-card-name { color:var(--rare); }
 .choice-card[data-rarity="legendary"] .choice-card-name { color:var(--legendary); }
 .choice-card-rarity { font-family:'Share Tech Mono',monospace; font-size:8px; letter-spacing:0.1em; color:var(--muted); text-transform:uppercase; }
 
-/* ── DROPPED SCREEN ──────────────────────────────── */
+/* ── DROPPED SCREEN ───────────────────────────────── */
 
 .dropped-wrapper { display:flex; flex-direction:column; align-items:center; gap:16px; text-align:center; }
 .dropped-icon { font-size:48px; color:var(--accent); animation:dropFall 0.6s cubic-bezier(0.34,1.56,0.64,1); }
@@ -254,19 +218,17 @@ html, body { height:100%; width:100%; overflow:hidden; background:var(--bg); fon
   margin-top:12px; padding:12px 28px;
   font-family:'Bebas Neue',sans-serif; font-size:16px; letter-spacing:0.12em;
   color:var(--text); background:none; border:1px solid var(--border);
-  border-radius:8px; cursor:pointer; transition:border-color 0.2s, color 0.2s;
+  border-radius:8px; cursor:pointer; transition:border-color 0.2s,color 0.2s;
 }
 .again-btn:hover { border-color:rgba(0,255,204,0.4); color:var(--accent); }
 
-/* ── SHARED SHAPE STYLES ─────────────────────────── */
+/* ── SHAPES ───────────────────────────────────────── */
 
-/* Reveal-size shapes */
-.rev-shape-el.shape-small-cube  { width:32px; height:32px; background:var(--common);   border-radius:3px; }
-.rev-shape-el.shape-large-cube  { width:68px; height:68px; background:var(--uncommon); border-radius:5px; }
-.rev-shape-el.shape-sphere      { width:66px; height:66px; background:var(--rare);     border-radius:50%; }
-.rev-shape-el.shape-triangle    { width:0; height:0; border-left:33px solid transparent; border-right:33px solid transparent; border-bottom:60px solid var(--legendary); }
+.rev-shape-el.shape-small-cube  { width:34px; height:34px; background:var(--common);   border-radius:3px; }
+.rev-shape-el.shape-large-cube  { width:74px; height:74px; background:var(--uncommon); border-radius:5px; }
+.rev-shape-el.shape-sphere      { width:70px; height:70px; background:var(--rare);     border-radius:50%; }
+.rev-shape-el.shape-triangle    { width:0; height:0; border-left:37px solid transparent; border-right:37px solid transparent; border-bottom:66px solid var(--legendary); }
 
-/* Choice-size shapes */
 .choice-shape-el.shape-small-cube { width:22px; height:22px; background:var(--common);   border-radius:2px; }
 .choice-shape-el.shape-large-cube { width:44px; height:44px; background:var(--uncommon); border-radius:4px; }
 .choice-shape-el.shape-sphere     { width:40px; height:40px; background:var(--rare);     border-radius:50%; }

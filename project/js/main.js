@@ -22,13 +22,12 @@ function pick(tier) {
   return { ...pool[Math.floor(Math.random() * pool.length)] };
 }
 
-// Roll a pack of 4 cards — rarest always last
+// Roll pack — rarest guaranteed last in reveal order
 function rollPack() {
   const cards = [];
-  const hasLegendary = Math.random() < 0.1;  // 1 in 10
-  const hasRare      = !hasLegendary && Math.random() < 0.2; // 1 in 5 (when no legendary)
+  const hasLegendary = Math.random() < 0.1;
+  const hasRare      = !hasLegendary && Math.random() < 0.2;
 
-  // Always: 1 uncommon minimum
   cards.push(pick('uncommon'));
 
   if (hasLegendary) {
@@ -45,7 +44,7 @@ function rollPack() {
     cards.push(pick('uncommon'));
   }
 
-  // Sort common → legendary so rarest is last (at back of stack visually = top of array)
+  // Sort ascending: commons first, rarest last
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
   return cards;
 }
@@ -54,16 +53,14 @@ function rollPack() {
 
 let ws             = null;
 let reconnectTimer = null;
-let packCards      = [];   // current pack, sorted common→rarest
-let revealedCards  = [];   // cards already flipped
-let currentIndex   = 0;    // index into packCards being shown
+let packCards      = [];
+let revealIndex    = 0;   // next card to reveal (0 = first/common end)
 
-// Swipe state
-let swipeStartX    = null;
-let swipeStartY    = null;
-let swipeTarget    = null; // 'pack' | 'card'
-const SWIPE_THRESHOLD = 55;
-const TOP_ZONE_RATIO  = 0.55; // top 55% of element triggers swipe
+// Swipe state (pack only)
+let swipeStartX = null;
+let swipeStartY = null;
+const SWIPE_THRESHOLD  = 55;
+const TOP_ZONE_RATIO   = 0.55;
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 
@@ -100,59 +97,45 @@ function showScreen(id) {
   document.getElementById(id).classList.remove('hidden');
 }
 
-// ─── Pack stack visual ────────────────────────────────────────────────────────
-// Cards peek from behind the pack, stacked and slightly rotated
+// ─── Pack swipe (horizontal, top-zone only) ───────────────────────────────────
 
-function buildPackStack() {
-  const stack = document.getElementById('packStack');
-  stack.innerHTML = '';
-  // Render back→front (rarest at back = rendered first = lowest z-index)
-  // We show 3 peek cards behind the pack
-  const peekRarities = ['legendary', 'rare', 'uncommon'];
-  peekRarities.forEach((rarity, i) => {
-    const peek = document.createElement('div');
-    peek.className = `peek-card peek-${i}`;
-    peek.dataset.rarity = rarity;
-    stack.appendChild(peek);
-  });
-}
+function initPack() {
+  const packEl = document.getElementById('pack');
 
-// ─── Swipe gesture (horizontal, top-zone only) ────────────────────────────────
+  // Stack starts hidden — no peek cards until opened
+  document.getElementById('packStack').innerHTML = '';
 
-function initSwipe(el, target, onSwipeLeft, onSwipeRight) {
-  el.addEventListener('touchstart', (e) => {
-    const rect  = el.getBoundingClientRect();
+  // Touch
+  packEl.addEventListener('touchstart', (e) => {
+    const rect  = packEl.getBoundingClientRect();
     const touch = e.touches[0];
-    const relY  = touch.clientY - rect.top;
-    if (relY > rect.height * TOP_ZONE_RATIO) return; // only top zone
+    if (touch.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
     swipeStartX = touch.clientX;
     swipeStartY = touch.clientY;
-    swipeTarget = target;
   }, { passive: true });
 
-  el.addEventListener('touchmove', (e) => {
-    if (swipeTarget !== target || swipeStartX === null) return;
+  packEl.addEventListener('touchmove', (e) => {
+    if (swipeStartX === null) return;
     const dx = e.touches[0].clientX - swipeStartX;
     const dy = Math.abs(e.touches[0].clientY - swipeStartY);
-    if (dy > 30) { resetSwipe(el); return; } // too vertical — let page scroll
+    if (dy > 30) { resetPackSwipe(packEl); return; }
     const clamped = Math.max(-120, Math.min(120, dx));
-    el.style.transform = `translateX(${clamped * 0.7}px) rotate(${clamped * 0.04}deg)`;
+    packEl.style.transform = `translateX(${clamped * 0.7}px) rotate(${clamped * 0.04}deg)`;
   }, { passive: true });
 
-  el.addEventListener('touchend', (e) => {
-    if (swipeTarget !== target || swipeStartX === null) return;
+  packEl.addEventListener('touchend', (e) => {
+    if (swipeStartX === null) return;
     const dx = e.changedTouches[0].clientX - swipeStartX;
     const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
-    resetSwipe(el);
+    resetPackSwipe(packEl);
     if (dy > 30) return;
-    if (dx < -SWIPE_THRESHOLD) onSwipeLeft();
-    else if (dx > SWIPE_THRESHOLD) onSwipeRight();
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
   }, { passive: true });
 
   // Mouse fallback
   let mStartX = null, mStartY = null;
-  el.addEventListener('mousedown', (e) => {
-    const rect = el.getBoundingClientRect();
+  packEl.addEventListener('mousedown', (e) => {
+    const rect = packEl.getBoundingClientRect();
     if (e.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
     mStartX = e.clientX; mStartY = e.clientY;
   });
@@ -160,87 +143,76 @@ function initSwipe(el, target, onSwipeLeft, onSwipeRight) {
     if (mStartX === null) return;
     const dx = e.clientX - mStartX;
     const clamped = Math.max(-120, Math.min(120, dx));
-    el.style.transform = `translateX(${clamped * 0.7}px) rotate(${clamped * 0.04}deg)`;
+    packEl.style.transform = `translateX(${clamped * 0.7}px) rotate(${clamped * 0.04}deg)`;
   });
   window.addEventListener('mouseup', (e) => {
     if (mStartX === null) return;
     const dx = e.clientX - mStartX;
     const dy = Math.abs(e.clientY - mStartY);
-    el.style.transform = '';
+    packEl.style.transform = '';
     mStartX = null;
     if (dy > 30) return;
-    if (dx < -SWIPE_THRESHOLD) onSwipeLeft();
-    else if (dx > SWIPE_THRESHOLD) onSwipeRight();
+    if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
   });
 }
 
-function resetSwipe(el) {
-  el.style.transform = '';
+function resetPackSwipe(packEl) {
+  packEl.style.transform = '';
   swipeStartX = null;
   swipeStartY = null;
-  swipeTarget = null;
-}
-
-// ─── Pack open ────────────────────────────────────────────────────────────────
-
-function initPack() {
-  const packEl = document.getElementById('pack');
-  buildPackStack();
-
-  initSwipe(packEl, 'pack',
-    () => triggerPackOpen('left'),
-    () => triggerPackOpen('right')
-  );
 }
 
 function triggerPackOpen(dir) {
   const packEl = document.getElementById('pack');
   packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
-  packCards    = rollPack();
-  revealedCards = [];
-  currentIndex  = 0;
+
+  // Roll the pack
+  packCards   = rollPack();
+  revealIndex = 0;
+
+  // Show peek stack briefly before transitioning
+  buildPackStack();
+
   setTimeout(() => {
     showScreen('screen-reveal');
-    buildRevealStack();
-  }, 380);
+    showRevealCard();
+  }, 520);
 }
 
-// ─── Reveal stack ─────────────────────────────────────────────────────────────
-// Cards stacked on screen, rarest at back (bottom z), commons on top
-// User swipes the top card away to reveal the one beneath
+// ─── Peek stack (shown only after swipe, before reveal screen) ────────────────
 
-function buildRevealStack() {
-  const container = document.getElementById('revealStack');
-  container.innerHTML = '';
+function buildPackStack() {
+  const stack = document.getElementById('packStack');
+  stack.innerHTML = '';
 
-  // Render rarest first (goes to back), commons last (goes to front/top)
-  // packCards is sorted common→rare, so we reverse for DOM order
-  [...packCards].reverse().forEach((card, i) => {
-    const el = makeRevealCardEl(card, i);
-    container.appendChild(el);
+  // Show peeks based on what's in this pack
+  const rarities = [...new Set(packCards.map(c => c.rarity))].reverse(); // rarest first = furthest back
+  rarities.forEach((rarity, i) => {
+    const peek = document.createElement('div');
+    peek.className = `peek-card peek-${i}`;
+    peek.dataset.rarity = rarity;
+    stack.appendChild(peek);
   });
 
-  updateRevealHint();
-  // Attach swipe to top card
-  attachTopCardSwipe();
+  // Animate peek cards in
+  stack.classList.add('stack-reveal');
 }
 
-function makeRevealCardEl(card, stackDepth) {
-  const el = document.createElement('div');
-  el.className = 'rev-card';
-  el.dataset.rarity = card.rarity;
-  el.dataset.id     = card.id;
+// ─── Reveal — tap to advance ──────────────────────────────────────────────────
 
-  // Stack offset — cards beneath are peeking
-  const offset   = stackDepth * 6;
-  const rotation = (stackDepth % 2 === 0 ? 1 : -1) * stackDepth * 1.5;
-  el.style.cssText = `
-    bottom: ${offset}px;
-    transform: rotate(${rotation}deg);
-    z-index: ${10 - stackDepth};
-  `;
+function showRevealCard() {
+  const card    = packCards[revealIndex];
+  const total   = packCards.length;
+  const isLast  = revealIndex === total - 1;
 
-  el.innerHTML = `
+  document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${total}`;
+  document.getElementById('revealHint').textContent    = isLast ? 'tap to keep' : 'tap to reveal next';
+
+  const revealCard = document.getElementById('revealCard');
+  revealCard.dataset.rarity = card.rarity;
+  revealCard.className      = 'rev-card';
+
+  revealCard.innerHTML = `
     <div class="rev-card-inner">
       <div class="rev-shape-wrap"><div class="${card.shapeClass} rev-shape-el"></div></div>
       <div class="rev-card-name">${card.name}</div>
@@ -248,60 +220,30 @@ function makeRevealCardEl(card, stackDepth) {
       <div class="rev-card-desc">${card.desc}</div>
     </div>
   `;
-  return el;
+
+  // Trigger entrance
+  void revealCard.offsetWidth;
+  revealCard.classList.add('rev-enter');
 }
 
-function attachTopCardSwipe() {
-  const container = document.getElementById('revealStack');
-  // Top card = last child (highest z-index)
-  const topCard = container.lastElementChild;
-  if (!topCard) return;
+document.getElementById('revealCard').addEventListener('click', () => {
+  const isLast = revealIndex === packCards.length - 1;
 
-  initSwipe(topCard, 'card',
-    () => dismissTopCard('left'),
-    () => dismissTopCard('right')
-  );
-}
+  if (isLast) {
+    showChoiceGrid();
+    return;
+  }
 
-function dismissTopCard(dir) {
-  const container = document.getElementById('revealStack');
-  const topCard   = container.lastElementChild;
-  if (!topCard) return;
-
-  const cardId = topCard.dataset.id;
-  const card   = packCards.find(c => c.id === cardId);
-  if (card) revealedCards.push(card);
-
-  topCard.classList.add(dir === 'left' ? 'dismiss-left' : 'dismiss-right');
+  // Exit current, then show next
+  const revealCard = document.getElementById('revealCard');
+  revealCard.classList.remove('rev-enter');
+  revealCard.classList.add('rev-exit');
 
   setTimeout(() => {
-    topCard.remove();
-    currentIndex++;
-
-    const remaining = container.children.length;
-
-    if (remaining === 0) {
-      // All cards revealed — show 2x2 grid
-      showChoiceGrid();
-    } else {
-      updateRevealHint();
-      attachTopCardSwipe();
-    }
-  }, 350);
-}
-
-function updateRevealHint() {
-  const remaining = packCards.length - revealedCards.length;
-  const hint = document.getElementById('revealHint');
-  const counter = document.getElementById('revealCounter');
-  if (remaining === 1) {
-    hint.textContent = 'swipe to reveal final card';
-    counter.textContent = `${packCards.length} / ${packCards.length}`;
-  } else {
-    hint.textContent = 'swipe to reveal next card';
-    counter.textContent = `${revealedCards.length + 1} / ${packCards.length}`;
-  }
-}
+    revealIndex++;
+    showRevealCard();
+  }, 260);
+});
 
 // ─── Choice grid ──────────────────────────────────────────────────────────────
 
@@ -339,8 +281,8 @@ function dropCard(card) {
 document.getElementById('againBtn').addEventListener('click', () => {
   const packEl = document.getElementById('pack');
   packEl.classList.remove('fly-left', 'fly-right');
+  document.getElementById('packStack').innerHTML = '';
   showScreen('screen-pack');
-  initPack();
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
