@@ -3,62 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>HELD</title>
+  <title>COLONY</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
 
-  <div class="transition-overlay" id="overlay"></div>
+  <div class="bg-grid"></div>
 
   <div class="shell">
 
+    <!-- Status bar -->
     <div class="status-bar">
-      <span class="wordmark">HELD</span>
+      <span class="wordmark">COLONY//FEED</span>
       <div class="ws-indicator">
         <div class="ws-dot" id="wsDot"></div>
         <span id="wsLabel">offline</span>
       </div>
     </div>
 
-    <div class="hero">
-      <h1 class="hero-title"></h1>
-      <p class="hero-subtitle"></p>
+    <!-- SCREEN 1: Pack -->
+    <div class="screen" id="screen-pack">
+      <div class="pack-wrapper">
+        <div class="pack" id="pack">
+          <div class="pack-inner">
+            <div class="pack-front">
+              <div class="pack-logo">◈</div>
+              <div class="pack-title">RESOURCE PACK</div>
+              <div class="pack-subtitle">3 cards inside</div>
+              <div class="pack-sheen"></div>
+            </div>
+          </div>
+        </div>
+        <p class="pack-hint">tap to open</p>
+      </div>
     </div>
 
-    <div class="app-grid">
-
-      <div class="app-card" data-app="held" data-camera="CAMERA_1" data-label="Held, Instantaneously">
-        <div class="badge"></div>
-        <div class="app-icon"></div>
-        <span class="app-name">Held</span>
-        <span class="app-tag">Dating</span>
+    <!-- SCREEN 2: Card selection -->
+    <div class="screen hidden" id="screen-cards">
+      <div class="cards-header">
+        <span class="cards-title">CHOOSE A RESOURCE</span>
+        <span class="cards-sub">feed your colony</span>
       </div>
-
-      <div class="app-card" data-app="archive" data-camera="CAMERA_2" data-label="ArchiveGram">
-        <div class="app-icon"></div>
-        <span class="app-name">ArchiveGram</span>
-        <span class="app-tag">Archive</span>
-      </div>
-
-      <div class="app-card" data-app="portals" data-camera="CAMERA_3" data-label="PORTALS">
-        <div class="app-icon"></div>
-        <span class="app-name">PORTALS</span>
-        <span class="app-tag">Surveillance</span>
-      </div>
-
-      <div class="app-card" data-app="unknown" data-camera="CAMERA_4" data-label="???">
-        <div class="app-icon">◻</div>
-        <span class="app-name">???</span>
-        <span class="app-tag">Soon</span>
-      </div>
-
+      <div class="cards-grid" id="cardsGrid"></div>
     </div>
 
-    <span class="bottom-hint">tap to enter</span>
+    <!-- SCREEN 3: Confirm drop -->
+    <div class="screen hidden" id="screen-confirm">
+      <div class="confirm-wrapper">
+        <div class="confirm-shape" id="confirmShape"></div>
+        <div class="confirm-info">
+          <div class="confirm-name" id="confirmName"></div>
+          <div class="confirm-rarity" id="confirmRarity"></div>
+        </div>
+        <button class="drop-btn" id="dropBtn">DROP INTO TERRARIUM</button>
+        <button class="back-btn" id="backBtn">← choose again</button>
+      </div>
+    </div>
+
+    <!-- SCREEN 4: Dropped -->
+    <div class="screen hidden" id="screen-dropped">
+      <div class="dropped-wrapper">
+        <div class="dropped-icon">⬇</div>
+        <div class="dropped-text">RESOURCE DROPPED</div>
+        <div class="dropped-sub" id="droppedSub"></div>
+        <button class="again-btn" id="againBtn">OPEN ANOTHER PACK</button>
+      </div>
+    </div>
 
   </div>
 
   <script src="js/main.js"></script>
-
 </body>
 </html>
