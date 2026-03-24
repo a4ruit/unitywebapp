@@ -55,7 +55,7 @@ html, body { height:100%; width:100%; overflow:hidden; background:var(--bg); fon
 @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
 
 /* Screens */
-.screen { width:100%; max-width:420px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; position:relative; }
+.screen { width:100%; max-width:420px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:20px; position:relative; min-height:480px; }
 .screen.hidden { display:none; }
 
 /* ── PACK SCREEN ──────────────────────────────────── */
@@ -150,12 +150,12 @@ html, body { height:100%; width:100%; overflow:hidden; background:var(--bg); fon
 .reveal-peek-stack {
   position:absolute;
   top:50%; left:50%;
-  transform:translate(-50%, -50%);
+  transform:translate(-50%, -54%);
   width:200px; height:290px;
   pointer-events:none;
   z-index:0;
 }
-.reveal-peek-stack .peek-card { position:absolute; left:0; top:0; }
+.reveal-peek-stack .peek-card { position:absolute; left:0; top:0; width:200px; height:290px; }
 
 .reveal-header { position:relative; z-index:2; }
 .reveal-counter { font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:0.2em; color:var(--muted); }
@@ -255,6 +255,23 @@ html, body { height:100%; width:100%; overflow:hidden; background:var(--bg); fon
   animation: nameRainbow 2s linear infinite;
 }
 @keyframes nameRainbow { to { background-position: 200% center; } }
+
+/* Rev card inner layout */
+.rev-card-inner {
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:14px; padding:36px 24px;
+  width:100%; position:relative; z-index:2;
+  text-align:center;
+}
+.rev-shape-wrap { width:90px; height:90px; display:flex; align-items:center; justify-content:center; margin:8px 0; }
+.rev-card-name  { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:0.08em; }
+.rev-card[data-rarity="common"]    .rev-card-name { color:var(--common); }
+.rev-card[data-rarity="uncommon"]  .rev-card-name { color:var(--uncommon); }
+.rev-card[data-rarity="rare"]      .rev-card-name { color:var(--rare); }
+.rev-card[data-rarity="legendary"] .rev-card-name { color:var(--legendary); }
+.rev-card-rarity { font-family:'Share Tech Mono',monospace; font-size:9px; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; margin-top:-10px; }
+.rev-card-desc   { font-size:12px; color:var(--muted); text-align:center; line-height:1.5; font-weight:300; }
 
 /* Entrance animations */
 .rev-card.rev-enter {

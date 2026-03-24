@@ -196,7 +196,7 @@ function buildPeekStack(containerId) {
   });
 
   // Trigger reveal animation
-  requestAnimationFrame(() => stack.classList.add('stack-reveal'));
+  setTimeout(() => stack.classList.add("stack-reveal"), 50);
 }
 
 // ─── Reveal ───────────────────────────────────────────────────────────────────
