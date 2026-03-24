@@ -43,7 +43,6 @@ function rollPack() {
     cards.push(pick('uncommon'));
   }
 
-  // Commons first, rarest last
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
   return cards;
 }
@@ -54,6 +53,9 @@ let ws             = null;
 let reconnectTimer = null;
 let packCards      = [];
 let revealIndex    = 0;
+
+// Session collection — array of dropped card objects with timestamp
+let collection = [];
 
 let swipeStartX = null;
 let swipeStartY = null;
@@ -87,6 +89,22 @@ function send(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) { ws.send(msg); console.log('[WS] Sent:', msg); }
   else console.warn('[WS] Not connected:', msg);
 }
+
+// ─── Tab switching ────────────────────────────────────────────────────────────
+
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const target = tab.dataset.tab;
+
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+
+    tab.classList.add('active');
+    document.getElementById(`tab-${target}`).classList.remove('hidden');
+
+    if (target === 'collection') renderCollection();
+  });
+});
 
 // ─── Screen management ───────────────────────────────────────────────────────
 
@@ -157,35 +175,32 @@ function resetPackSwipe(packEl) {
 }
 
 function triggerPackOpen(dir) {
+    send('pack_opened');
   const packEl = document.getElementById('pack');
   packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
 
   packCards   = rollPack();
   revealIndex = 0;
 
-  // Build peek stack in pack screen (briefly visible as pack flies off)
   buildPeekStack('packStack');
 
   setTimeout(() => {
     showScreen('screen-reveal');
-    // Rebuild peek stack in reveal screen — persists throughout reveal
     buildPeekStack('revealPeekStack');
     showRevealCard();
   }, 420);
 }
 
-// ─── Peek stack builder ───────────────────────────────────────────────────────
-// Builds into whichever container id is passed
+// ─── Peek stack ───────────────────────────────────────────────────────────────
 
 function buildPeekStack(containerId) {
   const stack = document.getElementById(containerId);
   stack.innerHTML = '';
 
-  // Unique rarities in this pack, rarest first = furthest back
   const rarities = [...new Set(packCards.map(c => c.rarity))]
     .sort((a, b) => {
       const rank = { common:0, uncommon:1, rare:2, legendary:3 };
-      return rank[b] - rank[a]; // descending = rarest first
+      return rank[b] - rank[a];
     });
 
   rarities.forEach((rarity, i) => {
@@ -195,8 +210,7 @@ function buildPeekStack(containerId) {
     stack.appendChild(peek);
   });
 
-  // Trigger reveal animation
-  setTimeout(() => stack.classList.add("stack-reveal"), 50);
+  setTimeout(() => stack.classList.add('stack-reveal'), 50);
 }
 
 // ─── Reveal ───────────────────────────────────────────────────────────────────
@@ -213,7 +227,6 @@ function showRevealCard() {
   revealCard.dataset.rarity = card.rarity;
   revealCard.className      = 'rev-card';
 
-  // Legendary gets the holo class
   if (card.rarity === 'legendary') revealCard.classList.add('legendary-holo');
 
   revealCard.innerHTML = `
@@ -229,7 +242,6 @@ function showRevealCard() {
   void revealCard.offsetWidth;
   revealCard.classList.add(card.rarity === 'legendary' ? 'rev-enter-legendary' : 'rev-enter');
 
-  // Legendary: flash the screen
   if (card.rarity === 'legendary') triggerFlash();
 }
 
@@ -251,7 +263,6 @@ document.getElementById('revealCard').addEventListener('click', () => {
   revealCard.classList.remove('rev-enter', 'rev-enter-legendary');
   revealCard.classList.add('rev-exit');
 
-  // Remove one peek card from the stack as each card is revealed
   const peekStack = document.getElementById('revealPeekStack');
   const lastPeek  = peekStack.lastElementChild;
   if (lastPeek) {
@@ -287,13 +298,67 @@ function showChoiceGrid() {
   });
 }
 
-// ─── Drop ─────────────────────────────────────────────────────────────────────
+// ─── Drop + collection ────────────────────────────────────────────────────────
 
 function dropCard(card) {
   send(card.command);
+
+  // Add to session collection with timestamp
+  collection.push({
+    ...card,
+    droppedAt: new Date()
+  });
+
   document.getElementById('droppedSub').textContent =
     `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
+
   showScreen('screen-dropped');
+}
+
+// ─── Collection renderer ──────────────────────────────────────────────────────
+
+function renderCollection() {
+  const grid    = document.getElementById('collectionGrid');
+  const empty   = document.getElementById('collectionEmpty');
+  const count   = document.getElementById('collectionCount');
+
+  const total = collection.length;
+  count.textContent = total === 1 ? '1 resource contributed' : `${total} resources contributed`;
+
+  if (total === 0) {
+    empty.classList.remove('hidden');
+    grid.innerHTML = '';
+    return;
+  }
+
+  empty.classList.add('hidden');
+  grid.innerHTML = '';
+
+  // Most recent first
+  [...collection].reverse().forEach((card, i) => {
+    const el = document.createElement('div');
+    el.className = 'col-card';
+    el.dataset.rarity = card.rarity;
+    el.style.animationDelay = `${i * 0.05}s`;
+
+    const time = formatTime(card.droppedAt);
+
+    el.innerHTML = `
+      <div class="col-shape-wrap"><div class="${card.shapeClass} col-shape-el"></div></div>
+      <div class="col-card-name">${card.name}</div>
+      <div class="col-card-rarity">${card.rarity}</div>
+      <div class="col-card-time">${time}</div>
+    `;
+    grid.appendChild(el);
+  });
+}
+
+function formatTime(date) {
+  const now  = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  if (diff < 60)  return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // ─── Again ────────────────────────────────────────────────────────────────────

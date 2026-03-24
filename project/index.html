@@ -20,54 +20,79 @@
       </div>
     </div>
 
-    <!-- SCREEN 1: Pack -->
-    <div class="screen" id="screen-pack">
-      <div class="pack-scene">
-        <div id="packStack" class="pack-stack"></div>
-        <div class="pack" id="pack">
-          <div class="pack-front">
-            <div class="pack-logo">◈</div>
-            <div class="pack-title">RESOURCE PACK</div>
-            <div class="pack-subtitle">4 cards inside</div>
-            <div class="pack-sheen"></div>
-            <div class="swipe-zone-indicator">← swipe to open →</div>
+    <!-- Tab bar -->
+    <div class="tab-bar">
+      <button class="tab active" data-tab="pack">PACK</button>
+      <button class="tab" data-tab="collection">COLLECTION</button>
+    </div>
+
+    <!-- TAB: Pack flow -->
+    <div class="tab-content" id="tab-pack">
+
+      <!-- SCREEN 1: Pack -->
+      <div class="screen" id="screen-pack">
+        <div class="pack-scene">
+          <div id="packStack" class="pack-stack"></div>
+          <div class="pack" id="pack">
+            <div class="pack-front">
+              <div class="pack-logo">◈</div>
+              <div class="pack-title">RESOURCE PACK</div>
+              <div class="pack-subtitle">4 cards inside</div>
+              <div class="pack-sheen"></div>
+              <div class="swipe-zone-indicator">← swipe to open →</div>
+            </div>
           </div>
         </div>
+        <p class="pack-hint">swipe left or right at the top</p>
       </div>
-      <p class="pack-hint">swipe left or right at the top</p>
+
+      <!-- SCREEN 2: Reveal -->
+      <div class="screen hidden" id="screen-reveal">
+        <div id="revealPeekStack" class="reveal-peek-stack"></div>
+        <div class="reveal-header">
+          <span class="reveal-counter" id="revealCounter">1 / 4</span>
+        </div>
+        <div class="rev-card" id="revealCard"></div>
+        <div class="reveal-hint" id="revealHint">tap to reveal next</div>
+      </div>
+
+      <!-- SCREEN 3: Choose -->
+      <div class="screen hidden" id="screen-choose">
+        <div class="choose-header">
+          <span class="choose-title">CHOOSE A RESOURCE</span>
+          <span class="choose-sub">feed your colony</span>
+        </div>
+        <div class="choice-grid" id="choiceGrid"></div>
+      </div>
+
+      <!-- SCREEN 4: Dropped -->
+      <div class="screen hidden" id="screen-dropped">
+        <div class="dropped-wrapper">
+          <div class="dropped-icon">⬇</div>
+          <div class="dropped-text">RESOURCE DROPPED</div>
+          <div class="dropped-sub" id="droppedSub"></div>
+          <button class="again-btn" id="againBtn">OPEN ANOTHER PACK</button>
+        </div>
+      </div>
+
     </div>
 
-    <!-- SCREEN 2: One-by-one reveal (tap) -->
-    <div class="screen hidden" id="screen-reveal">
-      <!-- Peek stack persists here throughout reveal -->
-      <div id="revealPeekStack" class="reveal-peek-stack"></div>
-      <div class="reveal-header">
-        <span class="reveal-counter" id="revealCounter">1 / 4</span>
+    <!-- TAB: Collection -->
+    <div class="tab-content hidden" id="tab-collection">
+      <div class="collection-header">
+        <span class="collection-title">YOUR DROPS</span>
+        <span class="collection-sub" id="collectionCount">0 resources contributed</span>
       </div>
-      <div class="rev-card" id="revealCard"></div>
-      <div class="reveal-hint" id="revealHint">tap to reveal next</div>
-    </div>
-
-    <!-- SCREEN 3: Choose -->
-    <div class="screen hidden" id="screen-choose">
-      <div class="choose-header">
-        <span class="choose-title">CHOOSE A RESOURCE</span>
-        <span class="choose-sub">feed your colony</span>
+      <div class="collection-empty" id="collectionEmpty">
+        <div class="empty-icon">◻</div>
+        <div class="empty-text">nothing dropped yet</div>
+        <div class="empty-sub">open a pack to feed the colony</div>
       </div>
-      <div class="choice-grid" id="choiceGrid"></div>
-    </div>
-
-    <!-- SCREEN 4: Dropped -->
-    <div class="screen hidden" id="screen-dropped">
-      <div class="dropped-wrapper">
-        <div class="dropped-icon">⬇</div>
-        <div class="dropped-text">RESOURCE DROPPED</div>
-        <div class="dropped-sub" id="droppedSub"></div>
-        <button class="again-btn" id="againBtn">OPEN ANOTHER PACK</button>
-      </div>
+      <div class="collection-grid" id="collectionGrid"></div>
     </div>
 
   </div>
+
   <script src="js/main.js"></script>
 </body>
 </html>
