@@ -22,7 +22,6 @@ function pick(tier) {
   return { ...pool[Math.floor(Math.random() * pool.length)] };
 }
 
-// Roll pack — rarest guaranteed last in reveal order
 function rollPack() {
   const cards = [];
   const hasLegendary = Math.random() < 0.1;
@@ -44,7 +43,7 @@ function rollPack() {
     cards.push(pick('uncommon'));
   }
 
-  // Sort ascending: commons first, rarest last
+  // Commons first, rarest last
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
   return cards;
 }
@@ -54,13 +53,12 @@ function rollPack() {
 let ws             = null;
 let reconnectTimer = null;
 let packCards      = [];
-let revealIndex    = 0;   // next card to reveal (0 = first/common end)
+let revealIndex    = 0;
 
-// Swipe state (pack only)
 let swipeStartX = null;
 let swipeStartY = null;
-const SWIPE_THRESHOLD  = 55;
-const TOP_ZONE_RATIO   = 0.55;
+const SWIPE_THRESHOLD = 55;
+const TOP_ZONE_RATIO  = 0.55;
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 
@@ -97,15 +95,12 @@ function showScreen(id) {
   document.getElementById(id).classList.remove('hidden');
 }
 
-// ─── Pack swipe (horizontal, top-zone only) ───────────────────────────────────
+// ─── Pack swipe ───────────────────────────────────────────────────────────────
 
 function initPack() {
   const packEl = document.getElementById('pack');
-
-  // Stack starts hidden — no peek cards until opened
   document.getElementById('packStack').innerHTML = '';
 
-  // Touch
   packEl.addEventListener('touchstart', (e) => {
     const rect  = packEl.getBoundingClientRect();
     const touch = e.touches[0];
@@ -132,7 +127,6 @@ function initPack() {
     if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
   }, { passive: true });
 
-  // Mouse fallback
   let mStartX = null, mStartY = null;
   packEl.addEventListener('mousedown', (e) => {
     const rect = packEl.getBoundingClientRect();
@@ -166,27 +160,34 @@ function triggerPackOpen(dir) {
   const packEl = document.getElementById('pack');
   packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
 
-  // Roll the pack
   packCards   = rollPack();
   revealIndex = 0;
 
-  // Show peek stack briefly before transitioning
-  buildPackStack();
+  // Build peek stack in pack screen (briefly visible as pack flies off)
+  buildPeekStack('packStack');
 
   setTimeout(() => {
     showScreen('screen-reveal');
+    // Rebuild peek stack in reveal screen — persists throughout reveal
+    buildPeekStack('revealPeekStack');
     showRevealCard();
-  }, 520);
+  }, 420);
 }
 
-// ─── Peek stack (shown only after swipe, before reveal screen) ────────────────
+// ─── Peek stack builder ───────────────────────────────────────────────────────
+// Builds into whichever container id is passed
 
-function buildPackStack() {
-  const stack = document.getElementById('packStack');
+function buildPeekStack(containerId) {
+  const stack = document.getElementById(containerId);
   stack.innerHTML = '';
 
-  // Show peeks based on what's in this pack
-  const rarities = [...new Set(packCards.map(c => c.rarity))].reverse(); // rarest first = furthest back
+  // Unique rarities in this pack, rarest first = furthest back
+  const rarities = [...new Set(packCards.map(c => c.rarity))]
+    .sort((a, b) => {
+      const rank = { common:0, uncommon:1, rare:2, legendary:3 };
+      return rank[b] - rank[a]; // descending = rarest first
+    });
+
   rarities.forEach((rarity, i) => {
     const peek = document.createElement('div');
     peek.className = `peek-card peek-${i}`;
@@ -194,16 +195,16 @@ function buildPackStack() {
     stack.appendChild(peek);
   });
 
-  // Animate peek cards in
-  stack.classList.add('stack-reveal');
+  // Trigger reveal animation
+  requestAnimationFrame(() => stack.classList.add('stack-reveal'));
 }
 
-// ─── Reveal — tap to advance ──────────────────────────────────────────────────
+// ─── Reveal ───────────────────────────────────────────────────────────────────
 
 function showRevealCard() {
-  const card    = packCards[revealIndex];
-  const total   = packCards.length;
-  const isLast  = revealIndex === total - 1;
+  const card   = packCards[revealIndex];
+  const total  = packCards.length;
+  const isLast = revealIndex === total - 1;
 
   document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${total}`;
   document.getElementById('revealHint').textContent    = isLast ? 'tap to keep' : 'tap to reveal next';
@@ -212,7 +213,11 @@ function showRevealCard() {
   revealCard.dataset.rarity = card.rarity;
   revealCard.className      = 'rev-card';
 
+  // Legendary gets the holo class
+  if (card.rarity === 'legendary') revealCard.classList.add('legendary-holo');
+
   revealCard.innerHTML = `
+    <div class="holo-layer"></div>
     <div class="rev-card-inner">
       <div class="rev-shape-wrap"><div class="${card.shapeClass} rev-shape-el"></div></div>
       <div class="rev-card-name">${card.name}</div>
@@ -221,9 +226,17 @@ function showRevealCard() {
     </div>
   `;
 
-  // Trigger entrance
   void revealCard.offsetWidth;
-  revealCard.classList.add('rev-enter');
+  revealCard.classList.add(card.rarity === 'legendary' ? 'rev-enter-legendary' : 'rev-enter');
+
+  // Legendary: flash the screen
+  if (card.rarity === 'legendary') triggerFlash();
+}
+
+function triggerFlash() {
+  const flash = document.getElementById('flashOverlay');
+  flash.classList.add('flashing');
+  setTimeout(() => flash.classList.remove('flashing'), 700);
 }
 
 document.getElementById('revealCard').addEventListener('click', () => {
@@ -234,10 +247,17 @@ document.getElementById('revealCard').addEventListener('click', () => {
     return;
   }
 
-  // Exit current, then show next
   const revealCard = document.getElementById('revealCard');
-  revealCard.classList.remove('rev-enter');
+  revealCard.classList.remove('rev-enter', 'rev-enter-legendary');
   revealCard.classList.add('rev-exit');
+
+  // Remove one peek card from the stack as each card is revealed
+  const peekStack = document.getElementById('revealPeekStack');
+  const lastPeek  = peekStack.lastElementChild;
+  if (lastPeek) {
+    lastPeek.classList.add('peek-dismiss');
+    setTimeout(() => lastPeek.remove(), 300);
+  }
 
   setTimeout(() => {
     revealIndex++;
@@ -281,7 +301,8 @@ function dropCard(card) {
 document.getElementById('againBtn').addEventListener('click', () => {
   const packEl = document.getElementById('pack');
   packEl.classList.remove('fly-left', 'fly-right');
-  document.getElementById('packStack').innerHTML = '';
+  document.getElementById('packStack').innerHTML       = '';
+  document.getElementById('revealPeekStack').innerHTML = '';
   showScreen('screen-pack');
 });
 

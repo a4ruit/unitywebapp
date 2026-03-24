@@ -8,6 +8,8 @@
 </head>
 <body>
   <div class="bg-grid"></div>
+  <div class="flash-overlay" id="flashOverlay"></div>
+
   <div class="shell">
 
     <div class="status-bar">
@@ -37,6 +39,8 @@
 
     <!-- SCREEN 2: One-by-one reveal (tap) -->
     <div class="screen hidden" id="screen-reveal">
+      <!-- Peek stack persists here throughout reveal -->
+      <div id="revealPeekStack" class="reveal-peek-stack"></div>
       <div class="reveal-header">
         <span class="reveal-counter" id="revealCounter">1 / 4</span>
       </div>
