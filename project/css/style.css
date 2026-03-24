@@ -407,3 +407,182 @@ html, body {
   transition: border-color 0.2s, color 0.2s;
 }
 .again-btn:hover { border-color: rgba(0,255,204,0.4); color: var(--accent); }
+
+/* Swipe arrow on pack */
+.pack-front::after {
+  content: '↑';
+  position: absolute;
+  bottom: 16px;
+  font-size: 18px;
+  color: rgba(0,255,204,0.4);
+  animation: arrowBounce 1.5s ease-in-out infinite;
+}
+@keyframes arrowBounce {
+  0%,100% { transform: translateY(0);   opacity: 0.4; }
+  50%      { transform: translateY(-6px); opacity: 0.9; }
+}
+
+.pack {
+  transition: transform 0.15s ease;
+}
+
+/* ── REVEAL SCREEN ──────────────────────────────── */
+
+#screen-reveal {
+  gap: 20px;
+}
+
+.reveal-counter {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+}
+
+.reveal-card {
+  width: 240px;
+  min-height: 340px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  position: relative;
+  opacity: 0;
+  transform: translateY(30px) scale(0.94);
+  transition: transform 0.15s ease;
+}
+
+.reveal-card:active {
+  transform: scale(0.97) !important;
+}
+
+/* Entrance animation */
+.reveal-card.reveal-enter {
+  animation: revealIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes revealIn {
+  from { opacity: 0; transform: translateY(40px) scale(0.88) rotateY(15deg); }
+  to   { opacity: 1; transform: translateY(0)   scale(1)    rotateY(0deg);  }
+}
+
+/* Exit animation */
+.reveal-card.reveal-exit {
+  animation: revealOut 0.28s ease-in forwards;
+}
+
+@keyframes revealOut {
+  from { opacity: 1; transform: translateY(0)    scale(1); }
+  to   { opacity: 0; transform: translateY(-30px) scale(0.92); }
+}
+
+/* Rarity borders */
+.reveal-card[data-rarity="common"]    { border-color: rgba(122,133,153,0.3); }
+.reveal-card[data-rarity="uncommon"]  { border-color: rgba(79,195,247,0.5); }
+.reveal-card[data-rarity="rare"]      { border-color: rgba(206,147,216,0.6); box-shadow: 0 0 24px rgba(206,147,216,0.12); }
+.reveal-card[data-rarity="legendary"] {
+  border-color: rgba(255,183,77,0.7);
+  box-shadow: 0 0 40px rgba(255,183,77,0.2);
+  animation: revealIn 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+             legendaryGlow 2s ease-in-out 0.5s infinite;
+}
+
+@keyframes legendaryGlow {
+  0%,100% { box-shadow: 0 0 30px rgba(255,183,77,0.15); }
+  50%      { box-shadow: 0 0 50px rgba(255,183,77,0.35); }
+}
+
+/* Foil sheen on every card */
+.reveal-card::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255,255,255,0.03) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: sheen 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.reveal-card-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 24px;
+  width: 100%;
+}
+
+.reveal-shape-wrap {
+  width: 80px; height: 80px;
+  display: flex; align-items: center; justify-content: center;
+  margin: 8px 0;
+}
+
+/* Scale up shapes for single card view */
+.reveal-shape-el.shape-small-cube {
+  width: 36px; height: 36px;
+  background: var(--common);
+  border-radius: 3px;
+}
+.reveal-shape-el.shape-large-cube {
+  width: 72px; height: 72px;
+  background: var(--uncommon);
+  border-radius: 5px;
+}
+.reveal-shape-el.shape-sphere {
+  width: 70px; height: 70px;
+  background: var(--rare);
+  border-radius: 50%;
+}
+.reveal-shape-el.shape-triangle {
+  width: 0; height: 0;
+  border-left: 36px solid transparent;
+  border-right: 36px solid transparent;
+  border-bottom: 66px solid var(--legendary);
+}
+
+.reveal-card-name {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 26px;
+  letter-spacing: 0.08em;
+  color: var(--text);
+}
+
+.reveal-card[data-rarity="common"]    .reveal-card-name { color: var(--common); }
+.reveal-card[data-rarity="uncommon"]  .reveal-card-name { color: var(--uncommon); }
+.reveal-card[data-rarity="rare"]      .reveal-card-name { color: var(--rare); }
+.reveal-card[data-rarity="legendary"] .reveal-card-name { color: var(--legendary); }
+
+.reveal-card-rarity {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin-top: -10px;
+  color: var(--muted);
+}
+
+.reveal-card-desc {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
+  font-weight: 300;
+}
+
+.reveal-tap-hint {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  color: var(--muted);
+  text-transform: uppercase;
+  animation: blink 2s ease-in-out infinite;
+}

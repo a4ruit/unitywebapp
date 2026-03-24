@@ -12,7 +12,6 @@
 
   <div class="shell">
 
-    <!-- Status bar -->
     <div class="status-bar">
       <span class="wordmark">COLONY//FEED</span>
       <div class="ws-indicator">
@@ -29,38 +28,23 @@
             <div class="pack-front">
               <div class="pack-logo">◈</div>
               <div class="pack-title">RESOURCE PACK</div>
-              <div class="pack-subtitle">3 cards inside</div>
+              <div class="pack-subtitle">4 cards inside</div>
               <div class="pack-sheen"></div>
             </div>
           </div>
         </div>
-        <p class="pack-hint">tap to open</p>
+        <p class="pack-hint" id="swipeHint">swipe up to open</p>
       </div>
     </div>
 
-    <!-- SCREEN 2: Card selection -->
-    <div class="screen hidden" id="screen-cards">
-      <div class="cards-header">
-        <span class="cards-title">CHOOSE A RESOURCE</span>
-        <span class="cards-sub">feed your colony</span>
-      </div>
-      <div class="cards-grid" id="cardsGrid"></div>
+    <!-- SCREEN 2: One-by-one reveal -->
+    <div class="screen hidden" id="screen-reveal">
+      <div class="reveal-counter" id="revealCounter">1 / 4</div>
+      <div class="reveal-card" id="revealCard"></div>
+      <div class="reveal-tap-hint" id="revealTap">tap to continue</div>
     </div>
 
-    <!-- SCREEN 3: Confirm drop -->
-    <div class="screen hidden" id="screen-confirm">
-      <div class="confirm-wrapper">
-        <div class="confirm-shape" id="confirmShape"></div>
-        <div class="confirm-info">
-          <div class="confirm-name" id="confirmName"></div>
-          <div class="confirm-rarity" id="confirmRarity"></div>
-        </div>
-        <button class="drop-btn" id="dropBtn">DROP INTO TERRARIUM</button>
-        <button class="back-btn" id="backBtn">← choose again</button>
-      </div>
-    </div>
-
-    <!-- SCREEN 4: Dropped -->
+    <!-- SCREEN 3: Dropped -->
     <div class="screen hidden" id="screen-dropped">
       <div class="dropped-wrapper">
         <div class="dropped-icon">⬇</div>
