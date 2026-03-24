@@ -7,9 +7,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-
   <div class="bg-grid"></div>
-
   <div class="shell">
 
     <div class="status-bar">
@@ -22,29 +20,42 @@
 
     <!-- SCREEN 1: Pack -->
     <div class="screen" id="screen-pack">
-      <div class="pack-wrapper">
+      <div class="pack-scene">
+        <div id="packStack" class="pack-stack"></div>
         <div class="pack" id="pack">
-          <div class="pack-inner">
-            <div class="pack-front">
-              <div class="pack-logo">◈</div>
-              <div class="pack-title">RESOURCE PACK</div>
-              <div class="pack-subtitle">4 cards inside</div>
-              <div class="pack-sheen"></div>
-            </div>
+          <div class="pack-front">
+            <div class="pack-logo">◈</div>
+            <div class="pack-title">RESOURCE PACK</div>
+            <div class="pack-subtitle">swipe to open</div>
+            <div class="pack-sheen"></div>
+            <div class="swipe-zone-indicator">← swipe →</div>
           </div>
         </div>
-        <p class="pack-hint" id="swipeHint">swipe up to open</p>
       </div>
+      <p class="pack-hint" id="swipeHint">swipe left or right at the top</p>
     </div>
 
     <!-- SCREEN 2: One-by-one reveal -->
     <div class="screen hidden" id="screen-reveal">
-      <div class="reveal-counter" id="revealCounter">1 / 4</div>
-      <div class="reveal-card" id="revealCard"></div>
-      <div class="reveal-tap-hint" id="revealTap">tap to continue</div>
+      <div class="reveal-header">
+        <span class="reveal-counter" id="revealCounter">1 / 4</span>
+      </div>
+      <div class="reveal-stack-wrap">
+        <div id="revealStack" class="reveal-stack"></div>
+      </div>
+      <div class="reveal-hint" id="revealHint">swipe to reveal next card</div>
     </div>
 
-    <!-- SCREEN 3: Dropped -->
+    <!-- SCREEN 3: Choose -->
+    <div class="screen hidden" id="screen-choose">
+      <div class="choose-header">
+        <span class="choose-title">CHOOSE A RESOURCE</span>
+        <span class="choose-sub">feed your colony</span>
+      </div>
+      <div class="choice-grid" id="choiceGrid"></div>
+    </div>
+
+    <!-- SCREEN 4: Dropped -->
     <div class="screen hidden" id="screen-dropped">
       <div class="dropped-wrapper">
         <div class="dropped-icon">⬇</div>
@@ -55,7 +66,6 @@
     </div>
 
   </div>
-
   <script src="js/main.js"></script>
 </body>
 </html>
