@@ -36,11 +36,67 @@
     <div class="page" id="page-pack">
 
       <div class="screen" id="screen-pack">
-        <!-- Peek stack still CSS behind the canvas -->
-        <div id="packStack" class="pack-stack-behind"></div>
-        <!-- Three.js canvas lives here -->
-        <div id="packCanvas" class="pack-canvas-wrap"></div>
-        <p class="pack-hint" id="packHint">swipe left or right</p>
+
+        <!-- Slot machine surround -->
+        <div class="slot-machine">
+
+          <!-- Top panel — reel display -->
+          <div class="slot-top">
+            <div class="slot-reel" id="slotReel1"><span>◈</span></div>
+            <div class="slot-reel" id="slotReel2"><span>◆</span></div>
+            <div class="slot-reel" id="slotReel3"><span>◈</span></div>
+          </div>
+
+          <!-- Centre — pack + side controls -->
+          <div class="slot-mid">
+
+            <!-- Left side panel -->
+            <div class="slot-side slot-side-l">
+              <div class="slot-led-col">
+                <div class="slot-led" id="led0"></div>
+                <div class="slot-led" id="led1"></div>
+                <div class="slot-led" id="led2"></div>
+                <div class="slot-led" id="led3"></div>
+                <div class="slot-led" id="led4"></div>
+              </div>
+              <div class="slot-label-vert">INSERT</div>
+            </div>
+
+            <!-- Pack area -->
+            <div class="slot-pack-area">
+              <div id="packStack" class="pack-stack-behind"></div>
+              <div id="packCanvas" class="pack-canvas-wrap"></div>
+            </div>
+
+            <!-- Right side panel -->
+            <div class="slot-side slot-side-r">
+              <div class="slot-label-vert">COLONY</div>
+              <div class="slot-led-col">
+                <div class="slot-led" id="led5"></div>
+                <div class="slot-led" id="led6"></div>
+                <div class="slot-led" id="led7"></div>
+                <div class="slot-led" id="led8"></div>
+                <div class="slot-led" id="led9"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom panel — credits style -->
+          <div class="slot-bottom">
+            <div class="slot-stat">
+              <div class="slot-stat-label">PACKS</div>
+              <div class="slot-stat-value" id="statPacks">00</div>
+            </div>
+            <div class="slot-pull-hint">← SWIPE →</div>
+            <div class="slot-stat">
+              <div class="slot-stat-label">DROPS</div>
+              <div class="slot-stat-value" id="statDrops">00</div>
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
       <div class="screen hidden" id="screen-reveal">

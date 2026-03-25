@@ -221,6 +221,9 @@ function showChoiceGrid() {
 
 function dropCard(card) {
   send(card.command);
+  dropsCount++;
+  updateSlotStats();
+  if (card.rarity === 'legendary') flashLEDs('win');
   document.getElementById('droppedSub').textContent =
     `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
   showScreen('screen-dropped');

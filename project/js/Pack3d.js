@@ -1,122 +1,95 @@
-// pack3d.js — Three.js interactive pack
-// Exposes: Pack3D.init(), Pack3D.throw(dir), Pack3D.reset(), Pack3D.isReady
+// pack3d.js — Three.js interactive pack with slot machine surround
 
 const Pack3D = (() => {
-
-  // ─── State ─────────────────────────────────────────────────────────────────
 
   let renderer, scene, camera, packMesh, rimLight;
   let animFrame;
   let isReady = false;
 
   // Interaction
-  let isDragging  = false;
-  let dragStartX  = 0;
-  let dragStartY  = 0;
-  let dragCurrentX = 0;
-  let dragCurrentY = 0;
-  let velocityX   = 0;
-  let velocityY   = 0;
-  let rotX        = 0.08;  // slight tilt toward viewer
-  let rotY        = 0;
-  let targetRotX  = 0.08;
-  let targetRotY  = 0;
+  let isDragging   = false;
+  let dragStartX   = 0, dragStartY = 0;
+  let dragCurrentX = 0, dragCurrentY = 0;
+  let velocityX    = 0;
+  let rotX = 0.08, rotY = 0;
+  let targetRotX   = 0.08, targetRotY = 0;
 
-  // Throw state
-  let isThrowing  = false;
-  let throwDirX   = 0;
-  let throwProgress = 0;
+  // Throw
+  let isThrowing      = false;
+  let throwDirX       = 0;
+  let throwProgress   = 0;
   let onThrowComplete = null;
 
-  // Idle bob
+  // Idle
   let idleT = 0;
 
-  const SWIPE_THRESHOLD = 45;
-  const TOP_ZONE = 0.6;   // top 60% of element registers swipe
+  const SWIPE_THRESHOLD = 42;
 
-  // ─── Canvas texture for pack face ──────────────────────────────────────────
+  // ─── Canvas texture ─────────────────────────────────────────────────────────
 
   function buildFaceTexture() {
-    const c   = document.createElement('canvas');
-    c.width   = 256;
-    c.height  = 384;
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 384;
     const ctx = c.getContext('2d');
 
-    // Background — dark green-black
     ctx.fillStyle = '#0f160f';
     ctx.fillRect(0, 0, 256, 384);
 
-    // Diamond grid pattern
-    ctx.strokeStyle = 'rgba(42,122,42,0.18)';
+    // Diamond grid
+    ctx.strokeStyle = 'rgba(42,122,42,0.2)';
     ctx.lineWidth = 1;
     for (let x = -384; x < 512; x += 24) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0); ctx.lineTo(x + 384, 384);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(x + 384, 0); ctx.lineTo(x, 384);
-      ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+384,384); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x+384,0); ctx.lineTo(x,384); ctx.stroke();
     }
 
-    // Outer orange border — double line
-    ctx.strokeStyle = '#e85c1a';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(6, 6, 244, 372);
-    ctx.strokeStyle = 'rgba(232,92,26,0.3)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(12, 12, 232, 360);
+    // Double border
+    ctx.strokeStyle = '#e85c1a'; ctx.lineWidth = 6;
+    ctx.strokeRect(5, 5, 246, 374);
+    ctx.strokeStyle = 'rgba(232,92,26,0.3)'; ctx.lineWidth = 2;
+    ctx.strokeRect(11, 11, 234, 362);
 
-    // Scanlines baked in
+    // Scanlines
     for (let y = 0; y < 384; y += 4) {
-      ctx.fillStyle = 'rgba(0,0,0,0.15)';
-      ctx.fillRect(0, y + 2, 256, 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.18)';
+      ctx.fillRect(0, y+2, 256, 2);
     }
 
     // Corner brackets
-    const bSize = 18, bW = 3, bPad = 18;
-    ctx.strokeStyle = '#e85c1a';
-    ctx.lineWidth = bW;
-    const corners = [
-      [bPad, bPad, 1, 1], [256 - bPad, bPad, -1, 1],
-      [bPad, 384 - bPad, 1, -1], [256 - bPad, 384 - bPad, -1, -1]
-    ];
-    corners.forEach(([x, y, sx, sy]) => {
-      ctx.beginPath();
-      ctx.moveTo(x, y + sy * bSize); ctx.lineTo(x, y); ctx.lineTo(x + sx * bSize, y);
-      ctx.stroke();
+    const b = 18, bw = 3, bp = 16;
+    ctx.strokeStyle = '#e85c1a'; ctx.lineWidth = bw;
+    [[bp,bp,1,1],[256-bp,bp,-1,1],[bp,384-bp,1,-1],[256-bp,384-bp,-1,-1]].forEach(([x,y,sx,sy]) => {
+      ctx.beginPath(); ctx.moveTo(x,y+sy*b); ctx.lineTo(x,y); ctx.lineTo(x+sx*b,y); ctx.stroke();
     });
 
-    // Central logo — pixelated ◈ character
-    ctx.font = 'bold 72px "VT323", monospace';
+    // Logo
+    ctx.font = '900 64px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillStyle = '#e85c1a';
-    ctx.shadowColor = 'rgba(232,92,26,0.6)';
-    ctx.shadowBlur = 16;
-    ctx.fillText('◈', 128, 188);
+    ctx.shadowColor = 'rgba(232,92,26,0.7)';
+    ctx.shadowBlur = 20;
+    ctx.fillText('◈', 128, 192);
     ctx.shadowBlur = 0;
 
-    // Title text
-    ctx.font = '22px "VT323", monospace';
+    // Title
+    ctx.font = 'bold 19px monospace';
     ctx.fillStyle = '#e8e0c8';
-    ctx.letterSpacing = '4px';
-    ctx.fillText('RESOURCE PACK', 128, 224);
+    ctx.fillText('RESOURCE PACK', 128, 226);
 
     // Subtitle
-    ctx.font = '14px "Share Tech Mono", monospace';
+    ctx.font = '12px monospace';
     ctx.fillStyle = 'rgba(232,224,200,0.4)';
-    ctx.fillText('4 cards inside', 128, 248);
+    ctx.fillText('4 cards inside', 128, 250);
 
-    // Bottom swipe indicator
-    ctx.font = '12px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(58,170,58,0.6)';
-    ctx.fillText('← swipe to open →', 128, 350);
+    // Swipe hint
+    ctx.font = '11px monospace';
+    ctx.fillStyle = 'rgba(58,170,58,0.55)';
+    ctx.fillText('← swipe to open →', 128, 352);
 
-    // Small dots in the corners — like the poster globe icons simplified
-    [[40, 56], [216, 56], [40, 328], [216, 328]].forEach(([x, y]) => {
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(232,92,26,0.4)';
-      ctx.fill();
+    // Corner dots
+    [[38,52],[218,52],[38,332],[218,332]].forEach(([x,y]) => {
+      ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
+      ctx.fillStyle='rgba(232,92,26,0.4)'; ctx.fill();
     });
 
     const tex = new THREE.CanvasTexture(c);
@@ -125,309 +98,202 @@ const Pack3D = (() => {
   }
 
   function buildBackTexture() {
-    const c   = document.createElement('canvas');
-    c.width   = 256;
-    c.height  = 384;
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 384;
     const ctx = c.getContext('2d');
-
-    ctx.fillStyle = '#0a100a';
-    ctx.fillRect(0, 0, 256, 384);
-
-    // Grid
-    ctx.strokeStyle = 'rgba(42,122,42,0.12)';
-    ctx.lineWidth = 1;
-    for (let x = -384; x < 512; x += 24) {
-      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + 384, 384); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x + 384, 0); ctx.lineTo(x, 384); ctx.stroke();
+    ctx.fillStyle = '#080f08'; ctx.fillRect(0,0,256,384);
+    ctx.strokeStyle='rgba(42,122,42,0.14)'; ctx.lineWidth=1;
+    for (let x=-384;x<512;x+=24) {
+      ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+384,384);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x+384,0);ctx.lineTo(x,384);ctx.stroke();
     }
-
-    ctx.strokeStyle = '#e85c1a';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(8, 8, 240, 368);
-
-    // Scanlines
-    for (let y = 0; y < 384; y += 4) {
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
-      ctx.fillRect(0, y + 2, 256, 2);
-    }
-
-    // Colony symbol on back
-    ctx.font = '40px "VT323", monospace';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(232,92,26,0.2)';
+    ctx.strokeStyle='#e85c1a'; ctx.lineWidth=4;
+    ctx.strokeRect(7,7,242,370);
+    for (let y=0;y<384;y+=4) { ctx.fillStyle='rgba(0,0,0,0.12)'; ctx.fillRect(0,y+2,256,2); }
+    ctx.font='bold 28px monospace'; ctx.textAlign='center'; ctx.fillStyle='rgba(232,92,26,0.18)';
     ctx.fillText('COLONY', 128, 200);
-
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
     return tex;
   }
 
-  // ─── Init ──────────────────────────────────────────────────────────────────
+  // ─── Init ───────────────────────────────────────────────────────────────────
 
   function init() {
     const wrap = document.getElementById('packCanvas');
     if (!wrap) return;
 
-    const W = wrap.clientWidth;
-    const H = wrap.clientHeight;
+    // Force layout before measuring
+    const doInit = () => {
+      const W = wrap.offsetWidth  || 240;
+      const H = wrap.offsetHeight || 320;
 
-    // Renderer
-    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(W, H);
-    renderer.setClearColor(0x000000, 0);
-    wrap.appendChild(renderer.domElement);
+      renderer = new THREE.WebGLRenderer({ antialias:false, alpha:true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(W, H);
+      renderer.setClearColor(0x000000, 0);
+      wrap.appendChild(renderer.domElement);
 
-    // Scene
-    scene = new THREE.Scene();
+      scene = new THREE.Scene();
 
-    // Camera — orthographic-ish perspective to feel more like a product shot
-    camera = new THREE.PerspectiveCamera(35, W / H, 0.1, 100);
-    camera.position.set(0, 0, 5.5);
+      camera = new THREE.PerspectiveCamera(36, W/H, 0.1, 100);
+      camera.position.set(0, 0, 5.2);
 
-    // Lights
-    const ambient = new THREE.AmbientLight(0x1a2a1a, 0.8);
-    scene.add(ambient);
+      // Lights
+      scene.add(new THREE.AmbientLight(0x1a2a1a, 0.9));
+      rimLight = new THREE.PointLight(0xe85c1a, 3.0, 10);
+      rimLight.position.set(0, -2.5, 1.5);
+      scene.add(rimLight);
+      const top = new THREE.DirectionalLight(0x3aaa3a, 0.5);
+      top.position.set(0, 3, 2); scene.add(top);
+      const front = new THREE.DirectionalLight(0xffffff, 0.35);
+      front.position.set(0, 0, 5); scene.add(front);
 
-    // Orange rim from below — the poster lighting
-    rimLight = new THREE.PointLight(0xe85c1a, 2.5, 8);
-    rimLight.position.set(0, -2.5, 1.5);
-    scene.add(rimLight);
+      // Geometry
+      const geo = new THREE.BoxGeometry(1.6, 2.4, 0.12);
+      const edgeMat = new THREE.MeshStandardMaterial({
+        color:0x0f160f, emissive:0xe85c1a, emissiveIntensity:0.18, roughness:0.8, metalness:0.1
+      });
+      const frontMat = new THREE.MeshStandardMaterial({ map:buildFaceTexture(), roughness:0.75, metalness:0.05 });
+      const backMat  = new THREE.MeshStandardMaterial({ map:buildBackTexture(),  roughness:0.8,  metalness:0.05 });
 
-    // Cool top fill
-    const topLight = new THREE.DirectionalLight(0x3aaa3a, 0.4);
-    topLight.position.set(0, 3, 2);
-    scene.add(topLight);
+      packMesh = new THREE.Mesh(geo, [edgeMat,edgeMat,edgeMat,edgeMat,frontMat,backMat]);
+      scene.add(packMesh);
 
-    // Front fill so the face is readable
-    const frontLight = new THREE.DirectionalLight(0xffffff, 0.3);
-    frontLight.position.set(0, 0, 5);
-    scene.add(frontLight);
+      attachEvents(wrap);
+      handleResize(wrap);
+      window.addEventListener('resize', () => handleResize(wrap));
 
-    // Pack geometry — portrait card proportions, slightly thick
-    const W_pack = 1.6, H_pack = 2.4, D_pack = 0.12;
-    const geo = new THREE.BoxGeometry(W_pack, H_pack, D_pack);
+      isReady = true;
+      animate();
+    };
 
-    const faceTex  = buildFaceTexture();
-    const backTex  = buildBackTexture();
-
-    // Six face materials — right, left, top, bottom, front, back
-    const edgeMat = new THREE.MeshStandardMaterial({
-      color: 0x0f160f,
-      emissive: 0xe85c1a,
-      emissiveIntensity: 0.15,
-      roughness: 0.8,
-      metalness: 0.1,
-    });
-
-    const frontMat = new THREE.MeshStandardMaterial({
-      map: faceTex,
-      roughness: 0.75,
-      metalness: 0.05,
-    });
-
-    const backMat = new THREE.MeshStandardMaterial({
-      map: backTex,
-      roughness: 0.8,
-      metalness: 0.05,
-    });
-
-    // BoxGeometry face order: +X, -X, +Y, -Y, +Z (front), -Z (back)
-    const materials = [edgeMat, edgeMat, edgeMat, edgeMat, frontMat, backMat];
-
-    packMesh = new THREE.Mesh(geo, materials);
-    scene.add(packMesh);
-
-    // Events
-    attachEvents(wrap);
-
-    isReady = true;
-    animate();
+    // Small delay ensures DOM layout is complete on mobile
+    if (wrap.offsetWidth === 0) {
+      setTimeout(doInit, 80);
+    } else {
+      doInit();
+    }
   }
 
-  // ─── Animation loop ────────────────────────────────────────────────────────
+  function handleResize(wrap) {
+    if (!renderer) return;
+    const W = wrap.offsetWidth || 240;
+    const H = wrap.offsetHeight || 320;
+    renderer.setSize(W, H);
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+  }
+
+  // ─── Animation ──────────────────────────────────────────────────────────────
 
   function animate() {
     animFrame = requestAnimationFrame(animate);
-
     idleT += 0.012;
 
     if (isThrowing) {
-      throwProgress += 0.045;
+      throwProgress += 0.042;
+      const t = throwProgress;
+      packMesh.position.x = throwDirX * t * 5;
+      packMesh.position.y = Math.sin(t * Math.PI) * 0.3 - t * 1.4;
+      packMesh.rotation.z += throwDirX * 0.055;
+      packMesh.rotation.x += 0.018;
 
-      const t  = throwProgress;
-      const cx = throwDirX * t * 4.5;
-      const cy = Math.sin(t * Math.PI) * 0.4;     // arc
-      packMesh.position.x = cx;
-      packMesh.position.y = cy - t * 1.2;          // fall slightly
-      packMesh.rotation.z += throwDirX * 0.06;     // spin on Z
-      packMesh.rotation.x += 0.02;
-      packMesh.material; // no-op, just tick
-
-      // Fade opacity via emissive
-      const fade = Math.max(0, 1 - throwProgress * 1.4);
-      packMesh.material.forEach?.(m => {
-        if (m.emissiveIntensity !== undefined) m.emissiveIntensity = 0.15 * fade;
-        if (m.opacity !== undefined) m.opacity = fade;
-      });
-
-      if (throwProgress >= 0.85 && onThrowComplete) {
+      if (throwProgress >= 0.9 && onThrowComplete) {
         isThrowing = false;
         onThrowComplete();
         onThrowComplete = null;
       }
-
     } else if (!isDragging) {
-      // Idle: gentle float and slight rotation
-      const idleRotY  = Math.sin(idleT * 0.7) * 0.06;
-      const idleRotX  = 0.08 + Math.cos(idleT * 0.5) * 0.02;
-      const idlePosY  = Math.sin(idleT * 0.9) * 0.04;
-
-      targetRotY = idleRotY;
-      targetRotX = idleRotX;
-      packMesh.position.y = idlePosY;
-
+      targetRotY = Math.sin(idleT * 0.7) * 0.055;
+      targetRotX = 0.08 + Math.cos(idleT * 0.5) * 0.018;
+      packMesh.position.y = Math.sin(idleT * 0.9) * 0.04;
       rotX = lerp(rotX, targetRotX, 0.06);
       rotY = lerp(rotY, targetRotY, 0.06);
       packMesh.rotation.x = rotX;
       packMesh.rotation.y = rotY;
-
     } else {
-      // Drag follow
       rotX = lerp(rotX, targetRotX, 0.18);
       rotY = lerp(rotY, targetRotY, 0.18);
       packMesh.rotation.x = rotX;
       packMesh.rotation.y = rotY;
     }
 
-    // Rim light pulse matching CRT glow
-    rimLight.intensity = 2.5 + Math.sin(idleT * 1.2) * 0.4;
-
+    rimLight.intensity = 3.0 + Math.sin(idleT * 1.2) * 0.5;
     renderer.render(scene, camera);
   }
 
-  function lerp(a, b, t) { return a + (b - a) * t; }
+  function lerp(a,b,t){ return a+(b-a)*t; }
 
-  // ─── Interaction ───────────────────────────────────────────────────────────
+  // ─── Events ─────────────────────────────────────────────────────────────────
 
   function attachEvents(el) {
-    // Touch
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove',  onTouchMove,  { passive: true });
-    el.addEventListener('touchend',   onTouchEnd,   { passive: true });
+    el.addEventListener('touchstart', e => {
+      if (isThrowing) return;
+      const t = e.touches[0];
+      startDrag(t.clientX, t.clientY);
+    }, { passive:true });
 
-    // Mouse
-    el.addEventListener('mousedown', onMouseDown);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup',   onMouseUp);
-  }
+    el.addEventListener('touchmove', e => {
+      if (!isDragging) return;
+      const t = e.touches[0];
+      moveDrag(t.clientX, t.clientY);
+    }, { passive:true });
 
-  function onTouchStart(e) {
-    if (isThrowing) return;
-    const t = e.touches[0];
-    startDrag(t.clientX, t.clientY);
-  }
+    el.addEventListener('touchend', e => {
+      if (!isDragging) return;
+      const t = e.changedTouches[0];
+      endDrag(t.clientX, t.clientY);
+    }, { passive:true });
 
-  function onTouchMove(e) {
-    if (!isDragging) return;
-    const t = e.touches[0];
-    moveDrag(t.clientX, t.clientY);
-  }
-
-  function onTouchEnd(e) {
-    if (!isDragging) return;
-    const t = e.changedTouches[0];
-    endDrag(t.clientX, t.clientY);
-  }
-
-  function onMouseDown(e) {
-    if (isThrowing) return;
-    startDrag(e.clientX, e.clientY);
-  }
-  function onMouseMove(e) {
-    if (!isDragging) return;
-    moveDrag(e.clientX, e.clientY);
-  }
-  function onMouseUp(e) {
-    if (!isDragging) return;
-    endDrag(e.clientX, e.clientY);
+    el.addEventListener('mousedown', e => { if (!isThrowing) startDrag(e.clientX, e.clientY); });
+    window.addEventListener('mousemove', e => { if (isDragging) moveDrag(e.clientX, e.clientY); });
+    window.addEventListener('mouseup',   e => { if (isDragging) endDrag(e.clientX, e.clientY); });
   }
 
   function startDrag(x, y) {
-    isDragging   = true;
-    dragStartX   = x;
-    dragStartY   = y;
-    dragCurrentX = x;
-    dragCurrentY = y;
-    velocityX    = 0;
-    velocityY    = 0;
+    isDragging = true;
+    dragStartX = dragCurrentX = x;
+    dragStartY = dragCurrentY = y;
+    velocityX = 0;
   }
 
   function moveDrag(x, y) {
-    const prevX  = dragCurrentX;
-    const prevY  = dragCurrentY;
-    dragCurrentX = x;
-    dragCurrentY = y;
-
-    velocityX = x - prevX;
-    velocityY = y - prevY;
-
+    velocityX = x - dragCurrentX;
+    dragCurrentX = x; dragCurrentY = y;
     const dx = x - dragStartX;
     const dy = y - dragStartY;
-
-    // Horizontal drag → Y rotation (turning the card)
-    // Vertical drag → X rotation (tilting)
-    targetRotY = dx * 0.012;
-    targetRotX = 0.08 - dy * 0.008;
-
-    // Clamp so it doesn't flip too far
-    targetRotY = Math.max(-0.5, Math.min(0.5, targetRotY));
-    targetRotX = Math.max(-0.2, Math.min(0.35, targetRotX));
+    targetRotY = Math.max(-0.55, Math.min(0.55, dx * 0.013));
+    targetRotX = Math.max(-0.2,  Math.min(0.35, 0.08 - dy * 0.009));
   }
 
   function endDrag(x, y) {
     isDragging = false;
+    const dx = x - dragStartX;
+    const dy = Math.abs(y - dragStartY);
+    const isH = Math.abs(dx) > dy * 1.4;
+    const isFast = Math.abs(velocityX) > 3.5;
 
-    const totalDX = x - dragStartX;
-    const totalDY = y - dragStartY;
-
-    // Check for throw gesture — fast horizontal swipe
-    const isHorizontal = Math.abs(totalDX) > Math.abs(totalDY) * 1.5;
-    const isFast = Math.abs(velocityX) > 4;
-
-    if (isHorizontal && (Math.abs(totalDX) > SWIPE_THRESHOLD || isFast)) {
-      const dir = totalDX < 0 ? -1 : 1;
-      // Dispatch custom event so main.js can catch it
-      document.dispatchEvent(new CustomEvent('pack3d:swipe', { detail: { dir } }));
+    if (isH && (Math.abs(dx) > SWIPE_THRESHOLD || isFast)) {
+      document.dispatchEvent(new CustomEvent('pack3d:swipe', { detail:{ dir: dx < 0 ? -1 : 1 } }));
     } else {
-      // Snap back to idle
-      targetRotY = 0;
-      targetRotX = 0.08;
+      targetRotY = 0; targetRotX = 0.08;
     }
   }
 
-  // ─── Public: throw animation ───────────────────────────────────────────────
+  // ─── Public ─────────────────────────────────────────────────────────────────
 
   function throwPack(dir, callback) {
-    isThrowing      = true;
-    throwDirX       = dir;
-    throwProgress   = 0;
-    onThrowComplete = callback;
+    isThrowing = true; throwDirX = dir;
+    throwProgress = 0; onThrowComplete = callback;
   }
 
   function resetPack() {
     if (!packMesh) return;
-    isThrowing = false;
-    throwProgress = 0;
-    packMesh.position.set(0, 0, 0);
-    packMesh.rotation.set(0.08, 0, 0);
-    rotX = 0.08; rotY = 0;
-    targetRotX = 0.08; targetRotY = 0;
-
-    // Reset opacity
-    packMesh.material?.forEach?.(m => {
-      if (m.emissiveIntensity !== undefined) m.emissiveIntensity = 0.15;
-    });
+    isThrowing = false; throwProgress = 0;
+    packMesh.position.set(0,0,0);
+    packMesh.rotation.set(0.08,0,0);
+    rotX = 0.08; rotY = 0; targetRotX = 0.08; targetRotY = 0;
   }
 
   function destroy() {
@@ -435,5 +301,5 @@ const Pack3D = (() => {
     renderer?.dispose();
   }
 
-  return { init, throwPack, resetPack, destroy, get isReady() { return isReady; } };
+  return { init, throwPack, resetPack, destroy, get isReady(){ return isReady; } };
 })();
