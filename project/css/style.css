@@ -27,6 +27,11 @@
   );
 }
 
+@font-face {
+  /* VT323 gives us that CRT pixel terminal look */
+  font-family: 'VT323';
+}
+
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body {
   height:100%; width:100%; overflow:hidden;
@@ -572,413 +577,48 @@ body::after {
 .debug-shape-el.shape-sphere     { width:40px; height:40px; background:var(--rare); clip-path:polygon(15% 0%,85% 0%,100% 15%,100% 85%,85% 100%,15% 100%,0% 85%,0% 15%); box-shadow:2px 2px 0 rgba(0,0,0,0.4); }
 .debug-shape-el.shape-triangle   { width:0; height:0; border-left:22px solid transparent; border-right:22px solid transparent; border-bottom:40px solid var(--legendary); filter:drop-shadow(2px 2px 0 rgba(0,0,0,0.4)); }
 
+/* ── THREE.JS PACK ────────────────────────────────── */
 
-
-/* ── SLOT MACHINE SURROUND ───────────────────────── */
-
-.slot-machine {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  max-width: 340px;
-  border: 3px solid var(--orange);
-  background: var(--panel);
-  box-shadow:
-    0 0 0 1px var(--bg),
-    0 0 0 3px var(--green),
-    6px 6px 0 rgba(0,0,0,0.6),
-    0 0 24px rgba(232,92,26,0.12);
-  position: relative;
-}
-
-/* Slot top — three reels */
-.slot-top {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  padding: 8px 12px;
-  border-bottom: 2px solid var(--orange);
-  background: rgba(0,0,0,0.4);
-}
-
-.slot-reel {
-  flex: 1;
-  height: 36px;
-  border: 2px solid var(--green);
-  background: #060c06;
-  display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-  position: relative;
-  box-shadow: inset 0 0 8px rgba(0,0,0,0.8);
-}
-
-/* Scanlines on reel */
-.slot-reel::after {
-  content: '';
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    0deg, transparent, transparent 3px,
-    rgba(0,0,0,0.2) 3px, rgba(0,0,0,0.2) 4px
-  );
-  pointer-events: none;
-}
-
-.slot-reel span {
-  font-family: 'VT323', monospace;
-  font-size: 22px;
-  color: var(--orange);
-  text-shadow: 0 0 6px rgba(232,92,26,0.8);
-  animation: reelIdle 8s steps(1) infinite;
-  line-height: 1;
-}
-.slot-reel:nth-child(2) span { animation-delay: -2.7s; color: var(--green-lt); text-shadow: 0 0 6px rgba(58,170,58,0.8); }
-.slot-reel:nth-child(3) span { animation-delay: -5.1s; }
-
-@keyframes reelIdle {
-  0%  { content: '◈'; opacity: 1; }
-  12% { opacity: 0.4; }
-  13% { opacity: 1; }
-  25% { transform: translateY(0); }
-  26% { transform: translateY(-100%); opacity: 0; }
-  27% { transform: translateY(100%); }
-  28% { transform: translateY(0); opacity: 1; }
-}
-
-/* Spinning class added by JS on pack open */
-.slot-reel.spinning span {
-  animation: reelSpin 0.08s steps(1) infinite;
-}
-@keyframes reelSpin {
-  0%  { content: '◈'; }
-  16% { content: '◆'; }
-  33% { content: '▲'; }
-  50% { content: '●'; }
-  66% { content: '■'; }
-  83% { content: '◇'; }
-}
-
-/* Centre row */
-.slot-mid {
-  display: flex;
-  align-items: stretch;
-  width: 100%;
-}
-
-/* Side panels */
-.slot-side {
-  width: 28px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 0;
-  background: rgba(0,0,0,0.3);
-  border-color: var(--orange);
-}
-.slot-side-l { border-right: 2px solid var(--orange); }
-.slot-side-r { border-left:  2px solid var(--orange); }
-
-.slot-led-col {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  align-items: center;
-}
-
-.slot-led {
-  width: 8px; height: 8px;
-  border-radius: 1px;
-  background: var(--green-dim);
-  transition: background 0.1s, box-shadow 0.1s;
-  image-rendering: pixelated;
-}
-.slot-led.on {
-  background: var(--orange);
-  box-shadow: 0 0 4px var(--orange), 0 0 0 1px rgba(232,92,26,0.3);
-}
-.slot-led.on-green {
-  background: var(--green-lt);
-  box-shadow: 0 0 4px var(--green-lt);
-}
-
-.slot-label-vert {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 6px;
-  letter-spacing: 0.15em;
-  color: var(--green-lt);
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  opacity: 0.7;
-  text-transform: uppercase;
-}
-
-/* Pack area */
-.slot-pack-area {
-  flex: 1;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 8px;
-  min-height: 300px;
-}
-
-/* Bottom panel */
-.slot-bottom {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 12px;
-  border-top: 2px solid var(--orange);
-  background: rgba(0,0,0,0.4);
-}
-
-.slot-stat {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-}
-.slot-stat-label {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 6px; letter-spacing: 0.15em;
-  color: var(--muted); text-transform: uppercase;
-}
-.slot-stat-value {
-  font-family: 'VT323', monospace;
-  font-size: 20px; line-height: 1;
-  color: var(--orange);
-  text-shadow: 0 0 6px rgba(232,92,26,0.6);
-  min-width: 28px; text-align: center;
-}
-
-.slot-pull-hint {
-  font-family: 'VT323', monospace;
-  font-size: 13px;
-  letter-spacing: 0.15em;
-  color: var(--green-lt);
-  animation: pixelBlink 1.6s steps(2) infinite;
-}
-
-/* Pack canvas — explicit fixed size, Safari-safe */
 .pack-canvas-wrap {
-  width: 200px;
-  height: 280px;
-  min-width: 200px;
-  min-height: 280px;
   position: relative;
-  z-index: 2;
+  width: 240px;
+  height: 320px;
   cursor: grab;
   flex-shrink: 0;
-  display: block;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0); /* force GPU layer on iOS */
 }
 .pack-canvas-wrap:active { cursor: grabbing; }
+
 .pack-canvas-wrap canvas {
-  position: absolute;
-  top: 0; left: 0;
-  width: 200px !important;
-  height: 280px !important;
   display: block;
+  width: 100% !important;
+  height: 100% !important;
   image-rendering: pixelated;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
 }
 
+/* Peek stack behind the 3D canvas */
 .pack-stack-behind {
   position: absolute;
+  /* sits in normal flow above canvas-wrap via z-index */
   width: 200px;
-  height: 280px;
-  left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
+  height: 288px;
   pointer-events: none;
-  z-index: 1;
+  z-index: 0;
 }
-.pack-stack-behind .peek-card {
-  position: absolute;
-  left: 0; top: 0;
-  width: 200px; height: 280px;
-}
-.pack-stack-behind .peek-card:nth-child(1) { transform: translateY(14px) rotate(-4deg) scale(0.93); z-index: 1; }
-.pack-stack-behind .peek-card:nth-child(2) { transform: translateY(8px)  rotate(-2deg) scale(0.96); z-index: 2; }
-.pack-stack-behind .peek-card:nth-child(3) { transform: translateY(4px)  rotate(-1deg) scale(0.98); z-index: 3; }
 
-/* ── CSS 3D PACK ──────────────────────────────────── */
-
-.pack-3d-scene {
-  perspective: 700px;
-  width: 200px;
-  height: 280px;
+/* The screen-pack now stacks things with position relative */
+#screen-pack {
   position: relative;
-  z-index: 2;
-  flex-shrink: 0;
-}
-
-.pack-3d-card {
-  width: 200px;
-  height: 280px;
-  position: relative;
-  transform-style: preserve-3d;
-  transform: rotateX(8deg) rotateY(0deg);
-  transition: transform 0.08s linear;
-  cursor: grab;
-  will-change: transform;
-  -webkit-transform-style: preserve-3d;
-}
-.pack-3d-card:active { cursor: grabbing; }
-
-/* Idle float animation */
-.pack-3d-card.idle {
-  animation: pack3dIdle 4s ease-in-out infinite;
-}
-@keyframes pack3dIdle {
-  0%,100% { transform: rotateX(8deg) rotateY(-3deg) translateY(0px); }
-  50%      { transform: rotateX(6deg) rotateY(3deg)  translateY(-4px); }
-}
-
-/* Throw animations */
-.pack-3d-card.throw-left {
-  animation: pack3dThrowLeft 0.45s ease-in forwards;
-}
-.pack-3d-card.throw-right {
-  animation: pack3dThrowRight 0.45s ease-in forwards;
-}
-@keyframes pack3dThrowLeft {
-  0%   { transform: rotateX(8deg) rotateY(0deg) translateX(0) translateY(0); opacity:1; }
-  100% { transform: rotateX(20deg) rotateY(-40deg) translateX(-280px) translateY(-40px); opacity:0; }
-}
-@keyframes pack3dThrowRight {
-  0%   { transform: rotateX(8deg) rotateY(0deg) translateX(0) translateY(0); opacity:1; }
-  100% { transform: rotateX(20deg) rotateY(40deg) translateX(280px) translateY(-40px); opacity:0; }
-}
-
-/* Front and back faces */
-.pack-3d-front,
-.pack-3d-back {
-  position: absolute;
-  inset: 0;
-  -webkit-backface-visibility: hidden;
-  backface-visibility: hidden;
-  border: 3px solid var(--orange);
-  background: var(--panel);
-  overflow: hidden;
-  box-shadow:
-    0 0 0 1px var(--bg),
-    0 0 0 3px var(--green),
-    8px 8px 0 rgba(0,0,0,0.5);
-}
-
-.pack-3d-back {
-  transform: rotateY(180deg);
-  -webkit-transform: rotateY(180deg);
-  display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Grid on faces */
-.pack-face-grid {
-  position: absolute; inset: 0;
-  background-image:
-    repeating-linear-gradient(45deg, transparent, transparent 23px, rgba(42,122,42,0.12) 23px, rgba(42,122,42,0.12) 24px),
-    repeating-linear-gradient(-45deg, transparent, transparent 23px, rgba(42,122,42,0.12) 23px, rgba(42,122,42,0.12) 24px);
-  pointer-events: none;
-}
-
-/* Scanlines on faces */
-.pack-face-scanlines {
-  position: absolute; inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 3px,
-    rgba(0,0,0,0.15) 3px,
-    rgba(0,0,0,0.15) 4px
-  );
-  pointer-events: none; z-index: 2;
-  animation: scanlineScroll 8s linear infinite;
-}
-@keyframes scanlineScroll {
-  0%   { background-position: 0 0; }
-  100% { background-position: 0 280px; }
-}
-
-/* Inner border */
-.pack-3d-front::before {
-  content: '';
+/* Peek cards behind canvas */
+.pack-stack-behind .peek-card {
   position: absolute;
-  inset: 8px;
-  border: 1px solid rgba(232,92,26,0.3);
-  pointer-events: none; z-index: 1;
+  left: 50%;
+  top: 50%;
+  transform-origin: center center;
 }
-
-/* Corner brackets */
-.pack-corner-tl, .pack-corner-tr,
-.pack-corner-bl, .pack-corner-br {
-  position: absolute;
-  width: 16px; height: 16px;
-  border-color: var(--orange);
-  border-style: solid;
-  z-index: 3;
-}
-.pack-corner-tl { top:10px;    left:10px;    border-width:2px 0 0 2px; }
-.pack-corner-tr { top:10px;    right:10px;   border-width:2px 2px 0 0; }
-.pack-corner-bl { bottom:10px; left:10px;    border-width:0 0 2px 2px; }
-.pack-corner-br { bottom:10px; right:10px;   border-width:0 2px 2px 0; }
-
-/* Face content */
-.pack-face-content {
-  position: absolute; inset: 0;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  gap: 8px; z-index: 3;
-  padding-bottom: 28px;
-}
-
-.pack-face-logo {
-  font-family: 'VT323', monospace;
-  font-size: 64px; line-height: 1;
-  color: var(--orange);
-  text-shadow:
-    0 0 12px rgba(232,92,26,0.9),
-    0 0 28px rgba(232,92,26,0.4);
-  animation: logoPulse 3s ease-in-out infinite;
-}
-@keyframes logoPulse {
-  0%,100% { text-shadow: 0 0 12px rgba(232,92,26,0.9), 0 0 28px rgba(232,92,26,0.4); }
-  50%     { text-shadow: 0 0 18px rgba(232,92,26,1),   0 0 44px rgba(232,92,26,0.7); }
-}
-
-.pack-face-title {
-  font-family: 'VT323', monospace;
-  font-size: 18px; letter-spacing: 0.2em;
-  color: var(--cream);
-}
-
-.pack-face-sub {
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 8px; letter-spacing: 0.1em;
-  color: var(--muted);
-}
-
-.pack-face-hint {
-  position: absolute;
-  bottom: 14px; left: 0; right: 0;
-  text-align: center;
-  font-family: 'Share Tech Mono', monospace;
-  font-size: 8px; letter-spacing: 0.12em;
-  color: var(--green-lt); opacity: 0.7;
-  animation: pixelBlink 1.8s steps(2) infinite;
-}
-
-.pack-back-text {
-  font-family: 'VT323', monospace;
-  font-size: 28px; letter-spacing: 0.2em;
-  color: rgba(232,92,26,0.2);
-  z-index: 3;
-}
+.pack-stack-behind .peek-card:nth-child(1) { transform: translate(-50%, -50%) translateY(16px) rotate(-4deg) scale(0.93); z-index: 1; }
+.pack-stack-behind .peek-card:nth-child(2) { transform: translate(-50%, -50%) translateY(10px) rotate(-2.5deg) scale(0.96); z-index: 2; }
+.pack-stack-behind .peek-card:nth-child(3) { transform: translate(-50%, -50%) translateY(5px) rotate(-1deg) scale(0.98); z-index: 3; }

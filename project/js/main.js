@@ -94,18 +94,8 @@ function showScreen(id) {
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
 
-  // Defer init to after full page paint — critical for Safari iOS
-  const doInit = () => {
-    Pack3D.init();
-  };
-
-  if (document.readyState === 'complete') {
-    requestAnimationFrame(() => requestAnimationFrame(doInit));
-  } else {
-    window.addEventListener('load', () => {
-      requestAnimationFrame(() => requestAnimationFrame(doInit));
-    }, { once: true });
-  }
+  // Init Three.js pack
+  Pack3D.init();
 
   // Listen for swipe events dispatched by pack3d.js
   document.addEventListener('pack3d:swipe', (e) => {
@@ -231,9 +221,6 @@ function showChoiceGrid() {
 
 function dropCard(card) {
   send(card.command);
-  dropsCount++;
-  updateSlotStats();
-  if (card.rarity === 'legendary') flashLEDs('win');
   document.getElementById('droppedSub').textContent =
     `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
   showScreen('screen-dropped');
