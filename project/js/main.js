@@ -89,63 +89,23 @@ function showScreen(id) {
   document.getElementById(id).classList.remove('hidden');
 }
 
-// ─── Pack swipe ───────────────────────────────────────────────────────────────
+// ─── Pack swipe — wired to Pack3D ────────────────────────────────────────────
 
 function initPack() {
-  const packEl = document.getElementById('pack');
   document.getElementById('packStack').innerHTML = '';
 
-  packEl.addEventListener('touchstart', (e) => {
-    const rect = packEl.getBoundingClientRect();
-    const t    = e.touches[0];
-    if (t.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
-    swipeStartX = t.clientX; swipeStartY = t.clientY;
-  }, { passive:true });
+  // Init Three.js pack
+  Pack3D.init();
 
-  packEl.addEventListener('touchmove', (e) => {
-    if (swipeStartX === null) return;
-    const dx = e.touches[0].clientX - swipeStartX;
-    const dy = Math.abs(e.touches[0].clientY - swipeStartY);
-    if (dy > 30) { resetPackSwipe(packEl); return; }
-    const c = Math.max(-120, Math.min(120, dx));
-    packEl.style.transform = `translateX(${c*0.7}px) rotate(${c*0.04}deg)`;
-  }, { passive:true });
-
-  packEl.addEventListener('touchend', (e) => {
-    if (swipeStartX === null) return;
-    const dx = e.changedTouches[0].clientX - swipeStartX;
-    const dy = Math.abs(e.changedTouches[0].clientY - swipeStartY);
-    resetPackSwipe(packEl);
-    if (dy > 30) return;
-    if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
-  }, { passive:true });
-
-  // Mouse fallback
-  let mX = null, mY = null;
-  packEl.addEventListener('mousedown', (e) => {
-    const rect = packEl.getBoundingClientRect();
-    if (e.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
-    mX = e.clientX; mY = e.clientY;
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (mX === null) return;
-    const c = Math.max(-120, Math.min(120, e.clientX - mX));
-    packEl.style.transform = `translateX(${c*0.7}px) rotate(${c*0.04}deg)`;
-  });
-  window.addEventListener('mouseup', (e) => {
-    if (mX === null) return;
-    const dx = e.clientX - mX;
-    const dy = Math.abs(e.clientY - mY);
-    packEl.style.transform = '';
-    mX = null;
-    if (dy > 30) return;
-    if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
+  // Listen for swipe events dispatched by pack3d.js
+  document.addEventListener('pack3d:swipe', (e) => {
+    const dir = e.detail.dir < 0 ? 'left' : 'right';
+    triggerPackOpen(dir);
   });
 }
 
-function resetPackSwipe(packEl) {
-  packEl.style.transform = '';
-  swipeStartX = null; swipeStartY = null;
+function resetPackSwipe() {
+  // no-op — 3D handles its own reset
 }
 
 function triggerPackOpen(dir) {

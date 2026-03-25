@@ -36,19 +36,11 @@
     <div class="page" id="page-pack">
 
       <div class="screen" id="screen-pack">
-        <div class="pack-scene">
-          <div id="packStack" class="pack-stack"></div>
-          <div class="pack" id="pack">
-            <div class="pack-front">
-              <div class="pack-logo">◈</div>
-              <div class="pack-title">RESOURCE PACK</div>
-              <div class="pack-subtitle">4 cards inside</div>
-              <div class="pack-sheen"></div>
-              <div class="swipe-zone-indicator">← swipe to open →</div>
-            </div>
-          </div>
-        </div>
-        <p class="pack-hint">swipe left or right at the top</p>
+        <!-- Peek stack still CSS behind the canvas -->
+        <div id="packStack" class="pack-stack-behind"></div>
+        <!-- Three.js canvas lives here -->
+        <div id="packCanvas" class="pack-canvas-wrap"></div>
+        <p class="pack-hint" id="packHint">swipe left or right</p>
       </div>
 
       <div class="screen hidden" id="screen-reveal">
@@ -133,6 +125,8 @@
 
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="js/pack3d.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
