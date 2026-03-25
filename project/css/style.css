@@ -27,11 +27,6 @@
   );
 }
 
-@font-face {
-  /* VT323 gives us that CRT pixel terminal look */
-  font-family: 'VT323';
-}
-
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body {
   height:100%; width:100%; overflow:hidden;
@@ -577,51 +572,7 @@ body::after {
 .debug-shape-el.shape-sphere     { width:40px; height:40px; background:var(--rare); clip-path:polygon(15% 0%,85% 0%,100% 15%,100% 85%,85% 100%,15% 100%,0% 85%,0% 15%); box-shadow:2px 2px 0 rgba(0,0,0,0.4); }
 .debug-shape-el.shape-triangle   { width:0; height:0; border-left:22px solid transparent; border-right:22px solid transparent; border-bottom:40px solid var(--legendary); filter:drop-shadow(2px 2px 0 rgba(0,0,0,0.4)); }
 
-/* ── THREE.JS PACK ────────────────────────────────── */
-
-.pack-canvas-wrap {
-  position: relative;
-  width: 240px;
-  height: 320px;
-  cursor: grab;
-  flex-shrink: 0;
-}
-.pack-canvas-wrap:active { cursor: grabbing; }
-
-.pack-canvas-wrap canvas {
-  display: block;
-  width: 100% !important;
-  height: 100% !important;
-  image-rendering: pixelated;
-}
-
-/* Peek stack behind the 3D canvas */
-.pack-stack-behind {
-  position: absolute;
-  /* sits in normal flow above canvas-wrap via z-index */
-  width: 200px;
-  height: 288px;
-  pointer-events: none;
-  z-index: 0;
-}
-
-/* The screen-pack now stacks things with position relative */
-#screen-pack {
-  position: relative;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Peek cards behind canvas */
-.pack-stack-behind .peek-card {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  transform-origin: center center;
-}
-.pack-stack-behind .peek-card:nth-child(1) { transform: translate(-50%, -50%) translateY(16px) rotate(-4deg) scale(0.93); z-index: 1; }
-.pack-stack-behind .peek-card:nth-child(2) { transform: translate(-50%, -50%) translateY(10px) rotate(-2.5deg) scale(0.96); z-index: 2; }
-.pack-stack-behind .peek-card:nth-child(3) { transform: translate(-50%, -50%) translateY(5px) rotate(-1deg) scale(0.98); z-index: 3; }
+/* THREE.JS PACK — see slot machine section below */
 
 /* ── SLOT MACHINE SURROUND ───────────────────────── */
 
@@ -813,21 +764,30 @@ body::after {
   animation: pixelBlink 1.6s steps(2) infinite;
 }
 
-/* Pack canvas inside slot-pack-area */
+/* Pack canvas — explicit fixed size, Safari-safe */
 .pack-canvas-wrap {
   width: 200px;
   height: 280px;
+  min-width: 200px;
+  min-height: 280px;
   position: relative;
   z-index: 2;
   cursor: grab;
   flex-shrink: 0;
+  display: block;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0); /* force GPU layer on iOS */
 }
 .pack-canvas-wrap:active { cursor: grabbing; }
 .pack-canvas-wrap canvas {
+  position: absolute;
+  top: 0; left: 0;
+  width: 200px !important;
+  height: 280px !important;
   display: block;
-  width: 100% !important;
-  height: 100% !important;
   image-rendering: pixelated;
+  -webkit-transform: translateZ(0);
+  transform: translateZ(0);
 }
 
 .pack-stack-behind {

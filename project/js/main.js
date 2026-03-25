@@ -94,8 +94,18 @@ function showScreen(id) {
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
 
-  // Init Three.js pack
-  Pack3D.init();
+  // Defer init to after full page paint — critical for Safari iOS
+  const doInit = () => {
+    Pack3D.init();
+  };
+
+  if (document.readyState === 'complete') {
+    requestAnimationFrame(() => requestAnimationFrame(doInit));
+  } else {
+    window.addEventListener('load', () => {
+      requestAnimationFrame(() => requestAnimationFrame(doInit));
+    }, { once: true });
+  }
 
   // Listen for swipe events dispatched by pack3d.js
   document.addEventListener('pack3d:swipe', (e) => {
