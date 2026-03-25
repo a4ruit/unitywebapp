@@ -152,6 +152,7 @@ function triggerPackOpen(dir) {
   const packEl = document.getElementById('pack');
   packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
   send('pack_opened');
+  setTickerState('active');
 
   packCards   = rollPack();
   revealIndex = 0;
@@ -211,7 +212,7 @@ function showRevealCard() {
 
   void el.offsetWidth;
   el.classList.add(card.rarity === 'legendary' ? 'rev-enter-legendary' : 'rev-enter');
-  if (card.rarity === 'legendary') triggerFlash();
+  if (card.rarity === 'legendary') { triggerFlash(); setTickerState('legendary'); }
 }
 
 function triggerFlash() {
@@ -272,6 +273,7 @@ document.getElementById('againBtn').addEventListener('click', () => {
   document.getElementById('packStack').innerHTML       = '';
   document.getElementById('revealPeekStack').innerHTML = '';
   showScreen('screen-pack');
+  setTickerState('idle');
 });
 
 // ─── Debug controls ───────────────────────────────────────────────────────────
