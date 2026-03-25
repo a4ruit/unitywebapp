@@ -2,45 +2,29 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 
 // ─── Card pool ────────────────────────────────────────────────────────────────
 
-const CARD_POOL = {
-  common: [
-    { id: 'small_cube', name: 'Small Cube', rarity: 'common', rarityRank: 0, command: 'spawn_small_cube', shapeClass: 'shape-small-cube', desc: 'A modest offering. The colony will accept it.' }
-  ],
-  uncommon: [
-    { id: 'large_cube', name: 'Large Cube', rarity: 'uncommon', rarityRank: 1, command: 'spawn_large_cube', shapeClass: 'shape-large-cube', desc: 'Substantial. Colonies may compete for this.' }
-  ],
-  rare: [
-    { id: 'sphere', name: 'Sphere', rarity: 'rare', rarityRank: 2, command: 'spawn_sphere', shapeClass: 'shape-sphere', desc: 'Unusual geometry. Unpredictable colony response.' }
-  ],
-  legendary: [
-    { id: 'triangle', name: 'Obelisk', rarity: 'legendary', rarityRank: 3, command: 'spawn_triangle', shapeClass: 'shape-triangle', desc: 'Ancient form. The colony will remember this.' }
-  ]
-};
+const CARDS = [
+  { id:'small_cube', name:'Small Cube',  rarity:'common',    rarityRank:0, command:'spawn_small_cube', shapeClass:'shape-small-cube', desc:'A modest offering. The colony will accept it.' },
+  { id:'large_cube', name:'Large Cube',  rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', shapeClass:'shape-large-cube', desc:'Substantial. Colonies may compete for this.' },
+  { id:'sphere',     name:'Sphere',      rarity:'rare',      rarityRank:2, command:'spawn_sphere',     shapeClass:'shape-sphere',     desc:'Unusual geometry. Unpredictable colony response.' },
+  { id:'triangle',   name:'Obelisk',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
+];
 
 function pick(tier) {
-  const pool = CARD_POOL[tier];
-  return { ...pool[Math.floor(Math.random() * pool.length)] };
+  return { ...CARDS.find(c => c.rarity === tier) };
 }
 
 function rollPack() {
-  const cards = [];
+  const cards        = [];
   const hasLegendary = Math.random() < 0.1;
   const hasRare      = !hasLegendary && Math.random() < 0.2;
 
   cards.push(pick('uncommon'));
-
   if (hasLegendary) {
-    cards.push(pick('common'));
-    cards.push(pick('common'));
-    cards.push(pick('legendary'));
+    cards.push(pick('common')); cards.push(pick('common')); cards.push(pick('legendary'));
   } else if (hasRare) {
-    cards.push(pick('common'));
-    cards.push(pick('uncommon'));
-    cards.push(pick('rare'));
+    cards.push(pick('common')); cards.push(pick('uncommon')); cards.push(pick('rare'));
   } else {
-    cards.push(pick('common'));
-    cards.push(pick('common'));
-    cards.push(pick('uncommon'));
+    cards.push(pick('common')); cards.push(pick('common')); cards.push(pick('uncommon'));
   }
 
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
@@ -53,12 +37,8 @@ let ws             = null;
 let reconnectTimer = null;
 let packCards      = [];
 let revealIndex    = 0;
-
-// Session collection — array of dropped card objects with timestamp
-let collection = [];
-
-let swipeStartX = null;
-let swipeStartY = null;
+let swipeStartX    = null;
+let swipeStartY    = null;
 const SWIPE_THRESHOLD = 55;
 const TOP_ZONE_RATIO  = 0.55;
 
@@ -79,30 +59,26 @@ function connect() {
     ws.onclose = () => { setStatus(false); reconnectTimer = setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
     ws.onmessage = (e) => console.log('[WS]', e.data);
-  } catch (e) {
-    setStatus(false);
-    reconnectTimer = setTimeout(connect, 3000);
-  }
+  } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
 }
 
 function send(msg) {
-  if (ws && ws.readyState === WebSocket.OPEN) { ws.send(msg); console.log('[WS] Sent:', msg); }
-  else console.warn('[WS] Not connected:', msg);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(msg);
+    console.log('[WS] Sent:', msg);
+  } else {
+    console.warn('[WS] Not connected:', msg);
+  }
 }
 
-// ─── Tab switching ────────────────────────────────────────────────────────────
+// ─── Nav ─────────────────────────────────────────────────────────────────────
 
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    const target = tab.dataset.tab;
-
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
-
-    tab.classList.add('active');
-    document.getElementById(`tab-${target}`).classList.remove('hidden');
-
-    if (target === 'collection') renderCollection();
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+    btn.classList.add('active');
+    document.getElementById(`page-${btn.dataset.page}`).classList.remove('hidden');
   });
 });
 
@@ -120,21 +96,20 @@ function initPack() {
   document.getElementById('packStack').innerHTML = '';
 
   packEl.addEventListener('touchstart', (e) => {
-    const rect  = packEl.getBoundingClientRect();
-    const touch = e.touches[0];
-    if (touch.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
-    swipeStartX = touch.clientX;
-    swipeStartY = touch.clientY;
-  }, { passive: true });
+    const rect = packEl.getBoundingClientRect();
+    const t    = e.touches[0];
+    if (t.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
+    swipeStartX = t.clientX; swipeStartY = t.clientY;
+  }, { passive:true });
 
   packEl.addEventListener('touchmove', (e) => {
     if (swipeStartX === null) return;
     const dx = e.touches[0].clientX - swipeStartX;
     const dy = Math.abs(e.touches[0].clientY - swipeStartY);
     if (dy > 30) { resetPackSwipe(packEl); return; }
-    const clamped = Math.max(-120, Math.min(120, dx));
-    packEl.style.transform = `translateX(${clamped * 0.7}px) rotate(${clamped * 0.04}deg)`;
-  }, { passive: true });
+    const c = Math.max(-120, Math.min(120, dx));
+    packEl.style.transform = `translateX(${c*0.7}px) rotate(${c*0.04}deg)`;
+  }, { passive:true });
 
   packEl.addEventListener('touchend', (e) => {
     if (swipeStartX === null) return;
@@ -143,26 +118,26 @@ function initPack() {
     resetPackSwipe(packEl);
     if (dy > 30) return;
     if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
-  }, { passive: true });
+  }, { passive:true });
 
-  let mStartX = null, mStartY = null;
+  // Mouse fallback
+  let mX = null, mY = null;
   packEl.addEventListener('mousedown', (e) => {
     const rect = packEl.getBoundingClientRect();
     if (e.clientY - rect.top > rect.height * TOP_ZONE_RATIO) return;
-    mStartX = e.clientX; mStartY = e.clientY;
+    mX = e.clientX; mY = e.clientY;
   });
   window.addEventListener('mousemove', (e) => {
-    if (mStartX === null) return;
-    const dx = e.clientX - mStartX;
-    const clamped = Math.max(-120, Math.min(120, dx));
-    packEl.style.transform = `translateX(${clamped * 0.7}px) rotate(${clamped * 0.04}deg)`;
+    if (mX === null) return;
+    const c = Math.max(-120, Math.min(120, e.clientX - mX));
+    packEl.style.transform = `translateX(${c*0.7}px) rotate(${c*0.04}deg)`;
   });
   window.addEventListener('mouseup', (e) => {
-    if (mStartX === null) return;
-    const dx = e.clientX - mStartX;
-    const dy = Math.abs(e.clientY - mStartY);
+    if (mX === null) return;
+    const dx = e.clientX - mX;
+    const dy = Math.abs(e.clientY - mY);
     packEl.style.transform = '';
-    mStartX = null;
+    mX = null;
     if (dy > 30) return;
     if (Math.abs(dx) >= SWIPE_THRESHOLD) triggerPackOpen(dx < 0 ? 'left' : 'right');
   });
@@ -170,14 +145,13 @@ function initPack() {
 
 function resetPackSwipe(packEl) {
   packEl.style.transform = '';
-  swipeStartX = null;
-  swipeStartY = null;
+  swipeStartX = null; swipeStartY = null;
 }
 
 function triggerPackOpen(dir) {
-    send('pack_opened');
   const packEl = document.getElementById('pack');
   packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
+  send('pack_opened');
 
   packCards   = rollPack();
   revealIndex = 0;
@@ -193,21 +167,19 @@ function triggerPackOpen(dir) {
 
 // ─── Peek stack ───────────────────────────────────────────────────────────────
 
-function buildPeekStack(containerId) {
-  const stack = document.getElementById(containerId);
+function buildPeekStack(id) {
+  const stack = document.getElementById(id);
   stack.innerHTML = '';
+  stack.classList.remove('stack-reveal');
 
   const rarities = [...new Set(packCards.map(c => c.rarity))]
-    .sort((a, b) => {
-      const rank = { common:0, uncommon:1, rare:2, legendary:3 };
-      return rank[b] - rank[a];
-    });
+    .sort((a, b) => ({ common:0, uncommon:1, rare:2, legendary:3 }[b] - { common:0, uncommon:1, rare:2, legendary:3 }[a]));
 
-  rarities.forEach((rarity, i) => {
-    const peek = document.createElement('div');
-    peek.className = `peek-card peek-${i}`;
-    peek.dataset.rarity = rarity;
-    stack.appendChild(peek);
+  rarities.forEach((r, i) => {
+    const el = document.createElement('div');
+    el.className = `peek-card peek-${i}`;
+    el.dataset.rarity = r;
+    stack.appendChild(el);
   });
 
   setTimeout(() => stack.classList.add('stack-reveal'), 50);
@@ -217,19 +189,17 @@ function buildPeekStack(containerId) {
 
 function showRevealCard() {
   const card   = packCards[revealIndex];
-  const total  = packCards.length;
-  const isLast = revealIndex === total - 1;
+  const isLast = revealIndex === packCards.length - 1;
 
-  document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${total}`;
+  document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${packCards.length}`;
   document.getElementById('revealHint').textContent    = isLast ? 'tap to keep' : 'tap to reveal next';
 
-  const revealCard = document.getElementById('revealCard');
-  revealCard.dataset.rarity = card.rarity;
-  revealCard.className      = 'rev-card';
+  const el = document.getElementById('revealCard');
+  el.dataset.rarity = card.rarity;
+  el.className = 'rev-card';
+  if (card.rarity === 'legendary') el.classList.add('legendary-holo');
 
-  if (card.rarity === 'legendary') revealCard.classList.add('legendary-holo');
-
-  revealCard.innerHTML = `
+  el.innerHTML = `
     <div class="holo-layer"></div>
     <div class="rev-card-inner">
       <div class="rev-shape-wrap"><div class="${card.shapeClass} rev-shape-el"></div></div>
@@ -239,41 +209,30 @@ function showRevealCard() {
     </div>
   `;
 
-  void revealCard.offsetWidth;
-  revealCard.classList.add(card.rarity === 'legendary' ? 'rev-enter-legendary' : 'rev-enter');
-
+  void el.offsetWidth;
+  el.classList.add(card.rarity === 'legendary' ? 'rev-enter-legendary' : 'rev-enter');
   if (card.rarity === 'legendary') triggerFlash();
 }
 
 function triggerFlash() {
-  const flash = document.getElementById('flashOverlay');
-  flash.classList.add('flashing');
-  setTimeout(() => flash.classList.remove('flashing'), 700);
+  const f = document.getElementById('flashOverlay');
+  f.classList.add('flashing');
+  setTimeout(() => f.classList.remove('flashing'), 700);
 }
 
 document.getElementById('revealCard').addEventListener('click', () => {
   const isLast = revealIndex === packCards.length - 1;
+  if (isLast) { showChoiceGrid(); return; }
 
-  if (isLast) {
-    showChoiceGrid();
-    return;
-  }
+  const el = document.getElementById('revealCard');
+  el.classList.remove('rev-enter', 'rev-enter-legendary');
+  el.classList.add('rev-exit');
 
-  const revealCard = document.getElementById('revealCard');
-  revealCard.classList.remove('rev-enter', 'rev-enter-legendary');
-  revealCard.classList.add('rev-exit');
+  const stack   = document.getElementById('revealPeekStack');
+  const lastPeek = stack.lastElementChild;
+  if (lastPeek) { lastPeek.classList.add('peek-dismiss'); setTimeout(() => lastPeek.remove(), 300); }
 
-  const peekStack = document.getElementById('revealPeekStack');
-  const lastPeek  = peekStack.lastElementChild;
-  if (lastPeek) {
-    lastPeek.classList.add('peek-dismiss');
-    setTimeout(() => lastPeek.remove(), 300);
-  }
-
-  setTimeout(() => {
-    revealIndex++;
-    showRevealCard();
-  }, 260);
+  setTimeout(() => { revealIndex++; showRevealCard(); }, 260);
 });
 
 // ─── Choice grid ──────────────────────────────────────────────────────────────
@@ -282,12 +241,11 @@ function showChoiceGrid() {
   showScreen('screen-choose');
   const grid = document.getElementById('choiceGrid');
   grid.innerHTML = '';
-
   packCards.forEach((card, i) => {
     const el = document.createElement('div');
     el.className = 'choice-card';
     el.dataset.rarity = card.rarity;
-    el.style.animationDelay = `${i * 0.08}s`;
+    el.style.animationDelay = `${i*0.08}s`;
     el.innerHTML = `
       <div class="choice-shape-wrap"><div class="${card.shapeClass} choice-shape-el"></div></div>
       <div class="choice-card-name">${card.name}</div>
@@ -298,77 +256,58 @@ function showChoiceGrid() {
   });
 }
 
-// ─── Drop + collection ────────────────────────────────────────────────────────
+// ─── Drop ─────────────────────────────────────────────────────────────────────
 
 function dropCard(card) {
   send(card.command);
-
-  // Add to session collection with timestamp
-  collection.push({
-    ...card,
-    droppedAt: new Date()
-  });
-
   document.getElementById('droppedSub').textContent =
     `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
-
   showScreen('screen-dropped');
-}
-
-// ─── Collection renderer ──────────────────────────────────────────────────────
-
-function renderCollection() {
-  const grid    = document.getElementById('collectionGrid');
-  const empty   = document.getElementById('collectionEmpty');
-  const count   = document.getElementById('collectionCount');
-
-  const total = collection.length;
-  count.textContent = total === 1 ? '1 resource contributed' : `${total} resources contributed`;
-
-  if (total === 0) {
-    empty.classList.remove('hidden');
-    grid.innerHTML = '';
-    return;
-  }
-
-  empty.classList.add('hidden');
-  grid.innerHTML = '';
-
-  // Most recent first
-  [...collection].reverse().forEach((card, i) => {
-    const el = document.createElement('div');
-    el.className = 'col-card';
-    el.dataset.rarity = card.rarity;
-    el.style.animationDelay = `${i * 0.05}s`;
-
-    const time = formatTime(card.droppedAt);
-
-    el.innerHTML = `
-      <div class="col-shape-wrap"><div class="${card.shapeClass} col-shape-el"></div></div>
-      <div class="col-card-name">${card.name}</div>
-      <div class="col-card-rarity">${card.rarity}</div>
-      <div class="col-card-time">${time}</div>
-    `;
-    grid.appendChild(el);
-  });
-}
-
-function formatTime(date) {
-  const now  = new Date();
-  const diff = Math.floor((now - date) / 1000);
-  if (diff < 60)  return `${diff}s ago`;
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // ─── Again ────────────────────────────────────────────────────────────────────
 
 document.getElementById('againBtn').addEventListener('click', () => {
-  const packEl = document.getElementById('pack');
-  packEl.classList.remove('fly-left', 'fly-right');
+  document.getElementById('pack').classList.remove('fly-left', 'fly-right');
   document.getElementById('packStack').innerHTML       = '';
   document.getElementById('revealPeekStack').innerHTML = '';
   showScreen('screen-pack');
+});
+
+// ─── Debug controls ───────────────────────────────────────────────────────────
+
+const debugLog = document.getElementById('debugLog');
+
+function addLogEntry(command, rarity) {
+  const empty = debugLog.querySelector('.debug-log-empty');
+  if (empty) empty.remove();
+
+  const now   = new Date();
+  const time  = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+
+  const entry = document.createElement('div');
+  entry.className = 'debug-log-entry';
+  entry.dataset.rarity = rarity;
+  entry.innerHTML = `<span class="log-time">${time}</span>${command}`;
+
+  debugLog.insertBefore(entry, debugLog.firstChild);
+
+  // Keep max 12 entries
+  while (debugLog.children.length > 12) debugLog.removeChild(debugLog.lastChild);
+}
+
+document.querySelectorAll('.debug-card').forEach(card => {
+  card.addEventListener('click', () => {
+    const command = card.dataset.command;
+    const rarity  = card.dataset.rarity;
+
+    send(command);
+    addLogEntry(command, rarity);
+
+    card.classList.remove('spawned');
+    void card.offsetWidth;
+    card.classList.add('spawned');
+  });
 });
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
