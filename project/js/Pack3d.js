@@ -165,8 +165,10 @@ const Pack3D = (() => {
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
-    const wrap = document.getElementById('packCanvas');
-    if (!wrap) return;
+  const wrap = document.getElementById('packCanvas');
+  console.log('[Pack3D] wrap:', wrap);
+  console.log('[Pack3D] dimensions:', wrap?.clientWidth, wrap?.clientHeight);
+  if (!wrap) return;
 
     const W = wrap.clientWidth;
     const H = wrap.clientHeight;
