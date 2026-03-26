@@ -109,7 +109,7 @@ function resetPackSwipe() {
 }
 
 function triggerPackOpen(dir) {
-  const packEl = document.getElementById('pack');
+  const packEl = document.getElementById('packCanvas');
   packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
   send('pack_opened');
   setTickerState('active');
@@ -229,7 +229,7 @@ function dropCard(card) {
 // ─── Again ────────────────────────────────────────────────────────────────────
 
 document.getElementById('againBtn').addEventListener('click', () => {
-  document.getElementById('pack').classList.remove('fly-left', 'fly-right');
+  document.getElementById('packCanvas').classList.remove('fly-left', 'fly-right');
   document.getElementById('packStack').innerHTML       = '';
   document.getElementById('revealPeekStack').innerHTML = '';
   showScreen('screen-pack');
@@ -271,6 +271,58 @@ document.querySelectorAll('.debug-card').forEach(card => {
     card.classList.add('spawned');
   });
 });
+
+// ─── Ticker ───────────────────────────────────────────────────────────────────
+
+const TICKER_MESSAGES = {
+  idle: [
+    'Colony feeding in progress',
+    'Awaiting resource drop',
+    'Ant activity nominal',
+    'Open a pack to begin',
+    'Resources sustain the colony',
+    'What will you offer?',
+  ],
+  active: [
+    'Pack opened — resources incoming',
+    'Colony on alert',
+    'Scanning card contents',
+    'Choose wisely — the ants are watching',
+    'Resource acquisition sequence initiated',
+  ],
+  legendary: [
+    '⬛ LEGENDARY RESOURCE DETECTED ⬛',
+    'Colony behavior unpredictable',
+    'Ancient form recognised',
+    'The ants will remember this',
+    '⬛ RARE EVENT LOGGED ⬛',
+  ],
+};
+
+function buildTickerHTML(messages) {
+  // Double the messages so the seamless loop works (CSS animates -50%)
+  const all = [...messages, ...messages];
+  return all.map(msg =>
+    `<span class="ticker-msg">${msg}</span><span class="ticker-sep">◈</span>`
+  ).join('');
+}
+
+function setTickerState(state) {
+  const track = document.getElementById('tickerTrack');
+  const messages = TICKER_MESSAGES[state] || TICKER_MESSAGES.idle;
+
+  // Swap content
+  track.innerHTML = buildTickerHTML(messages);
+
+  // Reset animation so it doesn't jump
+  track.style.animation = 'none';
+  void track.offsetWidth; // force reflow
+  track.style.animation = '';
+
+  // Colour shift for legendary
+  const wrap = track.closest('.ticker-wrap');
+  wrap.dataset.state = state;
+}
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 

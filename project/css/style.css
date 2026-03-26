@@ -622,3 +622,13 @@ body::after {
 .pack-stack-behind .peek-card:nth-child(1) { transform: translate(-50%, -50%) translateY(16px) rotate(-4deg) scale(0.93); z-index: 1; }
 .pack-stack-behind .peek-card:nth-child(2) { transform: translate(-50%, -50%) translateY(10px) rotate(-2.5deg) scale(0.96); z-index: 2; }
 .pack-stack-behind .peek-card:nth-child(3) { transform: translate(-50%, -50%) translateY(5px) rotate(-1deg) scale(0.98); z-index: 3; }
+
+.pack-canvas-wrap.fly-left  { animation: flyLeft  0.4s ease-in forwards; }
+.pack-canvas-wrap.fly-right { animation: flyRight 0.4s ease-in forwards; }
+
+.ticker-wrap[data-state="legendary"] { background: rgba(200,144,48,0.12); border-color: var(--legendary); }
+.ticker-wrap[data-state="legendary"] .ticker-msg { color: var(--legendary); text-shadow: 1px 1px 0 rgba(200,144,48,0.4); }
+.ticker-wrap[data-state="legendary"] .ticker-sep { color: var(--legendary); }
+
+.ticker-wrap[data-state="active"] .ticker-msg { color: var(--green-lt); }
+.ticker-wrap[data-state="active"] .ticker-sep { color: var(--orange); }
