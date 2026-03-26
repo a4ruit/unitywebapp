@@ -94,10 +94,11 @@ function showScreen(id) {
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
 
-  // Init Three.js pack
-  Pack3D.init();
+  // Wait for layout before initialising Three.js
+  requestAnimationFrame(() => {
+    Pack3D.init();
+  });
 
-  // Listen for swipe events dispatched by pack3d.js
   document.addEventListener('pack3d:swipe', (e) => {
     const dir = e.detail.dir < 0 ? 'left' : 'right';
     triggerPackOpen(dir);
