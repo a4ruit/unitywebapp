@@ -9,9 +9,7 @@ const CARDS = [
   { id:'triangle',   name:'Obelisk',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
 ];
 
-function pick(tier) {
-  return { ...CARDS.find(c => c.rarity === tier) };
-}
+function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
 
 function rollPack() {
   const cards        = [];
@@ -37,10 +35,6 @@ let ws             = null;
 let reconnectTimer = null;
 let packCards      = [];
 let revealIndex    = 0;
-let swipeStartX    = null;
-let swipeStartY    = null;
-const SWIPE_THRESHOLD = 55;
-const TOP_ZONE_RATIO  = 0.55;
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 
@@ -64,11 +58,55 @@ function connect() {
 
 function send(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(msg);
-    console.log('[WS] Sent:', msg);
+    ws.send(msg); console.log('[WS] Sent:', msg);
   } else {
     console.warn('[WS] Not connected:', msg);
   }
+}
+
+// ─── Ticker ───────────────────────────────────────────────────────────────────
+
+const TICKER_MESSAGES = {
+  idle: [
+    'Colony feeding in progress',
+    'Awaiting resource drop',
+    'Ant activity nominal',
+    'Open a pack to begin',
+    'Resources sustain the colony',
+    'What will you offer?',
+  ],
+  active: [
+    'Pack opened — resources incoming',
+    'Colony on alert',
+    'Scanning card contents',
+    'Choose wisely — the ants are watching',
+    'Resource acquisition sequence initiated',
+  ],
+  legendary: [
+    '⬛ LEGENDARY RESOURCE DETECTED ⬛',
+    'Colony behaviour unpredictable',
+    'Ancient form recognised',
+    'The ants will remember this',
+    '⬛ RARE EVENT LOGGED ⬛',
+  ],
+};
+
+function buildTickerHTML(messages) {
+  const all = [...messages, ...messages];
+  return all.map(msg =>
+    `<span class="ticker-msg">${msg}</span><span class="ticker-sep">◈</span>`
+  ).join('');
+}
+
+function setTickerState(state) {
+  const track    = document.getElementById('tickerTrack');
+  const messages = TICKER_MESSAGES[state] || TICKER_MESSAGES.idle;
+  track.innerHTML = buildTickerHTML(messages);
+  track.style.animation = 'none';
+  void track.offsetWidth;
+  track.style.animation = '';
+  const wrap = track.closest('.ticker-wrap');
+  wrap.dataset.state = state;
 }
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
@@ -89,13 +127,13 @@ function showScreen(id) {
   document.getElementById(id).classList.remove('hidden');
 }
 
-// ─── Pack swipe — wired to Pack3D ────────────────────────────────────────────
+// ─── Pack swipe ───────────────────────────────────────────────────────────────
 
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
 
   if (typeof Pack3D === 'undefined') {
-    console.error('[initPack] Pack3D not defined — pack3d.js failed to load or parse');
+    console.error('[initPack] Pack3D not defined');
     return;
   }
 
@@ -107,13 +145,7 @@ function initPack() {
   });
 }
 
-function resetPackSwipe() {
-  // no-op — 3D handles its own reset
-}
-
 function triggerPackOpen(dir) {
-  const packEl = document.getElementById('packCanvas');
-  packEl.classList.add(dir === 'left' ? 'fly-left' : 'fly-right');
   send('pack_opened');
   setTickerState('active');
 
@@ -122,11 +154,14 @@ function triggerPackOpen(dir) {
 
   buildPeekStack('packStack');
 
-  setTimeout(() => {
-    showScreen('screen-reveal');
-    buildPeekStack('revealPeekStack');
-    showRevealCard();
-  }, 420);
+  // Trigger the 3D throw + particles
+  Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
+    setTimeout(() => {
+      showScreen('screen-reveal');
+      buildPeekStack('revealPeekStack');
+      showRevealCard();
+    }, 80);
+  });
 }
 
 // ─── Peek stack ───────────────────────────────────────────────────────────────
@@ -158,24 +193,24 @@ function showRevealCard() {
   document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${packCards.length}`;
   document.getElementById('revealHint').textContent    = isLast ? 'tap to keep' : 'tap to reveal next';
 
+  // Hide hint until flip completes
+  document.getElementById('revealHint').style.opacity = '0';
+
+  if (card.rarity === 'legendary') {
+    triggerFlash();
+    setTickerState('legendary');
+  }
+
+  // Hand off to Cards3D — it replaces #revealCard contents with a canvas
+  Cards3D.showCard(card, 'revealCard', () => {
+    // Flip complete — show hint
+    document.getElementById('revealHint').style.opacity = '';
+  });
+
+  // Make the rev-card container visible and sized correctly
   const el = document.getElementById('revealCard');
   el.dataset.rarity = card.rarity;
-  el.className = 'rev-card';
-  if (card.rarity === 'legendary') el.classList.add('legendary-holo');
-
-  el.innerHTML = `
-    <div class="holo-layer"></div>
-    <div class="rev-card-inner">
-      <div class="rev-shape-wrap"><div class="${card.shapeClass} rev-shape-el"></div></div>
-      <div class="rev-card-name">${card.name}</div>
-      <div class="rev-card-rarity">${card.rarity}</div>
-      <div class="rev-card-desc">${card.desc}</div>
-    </div>
-  `;
-
-  void el.offsetWidth;
-  el.classList.add(card.rarity === 'legendary' ? 'rev-enter-legendary' : 'rev-enter');
-  if (card.rarity === 'legendary') { triggerFlash(); setTickerState('legendary'); }
+  el.style.opacity  = '1'; // Cards3D manages its own canvas opacity via Three.js
 }
 
 function triggerFlash() {
@@ -184,24 +219,32 @@ function triggerFlash() {
   setTimeout(() => f.classList.remove('flashing'), 700);
 }
 
+// Tap to advance
 document.getElementById('revealCard').addEventListener('click', () => {
+  if (Cards3D && typeof Cards3D.isFlipping !== 'undefined' && Cards3D.isFlipping) return; // block during flip
+
   const isLast = revealIndex === packCards.length - 1;
   if (isLast) { showChoiceGrid(); return; }
 
-  const el = document.getElementById('revealCard');
-  el.classList.remove('rev-enter', 'rev-enter-legendary');
-  el.classList.add('rev-exit');
-
-  const stack   = document.getElementById('revealPeekStack');
+  const stack    = document.getElementById('revealPeekStack');
   const lastPeek = stack.lastElementChild;
   if (lastPeek) { lastPeek.classList.add('peek-dismiss'); setTimeout(() => lastPeek.remove(), 300); }
 
-  setTimeout(() => { revealIndex++; showRevealCard(); }, 260);
+  revealIndex++;
+  showRevealCard();
 });
 
 // ─── Choice grid ──────────────────────────────────────────────────────────────
 
 function showChoiceGrid() {
+  // Destroy card renderer before leaving reveal screen
+  Cards3D.destroy();
+
+  // Restore #revealCard to a plain div for next time
+  const el = document.getElementById('revealCard');
+  el.innerHTML = '';
+  el.style.opacity = '';
+
   showScreen('screen-choose');
   const grid = document.getElementById('choiceGrid');
   grid.innerHTML = '';
@@ -232,9 +275,9 @@ function dropCard(card) {
 // ─── Again ────────────────────────────────────────────────────────────────────
 
 document.getElementById('againBtn').addEventListener('click', () => {
-  document.getElementById('packCanvas').classList.remove('fly-left', 'fly-right');
   document.getElementById('packStack').innerHTML       = '';
   document.getElementById('revealPeekStack').innerHTML = '';
+  Pack3D.resetPack();
   showScreen('screen-pack');
   setTickerState('idle');
 });
@@ -247,17 +290,14 @@ function addLogEntry(command, rarity) {
   const empty = debugLog.querySelector('.debug-log-empty');
   if (empty) empty.remove();
 
-  const now   = new Date();
-  const time  = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
+  const now  = new Date();
+  const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
 
   const entry = document.createElement('div');
   entry.className = 'debug-log-entry';
   entry.dataset.rarity = rarity;
   entry.innerHTML = `<span class="log-time">${time}</span>${command}`;
-
   debugLog.insertBefore(entry, debugLog.firstChild);
-
-  // Keep max 12 entries
   while (debugLog.children.length > 12) debugLog.removeChild(debugLog.lastChild);
 }
 
@@ -265,69 +305,16 @@ document.querySelectorAll('.debug-card').forEach(card => {
   card.addEventListener('click', () => {
     const command = card.dataset.command;
     const rarity  = card.dataset.rarity;
-
     send(command);
     addLogEntry(command, rarity);
-
     card.classList.remove('spawned');
     void card.offsetWidth;
     card.classList.add('spawned');
   });
 });
 
-// ─── Ticker ───────────────────────────────────────────────────────────────────
-
-const TICKER_MESSAGES = {
-  idle: [
-    'Colony feeding in progress',
-    'Awaiting resource drop',
-    'Ant activity nominal',
-    'Open a pack to begin',
-    'Resources sustain the colony',
-    'What will you offer?',
-  ],
-  active: [
-    'Pack opened — resources incoming',
-    'Colony on alert',
-    'Scanning card contents',
-    'Choose wisely — the ants are watching',
-    'Resource acquisition sequence initiated',
-  ],
-  legendary: [
-    '⬛ LEGENDARY RESOURCE DETECTED ⬛',
-    'Colony behavior unpredictable',
-    'Ancient form recognised',
-    'The ants will remember this',
-    '⬛ RARE EVENT LOGGED ⬛',
-  ],
-};
-
-function buildTickerHTML(messages) {
-  // Double the messages so the seamless loop works (CSS animates -50%)
-  const all = [...messages, ...messages];
-  return all.map(msg =>
-    `<span class="ticker-msg">${msg}</span><span class="ticker-sep">◈</span>`
-  ).join('');
-}
-
-function setTickerState(state) {
-  const track = document.getElementById('tickerTrack');
-  const messages = TICKER_MESSAGES[state] || TICKER_MESSAGES.idle;
-
-  // Swap content
-  track.innerHTML = buildTickerHTML(messages);
-
-  // Reset animation so it doesn't jump
-  track.style.animation = 'none';
-  void track.offsetWidth; // force reflow
-  track.style.animation = '';
-
-  // Colour shift for legendary
-  const wrap = track.closest('.ticker-wrap');
-  wrap.dataset.state = state;
-}
-
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 connect();
 initPack();
+setTickerState('idle');

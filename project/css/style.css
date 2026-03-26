@@ -632,3 +632,14 @@ body::after {
 
 .ticker-wrap[data-state="active"] .ticker-msg { color: var(--green-lt); }
 .ticker-wrap[data-state="active"] .ticker-sep { color: var(--orange); }
+
+/* Ticker state colours */
+.ticker-wrap[data-state="legendary"] { background:rgba(200,144,48,0.12); border-color:var(--legendary); }
+.ticker-wrap[data-state="legendary"] .ticker-msg { color:var(--legendary); }
+.ticker-wrap[data-state="legendary"] .ticker-sep { color:var(--legendary); }
+.ticker-wrap[data-state="active"] .ticker-msg { color:var(--green-lt); }
+.ticker-wrap[data-state="active"] .ticker-sep { color:var(--orange); }
+
+/* revealCard as canvas host */
+.rev-card { cursor: pointer; overflow: hidden; }
+.rev-card canvas { display:block; width:100%!important; height:100%!important; }
