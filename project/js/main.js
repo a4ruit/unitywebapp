@@ -94,10 +94,12 @@ function showScreen(id) {
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
 
-  // Wait for layout before initialising Three.js
-  requestAnimationFrame(() => {
-    Pack3D.init();
-  });
+  if (typeof Pack3D === 'undefined') {
+    console.error('[initPack] Pack3D not defined — pack3d.js failed to load or parse');
+    return;
+  }
+
+  requestAnimationFrame(() => Pack3D.init());
 
   document.addEventListener('pack3d:swipe', (e) => {
     const dir = e.detail.dir < 0 ? 'left' : 'right';
