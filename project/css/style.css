@@ -427,7 +427,27 @@ body::after {
 }
 .choose-sub { font-family:'Share Tech Mono', monospace; font-size:8px; color:var(--muted); letter-spacing:0.1em; }
 
-.choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; width:100%; }
+.choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  padding: 4px;
+}
+ 
+.choice-cell-3d {
+  width: 100%;
+  aspect-ratio: 2 / 3;       /* card proportions */
+  cursor: pointer;
+  position: relative;
+}
+ 
+.choice-cell-3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+}
 
 .choice-card {
   position:relative; border:2px solid var(--border);
@@ -643,3 +663,133 @@ body::after {
 /* revealCard as canvas host */
 .rev-card { cursor: pointer; overflow: hidden; }
 .rev-card canvas { display:block; width:100%!important; height:100%!important; }
+
+/* LED Pack Counter */
+.pack-counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--orange);
+  background: rgba(0,0,0,0.6);
+  position: relative;
+  flex-shrink: 0;
+  min-width: 90px;
+}
+ 
+/* CRT scanline on counter */
+.pack-counter::after {
+  content: '';
+  position: absolute; inset: 0;
+  background: var(--scanline);
+  pointer-events: none; opacity: 0.4;
+}
+ 
+.counter-led-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+ 
+/* The big LED number */
+.counter-packs {
+  font-family: 'VT323', monospace;
+  font-size: 36px;
+  line-height: 1;
+  color: var(--orange);
+  text-shadow:
+    0 0 6px rgba(232,92,26,0.8),
+    0 0 12px rgba(232,92,26,0.4),
+    2px 2px 0 rgba(0,0,0,0.8);
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  /* Stepped blink when counting down */
+  animation: ledIdle 3s steps(2) infinite;
+}
+ 
+@keyframes ledIdle {
+  0%, 100% { opacity: 1; }
+  97%       { opacity: 0.85; }
+}
+ 
+.counter-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+ 
+.counter-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 7px;
+  letter-spacing: 0.12em;
+  color: var(--green-lt);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+ 
+.counter-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 6px;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+ 
+.counter-tag {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 6px;
+  letter-spacing: 0.2em;
+  color: var(--orange);
+  opacity: 0.6;
+  text-transform: uppercase;
+  line-height: 1;
+}
+ 
+/* State variants */
+.pack-counter[data-state="waiting"] {
+  border-color: var(--green);
+}
+.pack-counter[data-state="waiting"] .counter-packs {
+  color: var(--green-lt);
+  font-size: 22px;
+  text-shadow: 0 0 6px rgba(58,170,58,0.8), 0 0 12px rgba(58,170,58,0.3);
+  animation: ledCountdown 1s steps(2) infinite;
+  letter-spacing: 0.04em;
+}
+.pack-counter[data-state="waiting"] .counter-label {
+  color: var(--orange);
+}
+ 
+@keyframes ledCountdown {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+ 
+/* Pulse flash on pack consumed */
+.pack-counter.counter-pulse {
+  animation: counterFlash 0.3s steps(4);
+}
+@keyframes counterFlash {
+  0%   { background: rgba(232,92,26,0.3); }
+  100% { background: rgba(0,0,0,0.6); }
+}
+ 
+/* ── STATUS BAR LAYOUT UPDATE ── */
+/* The status-bar needs to accommodate the counter on the left.
+   Update the existing .status-bar rule: */
+.status-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px 0;
+  flex-shrink: 0;
+  gap: 10px;
+}
+ 
+/* Wordmark shrinks slightly to make room */
+.wordmark {
+  font-size: 18px; /* was 22px */
+}

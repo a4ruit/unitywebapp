@@ -20,27 +20,39 @@
       </div>
     </div>
 
-
     <!-- Ticker -->
     <div class="ticker-wrap">
       <div class="ticker-track" id="tickerTrack"></div>
-    </div>
-
-    <!-- Nav -->
-    <div class="nav-bar">
-      <button class="nav-btn active" data-page="pack">PACK</button>
-      <button class="nav-btn" data-page="debug">DEBUG</button>
     </div>
 
     <!-- PAGE: Pack -->
     <div class="page" id="page-pack">
 
       <div class="screen" id="screen-pack">
-        <!-- Peek stack still CSS behind the canvas -->
+        <!-- Peek stack behind canvas -->
         <div id="packStack" class="pack-stack-behind"></div>
-        <!-- Three.js canvas lives here -->
+
+        <!-- Pack counter above canvas -->
+        <div class="pack-counter" id="packCounter" data-state="ready">
+          <div class="counter-led-wrap">
+            <span class="counter-packs" id="counterPacks">03</span>
+            <div class="counter-meta">
+              <span class="counter-label" id="counterLabel">NEXT: 1 MIN</span>
+              <span class="counter-sub" id="counterSub">then: 5 min</span>
+            </div>
+          </div>
+          <div class="counter-tag">PACKS</div>
+        </div>
+
+        <!-- Three.js canvas -->
         <div id="packCanvas" class="pack-canvas-wrap"></div>
         <p class="pack-hint" id="packHint">swipe left or right</p>
+
+        <!-- Nav below pack -->
+        <div class="nav-bar">
+          <button class="nav-btn active" data-page="pack">PACK</button>
+          <button class="nav-btn" data-page="debug">DEBUG</button>
+        </div>
       </div>
 
       <div class="screen hidden" id="screen-reveal">
@@ -126,10 +138,11 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="js/Pack3d.js"></script>
-<script src="js/cards3d.js"></script>
-<script src="js/main.js"></script>
-
+  <script src="js/Pack3d.js"></script>
+  <script src="js/cards3d.js"></script>
+  <script src="js/counter.js"></script>
+  <script src="js/choiceGrid3d.js"></script>
+  <script src="js/main.js"></script>
 
 </body>
 </html>

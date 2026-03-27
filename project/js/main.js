@@ -9,6 +9,8 @@ const CARDS = [
   { id:'triangle',   name:'Obelisk',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
 ];
 
+
+
 function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
 
 function rollPack() {
@@ -146,6 +148,7 @@ function initPack() {
 }
 
 function triggerPackOpen(dir) {
+   if (!consumePack()) return;
   send('pack_opened');
   setTickerState('active');
 
@@ -191,7 +194,7 @@ function showRevealCard() {
   const isLast = revealIndex === packCards.length - 1;
 
   document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${packCards.length}`;
-  document.getElementById('revealHint').textContent    = isLast ? 'tap to keep' : 'tap to reveal next';
+  document.getElementById('revealHint').textContent = isLast ? 'swipe to keep' : 'swipe to reveal next';
 
   // Hide hint until flip completes
   document.getElementById('revealHint').style.opacity = '0';
@@ -219,47 +222,67 @@ function triggerFlash() {
   setTimeout(() => f.classList.remove('flashing'), 700);
 }
 
-// Tap to advance
-document.getElementById('revealCard').addEventListener('click', () => {
-  if (Cards3D && typeof Cards3D.isFlipping !== 'undefined' && Cards3D.isFlipping) return; // block during flip
+// Swipe to advance reveal cards
+let revealSwipeStartX = null;
+let revealSwipeStartY = null;
+const REVEAL_SWIPE_THRESHOLD = 45;
 
+const revealEl = document.getElementById('revealCard');
+
+function advanceReveal() {
   const isLast = revealIndex === packCards.length - 1;
   if (isLast) { showChoiceGrid(); return; }
-
   const stack    = document.getElementById('revealPeekStack');
   const lastPeek = stack.lastElementChild;
   if (lastPeek) { lastPeek.classList.add('peek-dismiss'); setTimeout(() => lastPeek.remove(), 300); }
-
   revealIndex++;
   showRevealCard();
+}
+
+revealEl.addEventListener('touchstart', (e) => {
+  revealSwipeStartX = e.touches[0].clientX;
+  revealSwipeStartY = e.touches[0].clientY;
+}, { passive: true });
+
+revealEl.addEventListener('touchend', (e) => {
+  if (revealSwipeStartX === null) return;
+  const dx = e.changedTouches[0].clientX - revealSwipeStartX;
+  const dy = e.changedTouches[0].clientY - revealSwipeStartY;
+  revealSwipeStartX = null;
+  revealSwipeStartY = null;
+  const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+  if (isHorizontal && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) {
+    advanceReveal();
+  }
+}, { passive: true });
+
+// Mouse fallback for desktop
+revealEl.addEventListener('mousedown', (e) => { revealSwipeStartX = e.clientX; revealSwipeStartY = e.clientY; });
+revealEl.addEventListener('mouseup',   (e) => {
+  if (revealSwipeStartX === null) return;
+  const dx = e.clientX - revealSwipeStartX;
+  const dy = e.clientY - revealSwipeStartY;
+  revealSwipeStartX = null;
+  revealSwipeStartY = null;
+  const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
+  if (isHorizontal && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) {
+    advanceReveal();
+  }
 });
 
 // ─── Choice grid ──────────────────────────────────────────────────────────────
 
 function showChoiceGrid() {
-  // Destroy card renderer before leaving reveal screen
   Cards3D.destroy();
-
-  // Restore #revealCard to a plain div for next time
+ 
   const el = document.getElementById('revealCard');
   el.innerHTML = '';
   el.style.opacity = '';
-
+ 
   showScreen('screen-choose');
-  const grid = document.getElementById('choiceGrid');
-  grid.innerHTML = '';
-  packCards.forEach((card, i) => {
-    const el = document.createElement('div');
-    el.className = 'choice-card';
-    el.dataset.rarity = card.rarity;
-    el.style.animationDelay = `${i*0.08}s`;
-    el.innerHTML = `
-      <div class="choice-shape-wrap"><div class="${card.shapeClass} choice-shape-el"></div></div>
-      <div class="choice-card-name">${card.name}</div>
-      <div class="choice-card-rarity">${card.rarity}</div>
-    `;
-    el.addEventListener('click', () => dropCard(card));
-    grid.appendChild(el);
+ 
+  ChoiceGrid3D.show(packCards, 'choiceGrid', (chosenCard) => {
+    setTimeout(() => dropCard(chosenCard), 400);
   });
 }
 
@@ -318,3 +341,4 @@ document.querySelectorAll('.debug-card').forEach(card => {
 connect();
 initPack();
 setTickerState('idle');
+initCounter()
