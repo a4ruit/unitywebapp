@@ -2,14 +2,10 @@
 // Add this section to main.js — session-based, resets on refresh
 
 const PACK_BATCHES = [
-  { packs: 3, cost: null,           label: 'FREE' },
-  { packs: 3, cost: 60,             label: '1 MIN' },
-  { packs: 3, cost: 300,            label: '5 MIN' },
-  { packs: 3, cost: 1800,           label: '30 MIN' },
-  { packs: 3, cost: 18000,          label: '5 HRS' },
-  { packs: 3, cost: 157680000,      label: '5 YRS' },
-  { packs: 3, cost: 946080000,      label: '30 YRS' },
-  { packs: 3, cost: 2461680000,     label: '78 YRS' },
+  { packs: 3, cost: null,       label: 'FREE' },
+  { packs: 3, cost: 30,         label: '30 SEC' },
+  { packs: 3, cost: 946080000,  label: '30 YRS' },
+  { packs: 3, cost: 2461680000, label: '78 YRS' },
 ];
 
 let currentBatch      = 0;

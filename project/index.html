@@ -9,7 +9,11 @@
 <body>
   <div class="bg-grid"></div>
   <div class="flash-overlay" id="flashOverlay"></div>
-
+<div class="god-pack-banner hidden" id="godPackBanner">
+  <span class="god-banner-star">★</span>
+  <span class="god-banner-text">GOD PACK</span>
+  <span class="god-banner-star">★</span>
+</div>
   <div class="shell">
 
     <div class="status-bar">
@@ -74,8 +78,8 @@
 
       <div class="screen hidden" id="screen-dropped">
         <div class="dropped-wrapper">
-          <div class="dropped-icon">⬇</div>
-          <div class="dropped-text">RESOURCE DROPPED</div>
+          <div class="dropped-icon" id="droppedIcon">⬇</div>
+          <div class="dropped-text" id="droppedText">RESOURCE DROPPED</div>
           <div class="dropped-sub" id="droppedSub"></div>
           <button class="again-btn" id="againBtn">OPEN ANOTHER PACK</button>
         </div>

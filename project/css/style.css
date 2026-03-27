@@ -793,3 +793,95 @@ body::after {
 .wordmark {
   font-size: 18px; /* was 22px */
 }
+
+/* God-pack banner */
+.god-pack-banner {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 36px;
+  background: rgba(0,0,0,0.92);
+  border: 2px solid rgba(255,255,255,0.8);
+  pointer-events: none;
+  animation: godBannerIn 0.25s steps(5) forwards;
+}
+.god-pack-banner.hidden { display: none; }
+ 
+@keyframes godBannerIn {
+  from { opacity:0; transform:translate(-50%,-50%) scale(0.85); }
+  to   { opacity:1; transform:translate(-50%,-50%) scale(1); }
+}
+ 
+.god-banner-text {
+  font-family: 'VT323', monospace;
+  font-size: 52px;
+  line-height: 1;
+  letter-spacing: 0.2em;
+  background: linear-gradient(90deg,
+    hsl(0,100%,65%), hsl(60,100%,65%),
+    hsl(120,100%,65%), hsl(180,100%,65%),
+    hsl(240,100%,65%), hsl(300,100%,65%),
+    hsl(360,100%,65%)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: godRainbow 0.8s linear infinite;
+  background-size: 200% auto;
+}
+ 
+@keyframes godRainbow {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+ 
+.god-banner-star {
+  font-family: 'VT323', monospace;
+  font-size: 40px;
+  color: #fff;
+  animation: godSpin 1s steps(4) infinite;
+}
+ 
+@keyframes godSpin {
+  0%   { transform: rotate(0deg);   opacity: 1; }
+  25%  { transform: rotate(90deg);  opacity: 0.5; }
+  50%  { transform: rotate(180deg); opacity: 1; }
+  75%  { transform: rotate(270deg); opacity: 0.5; }
+  100% { transform: rotate(360deg); opacity: 1; }
+}
+ 
+/* God-pack ticker state */
+.ticker-wrap[data-state="godpack"] {
+  border-color: #fff;
+  animation: godTickerBorder 0.6s steps(2) infinite;
+}
+.ticker-wrap[data-state="godpack"] .ticker-msg {
+  background: linear-gradient(90deg,
+    hsl(0,100%,65%), hsl(120,100%,65%), hsl(240,100%,65%), hsl(360,100%,65%)
+  );
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background-size: 200% auto;
+  animation: godRainbow 1s linear infinite;
+}
+.ticker-wrap[data-state="godpack"] .ticker-sep { color: #fff; }
+ 
+@keyframes godTickerBorder {
+  0%, 100% { border-color: #fff; }
+  50%       { border-color: rgba(255,255,255,0.4); }
+}
+ 
+/* God-pack dropped screen — star icon pulses */
+#droppedIcon {
+  transition: color 0.3s;
+}
+.screen:not(.hidden) #droppedIcon:contains('★') {
+  color: #fff;
+  animation: godSpin 2s steps(4) infinite;
+}

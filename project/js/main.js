@@ -3,28 +3,34 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 // ─── Card pool ────────────────────────────────────────────────────────────────
 
 const CARDS = [
-  { id:'small_cube',      name:'Small Cube',      rarity:'common',         rarityRank:0, command:'spawn_small_cube',  shapeClass:'shape-small-cube', desc:'A modest offering. The colony will accept it.' },
-  { id:'large_cube',      name:'Large Cube',      rarity:'uncommon',       rarityRank:1, command:'spawn_large_cube',  shapeClass:'shape-large-cube', desc:'Substantial. Colonies may compete for this.' },
-  { id:'sphere',          name:'Sphere',          rarity:'rare',           rarityRank:2, command:'spawn_sphere',      shapeClass:'shape-sphere',     desc:'Unusual geometry. Unpredictable colony response.' },
-  { id:'triangle',        name:'Obelisk',         rarity:'legendary',      rarityRank:3, command:'spawn_triangle',    shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
-  { id:'octagon',         name:'Octagon',         rarity:'mythical',       rarityRank:4, command:'spawn_octagon',     shapeClass:'shape-octagon',    desc:'Eight sides. The colony trembles.' },
-  { id:'triple_circle',   name:'Triad',           rarity:'luck-maxxing',   rarityRank:5, command:'spawn_triad',       shapeClass:'shape-triad',      desc:'Three points of contact. Fortune intervenes.' },
-  { id:'star',            name:'Star',            rarity:'legendary-alpha',rarityRank:6, command:'spawn_star',        shapeClass:'shape-star',       desc:'It should not exist. Yet here it is.' },
+  { id:'small_cube',  name:'Small Cube', rarity:'common',          rarityRank:0, command:'spawn_small_cube', shapeClass:'shape-small-cube', desc:'A modest offering. The colony will accept it.' },
+  { id:'large_cube',  name:'Large Cube', rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', shapeClass:'shape-large-cube', desc:'Substantial. Colonies may compete for this.' },
+  { id:'sphere',      name:'Sphere',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     shapeClass:'shape-sphere',     desc:'Unusual geometry. Unpredictable colony response.' },
+  { id:'triangle',    name:'Obelisk',    rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
+  { id:'octagon',     name:'Octagon',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    shapeClass:'shape-octagon',    desc:'Eight sides. The colony trembles.' },
+  { id:'triad',       name:'Triad',      rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      shapeClass:'shape-triad',      desc:'Three points of contact. Fortune intervenes.' },
+  { id:'star',        name:'Star',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       shapeClass:'shape-star',       desc:'It should not exist. Yet here it is.' },
 ];
- 
+
 function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
- 
+
+let isGodPack = false;
+
 function rollPack() {
   const cards = [];
-  const roll  = Math.random();
- 
-  // Ultra-rare tiers — one guaranteed slot replaces the top card
-  // legendary-alpha: 1/25 = 0.04
-  // luck-maxxing:    1/20 = 0.05  (cumulative 0.09)
-  // mythical:        1/15 = 0.067 (cumulative ~0.157)
-  // legendary:       1/10 = 0.1   (cumulative ~0.257, existing)
-  // rare:            1/5  = 0.2   (cumulative ~0.457, existing)
- 
+
+  if (Math.random() < 0.0333) {
+    isGodPack = true;
+    cards.push(pick('mythical'));
+    cards.push(pick('luck-maxxing'));
+    cards.push(pick('legendary-alpha'));
+    cards.push(pick('legendary-alpha'));
+    cards.sort((a, b) => a.rarityRank - b.rarityRank);
+    return cards;
+  }
+
+  isGodPack = false;
+  const roll = Math.random();
   let topCard;
   if      (roll < 0.04)  topCard = pick('legendary-alpha');
   else if (roll < 0.09)  topCard = pick('luck-maxxing');
@@ -32,17 +38,14 @@ function rollPack() {
   else if (roll < 0.257) topCard = pick('legendary');
   else if (roll < 0.457) topCard = pick('rare');
   else                   topCard = pick('uncommon');
- 
-  // Fill remaining 3 slots with commons/uncommons
+
   cards.push(pick('common'));
   cards.push(pick('common'));
   cards.push(pick('uncommon'));
   cards.push(topCard);
- 
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
   return cards;
 }
- 
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +53,7 @@ let ws             = null;
 let reconnectTimer = null;
 let packCards      = [];
 let revealIndex    = 0;
+let godPackClaimed = [];
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
 
@@ -104,6 +108,14 @@ const TICKER_MESSAGES = {
     'The ants will remember this',
     '⬛ RARE EVENT LOGGED ⬛',
   ],
+  godpack: [
+    '★ GOD-PACK DETECTED ★',
+    'All resources claimed by the colony',
+    'The ants have never seen this',
+    '★ FOUR RELICS — ALL YOURS ★',
+    'Colony capacity exceeded',
+    'This should not be possible',
+  ],
 };
 
 function buildTickerHTML(messages) {
@@ -146,57 +158,68 @@ function showScreen(id) {
 
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
-
-  if (typeof Pack3D === 'undefined') {
-    console.error('[initPack] Pack3D not defined');
-    return;
-  }
-
+  if (typeof Pack3D === 'undefined') { console.error('[initPack] Pack3D not defined'); return; }
   requestAnimationFrame(() => Pack3D.init());
-
   document.addEventListener('pack3d:swipe', (e) => {
-    const dir = e.detail.dir < 0 ? 'left' : 'right';
-    triggerPackOpen(dir);
+    triggerPackOpen(e.detail.dir < 0 ? 'left' : 'right');
   });
 }
 
 function triggerPackOpen(dir) {
-   if (!consumePack()) return;
+  if (!consumePack()) return;
   send('pack_opened');
-  setTickerState('active');
 
-  packCards   = rollPack();
-  revealIndex = 0;
+  packCards      = rollPack();
+  revealIndex    = 0;
+  godPackClaimed = [];
 
+  setTickerState(isGodPack ? 'godpack' : 'active');
   buildPeekStack('packStack');
 
-  // Trigger the 3D throw + particles
   Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
+    if (isGodPack) triggerGodPackFlash();
     setTimeout(() => {
       showScreen('screen-reveal');
       buildPeekStack('revealPeekStack');
       showRevealCard();
-    }, 80);
+    }, isGodPack ? 900 : 80);
   });
 }
 
+// ─── God-pack flash ───────────────────────────────────────────────────────────
+
+function triggerGodPackFlash() {
+  const f = document.getElementById('flashOverlay');
+  let count = 0;
+  const iv = setInterval(() => {
+    f.classList.add('flashing');
+    setTimeout(() => f.classList.remove('flashing'), 280);
+    if (++count >= 3) clearInterval(iv);
+  }, 320);
+
+  const banner = document.getElementById('godPackBanner');
+  if (banner) {
+    banner.classList.remove('hidden');
+    setTimeout(() => banner.classList.add('hidden'), 2000);
+  }
+}
+
 // ─── Peek stack ───────────────────────────────────────────────────────────────
+
+const RARITY_RANK_MAP = { common:0, uncommon:1, rare:2, legendary:3, mythical:4, 'luck-maxxing':5, 'legendary-alpha':6 };
 
 function buildPeekStack(id) {
   const stack = document.getElementById(id);
   stack.innerHTML = '';
   stack.classList.remove('stack-reveal');
-
   const rarities = [...new Set(packCards.map(c => c.rarity))]
-    .sort((a, b) => ({ common:0, uncommon:1, rare:2, legendary:3 }[b] - { common:0, uncommon:1, rare:2, legendary:3 }[a]));
-
+    .sort((a, b) => (RARITY_RANK_MAP[b] ?? 0) - (RARITY_RANK_MAP[a] ?? 0));
   rarities.forEach((r, i) => {
     const el = document.createElement('div');
     el.className = `peek-card peek-${i}`;
     el.dataset.rarity = r;
     stack.appendChild(el);
   });
-
   setTimeout(() => stack.classList.add('stack-reveal'), 50);
 }
 
@@ -207,26 +230,24 @@ function showRevealCard() {
   const isLast = revealIndex === packCards.length - 1;
 
   document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${packCards.length}`;
-  document.getElementById('revealHint').textContent = isLast ? 'swipe to keep' : 'swipe to reveal next';
-
-  // Hide hint until flip completes
+  document.getElementById('revealHint').textContent    = isLast
+    ? (isGodPack ? 'swipe to claim all' : 'swipe to keep')
+    : 'swipe to reveal next';
   document.getElementById('revealHint').style.opacity = '0';
 
-if (['mythical','luck-maxxing','legendary-alpha'].includes(card.rarity)) {
-  triggerFlash();
-  setTickerState('legendary');
-}
+  const isUltraRare = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(card.rarity);
+  if (isUltraRare) {
+    triggerFlash();
+    setTickerState(isGodPack ? 'godpack' : 'legendary');
+  }
 
-  // Hand off to Cards3D — it replaces #revealCard contents with a canvas
   Cards3D.showCard(card, 'revealCard', () => {
-    // Flip complete — show hint
     document.getElementById('revealHint').style.opacity = '';
   });
 
-  // Make the rev-card container visible and sized correctly
   const el = document.getElementById('revealCard');
   el.dataset.rarity = card.rarity;
-  el.style.opacity  = '1'; // Cards3D manages its own canvas opacity via Three.js
+  el.style.opacity  = '1';
 }
 
 function triggerFlash() {
@@ -235,16 +256,19 @@ function triggerFlash() {
   setTimeout(() => f.classList.remove('flashing'), 700);
 }
 
-// Swipe to advance reveal cards
+// ─── Swipe to advance ─────────────────────────────────────────────────────────
+
 let revealSwipeStartX = null;
 let revealSwipeStartY = null;
 const REVEAL_SWIPE_THRESHOLD = 45;
-
 const revealEl = document.getElementById('revealCard');
 
 function advanceReveal() {
   const isLast = revealIndex === packCards.length - 1;
-  if (isLast) { showChoiceGrid(); return; }
+  if (isLast) {
+    isGodPack ? showGodPackClaimGrid() : showChoiceGrid();
+    return;
+  }
   const stack    = document.getElementById('revealPeekStack');
   const lastPeek = stack.lastElementChild;
   if (lastPeek) { lastPeek.classList.add('peek-dismiss'); setTimeout(() => lastPeek.remove(), 300); }
@@ -261,50 +285,69 @@ revealEl.addEventListener('touchend', (e) => {
   if (revealSwipeStartX === null) return;
   const dx = e.changedTouches[0].clientX - revealSwipeStartX;
   const dy = e.changedTouches[0].clientY - revealSwipeStartY;
-  revealSwipeStartX = null;
-  revealSwipeStartY = null;
-  const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
-  if (isHorizontal && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) {
-    advanceReveal();
-  }
+  revealSwipeStartX = null; revealSwipeStartY = null;
+  if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) advanceReveal();
 }, { passive: true });
 
-// Mouse fallback for desktop
 revealEl.addEventListener('mousedown', (e) => { revealSwipeStartX = e.clientX; revealSwipeStartY = e.clientY; });
-revealEl.addEventListener('mouseup',   (e) => {
+revealEl.addEventListener('mouseup', (e) => {
   if (revealSwipeStartX === null) return;
   const dx = e.clientX - revealSwipeStartX;
   const dy = e.clientY - revealSwipeStartY;
-  revealSwipeStartX = null;
-  revealSwipeStartY = null;
-  const isHorizontal = Math.abs(dx) > Math.abs(dy) * 1.2;
-  if (isHorizontal && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) {
-    advanceReveal();
-  }
+  revealSwipeStartX = null; revealSwipeStartY = null;
+  if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) advanceReveal();
 });
 
-// ─── Choice grid ──────────────────────────────────────────────────────────────
+// ─── Normal choice grid ───────────────────────────────────────────────────────
 
 function showChoiceGrid() {
   Cards3D.destroy();
- 
   const el = document.getElementById('revealCard');
-  el.innerHTML = '';
-  el.style.opacity = '';
- 
+  el.innerHTML = ''; el.style.opacity = '';
   showScreen('screen-choose');
- 
+  document.querySelector('.choose-title').textContent = 'CHOOSE A RESOURCE';
+  document.querySelector('.choose-sub').textContent   = 'feed your colony';
   ChoiceGrid3D.show(packCards, 'choiceGrid', (chosenCard) => {
     setTimeout(() => dropCard(chosenCard), 400);
   });
 }
 
-// ─── Drop ─────────────────────────────────────────────────────────────────────
+// ─── God-pack claim grid ──────────────────────────────────────────────────────
+
+function showGodPackClaimGrid() {
+  Cards3D.destroy();
+  const el = document.getElementById('revealCard');
+  el.innerHTML = ''; el.style.opacity = '';
+  showScreen('screen-choose');
+  document.querySelector('.choose-title').textContent = 'GOD-PACK';
+  document.querySelector('.choose-sub').textContent   = `claim all ${packCards.length} — tap each to keep`;
+
+  ChoiceGrid3D.showGodPack(packCards, 'choiceGrid', (claimedCard) => {
+    send(claimedCard.command);
+    godPackClaimed.push(claimedCard);
+    if (godPackClaimed.length === packCards.length) {
+      setTimeout(showGodPackComplete, 600);
+    }
+  });
+}
+
+function showGodPackComplete() {
+  ChoiceGrid3D.destroy();
+  const names = godPackClaimed.map(c => c.name.toUpperCase()).join(' · ');
+  document.getElementById('droppedSub').textContent  = names;
+  document.getElementById('droppedText').textContent = 'GOD-PACK CLAIMED';
+  document.getElementById('droppedIcon').textContent = '★';
+  showScreen('screen-dropped');
+  setTickerState('godpack');
+}
+
+// ─── Normal drop ──────────────────────────────────────────────────────────────
 
 function dropCard(card) {
   send(card.command);
-  document.getElementById('droppedSub').textContent =
-    `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
+  document.getElementById('droppedSub').textContent  = `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
+  document.getElementById('droppedText').textContent = 'RESOURCE DROPPED';
+  document.getElementById('droppedIcon').textContent = '⬇';
   showScreen('screen-dropped');
 }
 
@@ -313,6 +356,8 @@ function dropCard(card) {
 document.getElementById('againBtn').addEventListener('click', () => {
   document.getElementById('packStack').innerHTML       = '';
   document.getElementById('revealPeekStack').innerHTML = '';
+  isGodPack      = false;
+  godPackClaimed = [];
   Pack3D.resetPack();
   showScreen('screen-pack');
   setTickerState('idle');
@@ -325,10 +370,8 @@ const debugLog = document.getElementById('debugLog');
 function addLogEntry(command, rarity) {
   const empty = debugLog.querySelector('.debug-log-empty');
   if (empty) empty.remove();
-
   const now  = new Date();
   const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
-
   const entry = document.createElement('div');
   entry.className = 'debug-log-entry';
   entry.dataset.rarity = rarity;
@@ -354,4 +397,4 @@ document.querySelectorAll('.debug-card').forEach(card => {
 connect();
 initPack();
 setTickerState('idle');
-initCounter()
+initCounter();

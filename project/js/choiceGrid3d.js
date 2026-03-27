@@ -1,15 +1,21 @@
-// choiceGrid3d.js — 2x2 grid of 3D choice cards with animated texture support
+// choiceGrid3d.js — 2x2 grid of 3D choice cards
 // Depends on: cardTextures.js
-// Exposes: ChoiceGrid3D.show(cards, containerId, onPick), ChoiceGrid3D.destroy()
+// Exposes: ChoiceGrid3D.show(cards, containerId, onPick)
+//           ChoiceGrid3D.showGodPack(cards, containerId, onClaim)
+//           ChoiceGrid3D.destroy()
 
 const ChoiceGrid3D = (() => {
 
   const RARITY_ORDER = { common:0, uncommon:1, rare:2, legendary:3, mythical:4, 'luck-maxxing':5, 'legendary-alpha':6 };
   const STAGGER_MS   = 180;
 
-  let cells    = [];
-  let onPickCb = null;
-  let picking  = false;
+  let cells      = [];
+  let onPickCb   = null;
+  let onClaimCb  = null;
+  let picking    = false;
+  let godMode    = false;
+
+  // ─── Cell creation ─────────────────────────────────────────────────────────
 
   function createCell(containerId, card) {
     const wrap = document.getElementById(containerId);
@@ -44,7 +50,6 @@ const ChoiceGrid3D = (() => {
       scene.add(rarityLight);
     }
 
-    // Build face canvas
     const faceCanvas = document.createElement('canvas');
     faceCanvas.width = 256; faceCanvas.height = 384;
     CardTextures.buildFace(card, faceCanvas, 0);
@@ -68,18 +73,19 @@ const ChoiceGrid3D = (() => {
     mesh.rotation.y = Math.PI;
     scene.add(mesh);
 
-    const animated = CardTextures.isAnimated(card.rarity);
+    const animated  = CardTextures.isAnimated(card.rarity);
     const startTime = performance.now() / 1000;
 
     const cell = {
       renderer, scene, camera, mesh, rarityLight, card,
       faceCanvas, faceTex, frontMat, animated, startTime,
       animFrame: null,
-      state: 'waiting',
+      state: 'waiting', // waiting | flipping | idle | pulse | flipping-back | fading | claimed
       flipProgress: 0,
       idleT: Math.random() * Math.PI * 2,
       opacity: 1,
       pulseT: 0,
+      claimVY: 0,
     };
 
     renderer.domElement.addEventListener('click', () => onCellClick(cell));
@@ -88,6 +94,8 @@ const ChoiceGrid3D = (() => {
     return cell;
   }
 
+  // ─── Animation loop ────────────────────────────────────────────────────────
+
   function startCellLoop(cell) {
     function loop() {
       cell.animFrame = requestAnimationFrame(loop);
@@ -95,8 +103,8 @@ const ChoiceGrid3D = (() => {
       const t = performance.now() / 1000 - cell.startTime;
       const { mesh, rarityLight, card, faceCanvas, faceTex, animated } = cell;
 
-      // Animated texture update
-      if (animated && faceCanvas && faceTex && cell.state === 'idle') {
+      // Animated texture
+      if (animated && faceCanvas && faceTex && (cell.state === 'idle' || cell.state === 'pulse')) {
         CardTextures.buildFace(card, faceCanvas, t);
         faceTex.needsUpdate = true;
       }
@@ -106,14 +114,11 @@ const ChoiceGrid3D = (() => {
         const ease = 1 - Math.pow(1 - Math.min(cell.flipProgress,1), 3);
         mesh.rotation.y = Math.PI * (1 - ease);
         mesh.position.y = Math.sin(Math.min(cell.flipProgress,1) * Math.PI) * 0.12;
-
-        // Update animated texture during reveal
         if (animated && faceCanvas && faceTex && cell.flipProgress > 0.5) {
           CardTextures.buildFace(card, faceCanvas, t);
           faceTex.needsUpdate = true;
         }
-
-        if (cell.flipProgress >= 1) cell.state = 'idle';
+        if (cell.flipProgress >= 1) { cell.state = 'idle'; cell.flipProgress = 0; }
 
       } else if (cell.state === 'idle') {
         mesh.rotation.y = lerp(mesh.rotation.y, Math.sin(cell.idleT*0.6)*0.05, 0.05);
@@ -121,19 +126,50 @@ const ChoiceGrid3D = (() => {
         mesh.position.y = lerp(mesh.position.y, Math.sin(cell.idleT*0.8)*0.025, 0.08);
 
       } else if (cell.state === 'pulse') {
+        // Normal pick mode — pulse then fire callback
         cell.pulseT += 0.06;
         const pulse = 0.5 + Math.sin(cell.pulseT * 4) * 0.5;
         cell.frontMat.emissiveIntensity = pulse * 1.5;
-        if (rarityLight) rarityLight.intensity = pulse * (cfg_intensity(card.rarity) * 1.5);
+        if (rarityLight) rarityLight.intensity = pulse * cfgIntensity(card.rarity) * 1.5;
         mesh.rotation.y = Math.sin(cell.pulseT * 3) * 0.08;
-        // Animated texture during pulse too
+        if (cell.pulseT > Math.PI) {
+          cell.state = 'done';
+          if (onPickCb) { onPickCb(card); onPickCb = null; }
+        }
+
+      } else if (cell.state === 'claim-pulse') {
+        // God-pack mode — pulse then fly up and fade
+        cell.pulseT += 0.055;
+        const pulse = 0.5 + Math.sin(cell.pulseT * 5) * 0.5;
+        cell.frontMat.emissiveIntensity = pulse * 2.0;
+        if (rarityLight) rarityLight.intensity = pulse * cfgIntensity(card.rarity) * 2;
+        mesh.rotation.y = Math.sin(cell.pulseT * 4) * 0.12;
+        mesh.rotation.z = Math.sin(cell.pulseT * 3) * 0.04;
+
         if (animated && faceCanvas && faceTex) {
           CardTextures.buildFace(card, faceCanvas, t);
           faceTex.needsUpdate = true;
         }
-        if (cell.pulseT > Math.PI) {
-          cell.state = 'done';
-          if (onPickCb) { onPickCb(card); onPickCb = null; }
+
+        if (cell.pulseT > Math.PI * 0.7) {
+          cell.state     = 'claimed';
+          cell.claimVY   = 0.04;
+          if (onClaimCb) onClaimCb(card);
+        }
+
+      } else if (cell.state === 'claimed') {
+        // Fly upward and fade
+        cell.claimVY   += 0.004;
+        mesh.position.y += cell.claimVY;
+        cell.opacity    = lerp(cell.opacity, 0, 0.06);
+        mesh.material.forEach(m => {
+          if (!m.transparent) m.transparent = true;
+          m.opacity = cell.opacity;
+        });
+        if (cell.opacity < 0.02) {
+          cell.state = 'gone';
+          cell.renderer.domElement.style.opacity = '0';
+          cell.renderer.domElement.style.pointerEvents = 'none';
         }
 
       } else if (cell.state === 'flipping-back') {
@@ -144,27 +180,32 @@ const ChoiceGrid3D = (() => {
 
       } else if (cell.state === 'fading') {
         cell.opacity = lerp(cell.opacity, 0, 0.07);
-        mesh.material.forEach(m => { if (!m.transparent) m.transparent = true; m.opacity = cell.opacity; });
+        mesh.material.forEach(m => {
+          if (!m.transparent) m.transparent = true;
+          m.opacity = cell.opacity;
+        });
         if (cell.opacity < 0.01) {
           cell.state = 'gone';
           cell.renderer.domElement.style.opacity = '0';
+          cell.renderer.domElement.style.pointerEvents = 'none';
         }
       }
 
-      // Rarity light pulse in idle
-      if (rarityLight && cell.state === 'idle') {
+      // Rarity light in idle/claim-pulse
+      if (rarityLight && (cell.state === 'idle' || cell.state === 'claim-pulse')) {
         const rarity = card.rarity;
+        const base   = cfgIntensity(rarity);
         if (rarity === 'legendary-alpha') {
-          rarityLight.intensity = 4.0 + Math.sin(t*3)*1.5;
+          rarityLight.intensity = base + Math.sin(t*3)*1.5;
           rarityLight.color.setHSL((t*0.1)%1, 1, 0.7);
         } else if (rarity === 'luck-maxxing') {
-          rarityLight.intensity = 3.2 + Math.sin(t*2.5)*1.0;
+          rarityLight.intensity = base + Math.sin(t*2.5)*1.0;
         } else if (rarity === 'mythical') {
-          rarityLight.intensity = 3.0 + Math.sin(t*3.5)*1.2;
+          rarityLight.intensity = base + Math.sin(t*3.5)*1.2;
         } else if (rarity === 'legendary') {
-          rarityLight.intensity = 2.5 + Math.sin(cell.idleT*2)*0.8;
+          rarityLight.intensity = base + Math.sin(cell.idleT*2)*0.8;
         } else if (rarity === 'rare') {
-          rarityLight.intensity = 1.8 + Math.sin(cell.idleT*1.4)*0.3;
+          rarityLight.intensity = base + Math.sin(cell.idleT*1.4)*0.3;
         }
       }
 
@@ -173,35 +214,63 @@ const ChoiceGrid3D = (() => {
     loop();
   }
 
-  function cfg_intensity(rarity) {
-    const map = { common:0, uncommon:1.2, rare:1.8, legendary:2.5, mythical:3.0, 'luck-maxxing':3.2, 'legendary-alpha':4.0 };
-    return map[rarity] || 1;
+  function cfgIntensity(rarity) {
+    return { common:0, uncommon:1.2, rare:1.8, legendary:2.5, mythical:3.0, 'luck-maxxing':3.2, 'legendary-alpha':4.0 }[rarity] || 1;
   }
 
   function lerp(a,b,t) { return a+(b-a)*t; }
 
-  function onCellClick(chosenCell) {
-    if (picking) return;
-    if (chosenCell.state !== 'idle') return;
-    picking = true;
+  // ─── Click handler ─────────────────────────────────────────────────────────
 
-    cells.forEach(cell => {
-      if (cell === chosenCell) {
-        cell.state  = 'pulse';
-        cell.pulseT = 0;
-      } else {
-        setTimeout(() => {
-          if (cell.state === 'idle') { cell.state = 'flipping-back'; cell.flipProgress = 0; }
-        }, 80 + Math.random() * 120);
-      }
-    });
+  function onCellClick(chosenCell) {
+    if (chosenCell.state !== 'idle') return;
+
+    if (godMode) {
+      // God-pack: claim this card, leave others untouched
+      chosenCell.state  = 'claim-pulse';
+      chosenCell.pulseT = 0;
+
+    } else {
+      // Normal mode: pick one, dismiss others
+      if (picking) return;
+      picking = true;
+      cells.forEach(cell => {
+        if (cell === chosenCell) {
+          cell.state = 'pulse'; cell.pulseT = 0;
+        } else {
+          setTimeout(() => {
+            if (cell.state === 'idle') { cell.state = 'flipping-back'; cell.flipProgress = 0; }
+          }, 80 + Math.random() * 120);
+        }
+      });
+    }
   }
+
+  // ─── Public: show (normal pick mode) ──────────────────────────────────────
 
   function show(cards, containerId, onPick) {
     destroy();
-    picking  = false;
-    onPickCb = onPick;
+    picking   = false;
+    godMode   = false;
+    onPickCb  = onPick;
+    onClaimCb = null;
+    _buildGrid(cards, containerId);
+  }
 
+  // ─── Public: showGodPack (claim-all mode) ─────────────────────────────────
+
+  function showGodPack(cards, containerId, onClaim) {
+    destroy();
+    picking   = false;
+    godMode   = true;
+    onPickCb  = null;
+    onClaimCb = onClaim;
+    _buildGrid(cards, containerId);
+  }
+
+  // ─── Shared grid builder ──────────────────────────────────────────────────
+
+  function _buildGrid(cards, containerId) {
     const grid = document.getElementById(containerId);
     if (!grid) return;
     grid.innerHTML = '';
@@ -228,6 +297,8 @@ const ChoiceGrid3D = (() => {
     });
   }
 
+  // ─── Destroy ──────────────────────────────────────────────────────────────
+
   function destroy() {
     cells.forEach(cell => {
       if (!cell) return;
@@ -238,8 +309,8 @@ const ChoiceGrid3D = (() => {
       if (cell.rarityLight) cell.scene?.remove(cell.rarityLight);
       cell.renderer?.dispose();
     });
-    cells = []; onPickCb = null; picking = false;
+    cells = []; onPickCb = null; onClaimCb = null; picking = false; godMode = false;
   }
 
-  return { show, destroy };
+  return { show, showGodPack, destroy };
 })();
