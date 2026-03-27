@@ -3,33 +3,46 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 // ─── Card pool ────────────────────────────────────────────────────────────────
 
 const CARDS = [
-  { id:'small_cube', name:'Small Cube',  rarity:'common',    rarityRank:0, command:'spawn_small_cube', shapeClass:'shape-small-cube', desc:'A modest offering. The colony will accept it.' },
-  { id:'large_cube', name:'Large Cube',  rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', shapeClass:'shape-large-cube', desc:'Substantial. Colonies may compete for this.' },
-  { id:'sphere',     name:'Sphere',      rarity:'rare',      rarityRank:2, command:'spawn_sphere',     shapeClass:'shape-sphere',     desc:'Unusual geometry. Unpredictable colony response.' },
-  { id:'triangle',   name:'Obelisk',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
+  { id:'small_cube',      name:'Small Cube',      rarity:'common',         rarityRank:0, command:'spawn_small_cube',  shapeClass:'shape-small-cube', desc:'A modest offering. The colony will accept it.' },
+  { id:'large_cube',      name:'Large Cube',      rarity:'uncommon',       rarityRank:1, command:'spawn_large_cube',  shapeClass:'shape-large-cube', desc:'Substantial. Colonies may compete for this.' },
+  { id:'sphere',          name:'Sphere',          rarity:'rare',           rarityRank:2, command:'spawn_sphere',      shapeClass:'shape-sphere',     desc:'Unusual geometry. Unpredictable colony response.' },
+  { id:'triangle',        name:'Obelisk',         rarity:'legendary',      rarityRank:3, command:'spawn_triangle',    shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
+  { id:'octagon',         name:'Octagon',         rarity:'mythical',       rarityRank:4, command:'spawn_octagon',     shapeClass:'shape-octagon',    desc:'Eight sides. The colony trembles.' },
+  { id:'triple_circle',   name:'Triad',           rarity:'luck-maxxing',   rarityRank:5, command:'spawn_triad',       shapeClass:'shape-triad',      desc:'Three points of contact. Fortune intervenes.' },
+  { id:'star',            name:'Star',            rarity:'legendary-alpha',rarityRank:6, command:'spawn_star',        shapeClass:'shape-star',       desc:'It should not exist. Yet here it is.' },
 ];
-
-
-
+ 
 function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
-
+ 
 function rollPack() {
-  const cards        = [];
-  const hasLegendary = Math.random() < 0.1;
-  const hasRare      = !hasLegendary && Math.random() < 0.2;
-
+  const cards = [];
+  const roll  = Math.random();
+ 
+  // Ultra-rare tiers — one guaranteed slot replaces the top card
+  // legendary-alpha: 1/25 = 0.04
+  // luck-maxxing:    1/20 = 0.05  (cumulative 0.09)
+  // mythical:        1/15 = 0.067 (cumulative ~0.157)
+  // legendary:       1/10 = 0.1   (cumulative ~0.257, existing)
+  // rare:            1/5  = 0.2   (cumulative ~0.457, existing)
+ 
+  let topCard;
+  if      (roll < 0.04)  topCard = pick('legendary-alpha');
+  else if (roll < 0.09)  topCard = pick('luck-maxxing');
+  else if (roll < 0.157) topCard = pick('mythical');
+  else if (roll < 0.257) topCard = pick('legendary');
+  else if (roll < 0.457) topCard = pick('rare');
+  else                   topCard = pick('uncommon');
+ 
+  // Fill remaining 3 slots with commons/uncommons
+  cards.push(pick('common'));
+  cards.push(pick('common'));
   cards.push(pick('uncommon'));
-  if (hasLegendary) {
-    cards.push(pick('common')); cards.push(pick('common')); cards.push(pick('legendary'));
-  } else if (hasRare) {
-    cards.push(pick('common')); cards.push(pick('uncommon')); cards.push(pick('rare'));
-  } else {
-    cards.push(pick('common')); cards.push(pick('common')); cards.push(pick('uncommon'));
-  }
-
+  cards.push(topCard);
+ 
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
   return cards;
 }
+ 
 
 // ─── State ───────────────────────────────────────────────────────────────────
 
@@ -199,10 +212,10 @@ function showRevealCard() {
   // Hide hint until flip completes
   document.getElementById('revealHint').style.opacity = '0';
 
-  if (card.rarity === 'legendary') {
-    triggerFlash();
-    setTickerState('legendary');
-  }
+if (['mythical','luck-maxxing','legendary-alpha'].includes(card.rarity)) {
+  triggerFlash();
+  setTickerState('legendary');
+}
 
   // Hand off to Cards3D — it replaces #revealCard contents with a canvas
   Cards3D.showCard(card, 'revealCard', () => {
