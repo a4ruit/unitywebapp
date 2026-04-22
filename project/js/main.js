@@ -3,13 +3,69 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 // ─── Card pool ────────────────────────────────────────────────────────────────
 
 const CARDS = [
-  { id:'small_cube',  name:'Small Cube', rarity:'common',          rarityRank:0, command:'spawn_small_cube', shapeClass:'shape-small-cube', desc:'A modest offering. The colony will accept it.' },
-  { id:'large_cube',  name:'Large Cube', rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', shapeClass:'shape-large-cube', desc:'Substantial. Colonies may compete for this.' },
-  { id:'sphere',      name:'Sphere',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     shapeClass:'shape-sphere',     desc:'Unusual geometry. Unpredictable colony response.' },
-  { id:'triangle',    name:'Obelisk',    rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   shapeClass:'shape-triangle',   desc:'Ancient form. The colony will remember this.' },
-  { id:'octagon',     name:'Octagon',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    shapeClass:'shape-octagon',    desc:'Eight sides. The colony trembles.' },
-  { id:'triad',       name:'Triad',      rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      shapeClass:'shape-triad',      desc:'Three points of contact. Fortune intervenes.' },
-  { id:'star',        name:'Star',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       shapeClass:'shape-star',       desc:'It should not exist. Yet here it is.' },
+  {
+    id:'small_cube',
+    name:'Plastic Bag',
+    rarity:'common',
+    rarityRank:0,
+    command:'spawn_small_cube',
+    shapeClass:'shape-small-cube',
+    desc:'Lightweight. Permanent. The colony accepts all offerings.'
+  },
+  {
+    id:'large_cube',
+    name:'Cardboard Box',
+    rarity:'uncommon',
+    rarityRank:1,
+    command:'spawn_large_cube',
+    shapeClass:'shape-large-cube',
+    desc:'It contained something once.'
+  },
+  {
+    id:'sphere',
+    name:'Crushed Can',
+    rarity:'rare',
+    rarityRank:2,
+    command:'spawn_sphere',
+    shapeClass:'shape-sphere',
+    desc:'Aluminium. Recyclable in theory.'
+  },
+  {
+    id:'triangle',
+    name:'Glass Bottle',
+    rarity:'legendary',
+    rarityRank:3,
+    command:'spawn_triangle',
+    shapeClass:'shape-triangle',
+    desc:'Shatter radius: significant.'
+  },
+  {
+    id:'octagon',
+    name:'Bottle Cap',
+    rarity:'mythical',
+    rarityRank:4,
+    command:'spawn_octagon',
+    shapeClass:'shape-octagon',
+    desc:'Dense. Pointless. Irreducible.'
+  },
+  {
+    id:'triad',
+    name:'Cigarette Butts',
+    rarity:'luck-maxxing',
+    rarityRank:5,
+    command:'spawn_triad',
+    shapeClass:'shape-triad',
+    desc:'Three. Always three.'
+  },
+  {
+    id:'star',
+    name:'Styrofoam Chunk',
+    rarity:'legendary-alpha',
+    rarityRank:6,
+    command:'spawn_star',
+    shapeClass:'shape-star',
+    desc:'Will outlast everything in this environment including you.'
+  },
 ];
 
 function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
@@ -87,34 +143,34 @@ function send(msg) {
 
 const TICKER_MESSAGES = {
   idle: [
-    'Colony feeding in progress',
-    'Awaiting resource drop',
-    'Ant activity nominal',
-    'Open a pack to begin',
-    'Resources sustain the colony',
-    'What will you offer?',
+    'Awaiting next deposit',
+    'The environment is watching',
+    'Open a pack to contribute',
+    'What will you leave behind?',
+    'Every pack pollutes',
+    'Nothing is free. Nothing decomposes.',
   ],
   active: [
-    'Pack opened — resources incoming',
-    'Colony on alert',
-    'Scanning card contents',
-    'Choose wisely — the ants are watching',
-    'Resource acquisition sequence initiated',
+    'Pack opened — waste incoming',
+    'Environmental load increasing',
+    'Scanning contents',
+    'Choose wisely — it stays forever',
+    'Contribution logged',
   ],
   legendary: [
-    '⬛ LEGENDARY RESOURCE DETECTED ⬛',
-    'Colony behaviour unpredictable',
-    'Ancient form recognised',
-    'The ants will remember this',
-    '⬛ RARE EVENT LOGGED ⬛',
+    '⬛ HIGH-IMPACT WASTE DETECTED ⬛',
+    'Shatter radius: significant',
+    'The environment will remember this',
+    'Decomposition time: unknown',
+    '⬛ RARE POLLUTANT LOGGED ⬛',
   ],
   godpack: [
-    '★ GOD-PACK DETECTED ★',
-    'All resources claimed by the colony',
-    'The ants have never seen this',
-    '★ FOUR RELICS — ALL YOURS ★',
-    'Colony capacity exceeded',
-    'This should not be possible',
+    '★ LANDFILL EVENT DETECTED ★',
+    'Full dump in progress',
+    'The environment has never seen this',
+    '★ MAXIMUM IMPACT ★',
+    'Capacity exceeded',
+    'You did this.',
   ],
 };
 
@@ -231,7 +287,7 @@ function showRevealCard() {
 
   document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${packCards.length}`;
   document.getElementById('revealHint').textContent    = isLast
-    ? (isGodPack ? 'swipe to claim all' : 'swipe to keep')
+    ? (isGodPack ? 'swipe to dump all' : 'swipe to drop')
     : 'swipe to reveal next';
   document.getElementById('revealHint').style.opacity = '0';
 
@@ -305,8 +361,8 @@ function showChoiceGrid() {
   const el = document.getElementById('revealCard');
   el.innerHTML = ''; el.style.opacity = '';
   showScreen('screen-choose');
-  document.querySelector('.choose-title').textContent = 'CHOOSE A RESOURCE';
-  document.querySelector('.choose-sub').textContent   = 'feed your colony';
+  document.querySelector('.choose-title').textContent = 'CHOOSE YOUR WASTE';
+  document.querySelector('.choose-sub').textContent   = 'one drop per pack';
   ChoiceGrid3D.show(packCards, 'choiceGrid', (chosenCard) => {
     setTimeout(() => dropCard(chosenCard), 400);
   });
@@ -319,8 +375,8 @@ function showGodPackClaimGrid() {
   const el = document.getElementById('revealCard');
   el.innerHTML = ''; el.style.opacity = '';
   showScreen('screen-choose');
-  document.querySelector('.choose-title').textContent = 'GOD-PACK';
-  document.querySelector('.choose-sub').textContent   = `claim all ${packCards.length} — tap each to keep`;
+  document.querySelector('.choose-title').textContent = 'FULL DUMP';
+  document.querySelector('.choose-sub').textContent   = `drop all ${packCards.length} — tap each to release`;
 
   ChoiceGrid3D.showGodPack(packCards, 'choiceGrid', (claimedCard) => {
     send(claimedCard.command);
@@ -335,7 +391,7 @@ function showGodPackComplete() {
   ChoiceGrid3D.destroy();
   const names = godPackClaimed.map(c => c.name.toUpperCase()).join(' · ');
   document.getElementById('droppedSub').textContent  = names;
-  document.getElementById('droppedText').textContent = 'GOD-PACK CLAIMED';
+  document.getElementById('droppedText').textContent = 'YOU DID THIS.';
   document.getElementById('droppedIcon').textContent = '★';
   showScreen('screen-dropped');
   setTickerState('godpack');
@@ -346,7 +402,7 @@ function showGodPackComplete() {
 function dropCard(card) {
   send(card.command);
   document.getElementById('droppedSub').textContent  = `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
-  document.getElementById('droppedText').textContent = 'RESOURCE DROPPED';
+  document.getElementById('droppedText').textContent = 'DROPPED INTO THE ENVIRONMENT';
   document.getElementById('droppedIcon').textContent = '⬇';
   showScreen('screen-dropped');
 }
