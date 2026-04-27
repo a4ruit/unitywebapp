@@ -2,71 +2,133 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 
 // ─── Card pool ────────────────────────────────────────────────────────────────
 
-const CARDS = [
-  {
-    id:'small_cube',
-    name:'Plastic Bag',
-    rarity:'common',
-    rarityRank:0,
-    command:'spawn_small_cube',
-    shapeClass:'shape-small-cube',
-    desc:'Lightweight. Permanent. The colony accepts all offerings.'
-  },
-  {
-    id:'large_cube',
-    name:'Cardboard Box',
-    rarity:'uncommon',
-    rarityRank:1,
-    command:'spawn_large_cube',
-    shapeClass:'shape-large-cube',
-    desc:'It contained something once.'
-  },
-  {
-    id:'sphere',
-    name:'Crushed Can',
-    rarity:'rare',
-    rarityRank:2,
-    command:'spawn_sphere',
-    shapeClass:'shape-sphere',
-    desc:'Aluminium. Recyclable in theory.'
-  },
-  {
-    id:'triangle',
-    name:'Glass Bottle',
-    rarity:'legendary',
-    rarityRank:3,
-    command:'spawn_triangle',
-    shapeClass:'shape-triangle',
-    desc:'Shatter radius: significant.'
-  },
-  {
-    id:'octagon',
-    name:'Bottle Cap',
-    rarity:'mythical',
-    rarityRank:4,
-    command:'spawn_octagon',
-    shapeClass:'shape-octagon',
-    desc:'Dense. Pointless. Irreducible.'
-  },
-  {
-    id:'triad',
-    name:'Cigarette Butts',
-    rarity:'luck-maxxing',
-    rarityRank:5,
-    command:'spawn_triad',
-    shapeClass:'shape-triad',
-    desc:'Three. Always three.'
-  },
-  {
-    id:'star',
-    name:'Styrofoam Chunk',
-    rarity:'legendary-alpha',
-    rarityRank:6,
-    command:'spawn_star',
-    shapeClass:'shape-star',
-    desc:'Will outlast everything in this environment including you.'
-  },
+// ─── GARBAGE pack ─────────────────────────────────────────────────────────────
+const GARBAGE_CARDS = [
+  { id:'small_cube', name:'Plastic Bag',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Lightweight. Permanent. The colony accepts all offerings.' },
+  { id:'large_cube', name:'Cardboard Box',   rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'It contained something once.' },
+  { id:'sphere',     name:'Crushed Can',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Aluminium. Recyclable in theory.' },
+  { id:'triangle',   name:'Glass Bottle',   rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Shatter radius: significant.' },
+  { id:'octagon',    name:'Bottle Cap',      rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Dense. Pointless. Irreducible.' },
+  { id:'triad',      name:'Cigarette Butts', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three.' },
+  { id:'star',       name:'Styrofoam Chunk', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Will outlast everything in this environment including you.' },
 ];
+
+// ─── E-WASTE pack ──────────────────────────────────────────────────────────────
+const EWASTE_CARDS = [
+  { id:'small_cube', name:'Tangled Cable',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'USB-A. Obsolete. Non-recyclable.' },
+  { id:'large_cube', name:'Dead Battery',    rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Lithium. Do not puncture. Do not discard.' },
+  { id:'sphere',     name:'Cracked Screen',  rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Glass and indium. Separation cost: infinite.' },
+  { id:'triangle',   name:'Old iPod',        rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'1000 songs. 0 second-lives. Still here.' },
+  { id:'octagon',    name:'Laptop Shell',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Magnesium alloy. The guts are somewhere else.' },
+  { id:'triad',      name:'Circuit Board',   rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Lead solder. Gold traces. Worth nothing now.' },
+  { id:'star',       name:'RAM Stick',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'32GB DDR5. Rare earth metals. Permanent.' },
+];
+
+// ─── AD PACK cards ────────────────────────────────────────────────────────────
+const ADPACK_CARDS = [
+  { id:'small_cube', name:'Flyer',              rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Already on the ground before you noticed.' },
+  { id:'large_cube', name:'Pop-Up Ad',          rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Appeared without warning. Cannot be closed.' },
+  { id:'sphere',     name:'Digital Billboard',  rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Never turns off. Never looks away.' },
+  { id:'triangle',   name:'Loyalty Card',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'You signed up for this.' },
+  { id:'octagon',    name:'Sponsored Content',  rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'You cannot tell the difference anymore.' },
+  { id:'triad',      name:'Terms & Conditions', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'94 pages. Updated weekly. You agreed.' },
+  { id:'star',       name:'Data Centre',        rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'The water remembers.' },
+];
+
+// ─── Active pack type ──────────────────────────────────────────────────────────
+let activePackType = 'garbage';
+let CARDS = GARBAGE_CARDS;
+const PACK_TYPE_ORDER = ['garbage', 'ewaste', 'adpack'];
+let isPackTypeSwitching = false;
+
+function updatePackCarousel(type) {
+  const packs = Array.from(document.querySelectorAll('#packCarouselBg .carousel-pack'));
+  if (!packs.length) return;
+
+  const currentIdx = PACK_TYPE_ORDER.indexOf(type);
+  packs.forEach((el) => {
+    const packType = el.dataset.pack;
+    const idx = PACK_TYPE_ORDER.indexOf(packType);
+    const rel = (idx - currentIdx + PACK_TYPE_ORDER.length) % PACK_TYPE_ORDER.length;
+
+    el.classList.remove('carousel-left', 'carousel-center', 'carousel-right');
+    if (rel === 0) el.classList.add('carousel-center');
+    else if (rel === 1) el.classList.add('carousel-right');
+    else el.classList.add('carousel-left');
+  });
+}
+
+function animatePackTypeSwitch(fromType, toType) {
+  const wrap = document.getElementById('packCanvas');
+  if (!wrap || fromType === toType) {
+    Pack3D.setPackTheme(toType);
+    Pack3D.resetPack();
+    isPackTypeSwitching = false;
+    return;
+  }
+
+  const prevIdx = PACK_TYPE_ORDER.indexOf(fromType);
+  const nextIdx = PACK_TYPE_ORDER.indexOf(toType);
+  const delta = (nextIdx - prevIdx + PACK_TYPE_ORDER.length) % PACK_TYPE_ORDER.length;
+  const movingRight = delta === 1;
+  const outClass = delta === 1 ? 'pack-swap-out-right' : 'pack-swap-out-left';
+  const inClass  = delta === 1 ? 'pack-swap-in-right'  : 'pack-swap-in-left';
+  const stage = document.getElementById('packCarouselStage');
+
+  wrap.classList.remove('pack-swap-out-left', 'pack-swap-out-right', 'pack-swap-in-left', 'pack-swap-in-right');
+  void wrap.offsetWidth;
+  if (stage) {
+    stage.classList.remove('carousel-arc-left', 'carousel-arc-right');
+    void stage.offsetWidth;
+    stage.classList.add(movingRight ? 'carousel-arc-right' : 'carousel-arc-left');
+    setTimeout(() => stage.classList.remove('carousel-arc-left', 'carousel-arc-right'), 480);
+  }
+  wrap.classList.add(outClass);
+
+  setTimeout(() => {
+    Pack3D.setPackTheme(toType);
+    Pack3D.resetPack();
+    wrap.classList.remove(outClass);
+    wrap.classList.add(inClass);
+    setTimeout(() => {
+      wrap.classList.remove(inClass);
+      isPackTypeSwitching = false;
+    }, 360);
+  }, 220);
+}
+
+function setPackType(type) {
+  if (type === activePackType || isPackTypeSwitching) return;
+  isPackTypeSwitching = true;
+  const prevType = activePackType;
+  activePackType = type;
+  window.activePackType = type;
+  if (type === 'adpack') {
+    CARDS = ADPACK_CARDS;
+  } else if (type === 'ewaste') {
+    CARDS = EWASTE_CARDS;
+  } else {
+    CARDS = GARBAGE_CARDS;
+  }
+  document.getElementById('packTypeGarbage')?.classList.toggle('active', type === 'garbage');
+  document.getElementById('packTypeEwaste')?.classList.toggle('active',  type === 'ewaste');
+  document.getElementById('packTypeAdpack')?.classList.toggle('active',  type === 'adpack');
+  updatePackCarousel(type);
+  animatePackTypeSwitch(prevType, type);
+  // Toggle adpack glow on screen-pack
+  const sp = document.getElementById('screen-pack');
+  if (sp) sp.classList.toggle('adpack-active', type === 'adpack');
+  const stage = document.getElementById('packCarouselStage');
+  if (stage) {
+    stage.classList.remove('adpack-shimmer-burst');
+    if (type === 'adpack') {
+      void stage.offsetWidth;
+      stage.classList.add('adpack-shimmer-burst');
+    }
+  }
+  showScreen('screen-pack');
+  setTickerState('idle');
+}
 
 function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
 
@@ -157,6 +219,14 @@ const TICKER_MESSAGES = {
     'Choose wisely — it stays forever',
     'Contribution logged',
   ],
+  adpack: [
+    '◈ AD PACK DETECTED ◈',
+    'Sponsored content incoming',
+    'The environment is now ad-supported',
+    'Your attention has been allocated',
+    '◈ PREMIUM POLLUTION ◈',
+    'Terms and conditions apply',
+  ],
   legendary: [
     '⬛ HIGH-IMPACT WASTE DETECTED ⬛',
     'Shatter radius: significant',
@@ -183,13 +253,14 @@ function buildTickerHTML(messages) {
 
 function setTickerState(state) {
   const track    = document.getElementById('tickerTrack');
+  if (!track) return;
   const messages = TICKER_MESSAGES[state] || TICKER_MESSAGES.idle;
   track.innerHTML = buildTickerHTML(messages);
   track.style.animation = 'none';
   void track.offsetWidth;
   track.style.animation = '';
   const wrap = track.closest('.ticker-wrap');
-  wrap.dataset.state = state;
+  if (wrap) wrap.dataset.state = state;
 }
 
 // ─── Nav ─────────────────────────────────────────────────────────────────────
@@ -216,29 +287,86 @@ function initPack() {
   document.getElementById('packStack').innerHTML = '';
   if (typeof Pack3D === 'undefined') { console.error('[initPack] Pack3D not defined'); return; }
   requestAnimationFrame(() => Pack3D.init());
+
+  // Swipe to open
   document.addEventListener('pack3d:swipe', (e) => {
     triggerPackOpen(e.detail.dir < 0 ? 'left' : 'right');
   });
+
+  // Click/tap the pack canvas to open
+  const packCanvas = document.getElementById('packCanvas');
+  if (packCanvas) {
+    packCanvas.addEventListener('click', () => triggerPackOpen('right'));
+  }
 }
 
+let _pendingPackDir = 'right';
+
 function triggerPackOpen(dir) {
+  if (activePackType === 'adpack') {
+    _pendingPackDir = dir;
+    showAdpackPrompt();
+    return;
+  }
   if (!consumePack()) return;
+  doPackOpen(dir);
+}
+
+function showAdpackPrompt() {
+  // Update skip button affordability
+  const skipBtn = document.getElementById('adpackSkipBtn');
+  if (skipBtn) {
+    const canAfford = stars >= STARS_SKIP_AD;
+    skipBtn.style.opacity = canAfford ? '1' : '0.35';
+    const sub = skipBtn.querySelector('.adpack-prompt-btn-sub');
+    if (sub) sub.textContent = canAfford ? 'skip ad · open pack' : `need 10 ★ · you have ${stars}`;
+  }
+  showScreen('screen-adpack-prompt');
+}
+
+function adpackConfirmWatch() {
+  showAd({
+    onComplete: () => {
+      addStars(STARS_PER_AD);
+      doPackOpen(_pendingPackDir);
+    },
+    onSkip: () => {
+      doPackOpen(_pendingPackDir);
+    }
+  });
+}
+
+function adpackConfirmSkip() {
+  if (stars < STARS_SKIP_AD) return;
+  spendStars(STARS_SKIP_AD);
+  doPackOpen(_pendingPackDir);
+}
+
+function adpackCancel() {
+  showScreen('screen-pack');
+}
+
+function doPackOpen(dir) {
   send('pack_opened');
 
   packCards      = rollPack();
   revealIndex    = 0;
   godPackClaimed = [];
 
-  setTickerState(isGodPack ? 'godpack' : 'active');
-  buildPeekStack('packStack');
+  const isAdpack = activePackType === 'adpack';
+  setTickerState(isGodPack ? 'godpack' : isAdpack ? 'adpack' : 'active');
+
+  // Flash for high rarity pulls
+  const topCard = packCards[packCards.length - 1];
+  const isHighRarity = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(topCard?.rarity);
+  if (isHighRarity) triggerFlash();
 
   Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
     if (isGodPack) triggerGodPackFlash();
     setTimeout(() => {
-      showScreen('screen-reveal');
-      buildPeekStack('revealPeekStack');
-      showRevealCard();
-    }, isGodPack ? 900 : 80);
+      // Skip reveal — go straight to choice grid (suspension is in the face-down hold)
+      isGodPack ? showGodPackClaimGrid() : showChoiceGrid();
+    }, isGodPack ? 900 : 120);
   });
 }
 
@@ -279,90 +407,23 @@ function buildPeekStack(id) {
   setTimeout(() => stack.classList.add('stack-reveal'), 50);
 }
 
-// ─── Reveal ───────────────────────────────────────────────────────────────────
-
-function showRevealCard() {
-  const card   = packCards[revealIndex];
-  const isLast = revealIndex === packCards.length - 1;
-
-  document.getElementById('revealCounter').textContent = `${revealIndex + 1} / ${packCards.length}`;
-  document.getElementById('revealHint').textContent    = isLast
-    ? (isGodPack ? 'swipe to dump all' : 'swipe to drop')
-    : 'swipe to reveal next';
-  document.getElementById('revealHint').style.opacity = '0';
-
-  const isUltraRare = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(card.rarity);
-  if (isUltraRare) {
-    triggerFlash();
-    setTickerState(isGodPack ? 'godpack' : 'legendary');
-  }
-
-  Cards3D.showCard(card, 'revealCard', () => {
-    document.getElementById('revealHint').style.opacity = '';
-  });
-
-  const el = document.getElementById('revealCard');
-  el.dataset.rarity = card.rarity;
-  el.style.opacity  = '1';
-}
-
 function triggerFlash() {
   const f = document.getElementById('flashOverlay');
   f.classList.add('flashing');
   setTimeout(() => f.classList.remove('flashing'), 700);
 }
 
-// ─── Swipe to advance ─────────────────────────────────────────────────────────
-
-let revealSwipeStartX = null;
-let revealSwipeStartY = null;
-const REVEAL_SWIPE_THRESHOLD = 45;
-const revealEl = document.getElementById('revealCard');
-
-function advanceReveal() {
-  const isLast = revealIndex === packCards.length - 1;
-  if (isLast) {
-    isGodPack ? showGodPackClaimGrid() : showChoiceGrid();
-    return;
-  }
-  const stack    = document.getElementById('revealPeekStack');
-  const lastPeek = stack.lastElementChild;
-  if (lastPeek) { lastPeek.classList.add('peek-dismiss'); setTimeout(() => lastPeek.remove(), 300); }
-  revealIndex++;
-  showRevealCard();
-}
-
-revealEl.addEventListener('touchstart', (e) => {
-  revealSwipeStartX = e.touches[0].clientX;
-  revealSwipeStartY = e.touches[0].clientY;
-}, { passive: true });
-
-revealEl.addEventListener('touchend', (e) => {
-  if (revealSwipeStartX === null) return;
-  const dx = e.changedTouches[0].clientX - revealSwipeStartX;
-  const dy = e.changedTouches[0].clientY - revealSwipeStartY;
-  revealSwipeStartX = null; revealSwipeStartY = null;
-  if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) advanceReveal();
-}, { passive: true });
-
-revealEl.addEventListener('mousedown', (e) => { revealSwipeStartX = e.clientX; revealSwipeStartY = e.clientY; });
-revealEl.addEventListener('mouseup', (e) => {
-  if (revealSwipeStartX === null) return;
-  const dx = e.clientX - revealSwipeStartX;
-  const dy = e.clientY - revealSwipeStartY;
-  revealSwipeStartX = null; revealSwipeStartY = null;
-  if (Math.abs(dx) > Math.abs(dy) * 1.2 && Math.abs(dx) > REVEAL_SWIPE_THRESHOLD) advanceReveal();
-});
-
 // ─── Normal choice grid ───────────────────────────────────────────────────────
 
 function showChoiceGrid() {
   Cards3D.destroy();
   const el = document.getElementById('revealCard');
-  el.innerHTML = ''; el.style.opacity = '';
+  if (el) { el.innerHTML = ''; el.style.opacity = ''; }
   showScreen('screen-choose');
-  document.querySelector('.choose-title').textContent = 'CHOOSE YOUR WASTE';
-  document.querySelector('.choose-sub').textContent   = 'one drop per pack';
+  const ct = document.querySelector('.choose-title');
+  const cs = document.querySelector('.choose-sub');
+  if (ct) ct.textContent = activePackType === 'adpack' ? 'CHOOSE YOUR AD' : 'CHOOSE YOUR WASTE';
+  if (cs) cs.textContent = activePackType === 'adpack' ? 'pollution is the point' : 'one drop per pack';
   ChoiceGrid3D.show(packCards, 'choiceGrid', (chosenCard) => {
     setTimeout(() => dropCard(chosenCard), 400);
   });
@@ -373,10 +434,12 @@ function showChoiceGrid() {
 function showGodPackClaimGrid() {
   Cards3D.destroy();
   const el = document.getElementById('revealCard');
-  el.innerHTML = ''; el.style.opacity = '';
+  if (el) { el.innerHTML = ''; el.style.opacity = ''; }
   showScreen('screen-choose');
-  document.querySelector('.choose-title').textContent = 'FULL DUMP';
-  document.querySelector('.choose-sub').textContent   = `drop all ${packCards.length} — tap each to release`;
+  const ct = document.querySelector('.choose-title');
+  const cs = document.querySelector('.choose-sub');
+  if (ct) ct.textContent = 'FULL DUMP';
+  if (cs) cs.textContent = `drop all ${packCards.length} — tap each to release`;
 
   ChoiceGrid3D.showGodPack(packCards, 'choiceGrid', (claimedCard) => {
     send(claimedCard.command);
@@ -389,68 +452,42 @@ function showGodPackClaimGrid() {
 
 function showGodPackComplete() {
   ChoiceGrid3D.destroy();
-  const names = godPackClaimed.map(c => c.name.toUpperCase()).join(' · ');
-  document.getElementById('droppedSub').textContent  = names;
-  document.getElementById('droppedText').textContent = 'YOU DID THIS.';
-  document.getElementById('droppedIcon').textContent = '★';
-  showScreen('screen-dropped');
-  setTickerState('godpack');
+  // Skip dropped screen — immediately reset for next pack
+  resetToPackScreen();
 }
 
 // ─── Normal drop ──────────────────────────────────────────────────────────────
 
 function dropCard(card) {
   send(card.command);
-  document.getElementById('droppedSub').textContent  = `${card.name.toUpperCase()} · ${card.rarity.toUpperCase()} · ${card.desc}`;
-  document.getElementById('droppedText').textContent = 'DROPPED INTO THE ENVIRONMENT';
-  document.getElementById('droppedIcon').textContent = '⬇';
-  showScreen('screen-dropped');
+  // Skip dropped screen — immediately reset for next pack
+  resetToPackScreen();
 }
 
 // ─── Again ────────────────────────────────────────────────────────────────────
 
-document.getElementById('againBtn').addEventListener('click', () => {
-  document.getElementById('packStack').innerHTML       = '';
-  document.getElementById('revealPeekStack').innerHTML = '';
+// ─── Reset to pack screen ────────────────────────────────────────────────────
+
+function resetToPackScreen() {
+  document.getElementById('packStack').innerHTML = '';
   isGodPack      = false;
   godPackClaimed = [];
+  Cards3D.destroy();
+  ChoiceGrid3D.destroy();
   Pack3D.resetPack();
   showScreen('screen-pack');
   setTickerState('idle');
-});
+}
 
 // ─── Debug controls ───────────────────────────────────────────────────────────
 
-const debugLog = document.getElementById('debugLog');
-
-function addLogEntry(command, rarity) {
-  const empty = debugLog.querySelector('.debug-log-empty');
-  if (empty) empty.remove();
-  const now  = new Date();
-  const time = `${now.getHours().toString().padStart(2,'0')}:${now.getMinutes().toString().padStart(2,'0')}:${now.getSeconds().toString().padStart(2,'0')}`;
-  const entry = document.createElement('div');
-  entry.className = 'debug-log-entry';
-  entry.dataset.rarity = rarity;
-  entry.innerHTML = `<span class="log-time">${time}</span>${command}`;
-  debugLog.insertBefore(entry, debugLog.firstChild);
-  while (debugLog.children.length > 12) debugLog.removeChild(debugLog.lastChild);
-}
-
-document.querySelectorAll('.debug-card').forEach(card => {
-  card.addEventListener('click', () => {
-    const command = card.dataset.command;
-    const rarity  = card.dataset.rarity;
-    send(command);
-    addLogEntry(command, rarity);
-    card.classList.remove('spawned');
-    void card.offsetWidth;
-    card.classList.add('spawned');
-  });
-});
+// debug panel removed
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
+window.activePackType = 'garbage'; // default for cardTextures.js
 connect();
 initPack();
+updatePackCarousel(activePackType);
 setTickerState('idle');
 initCounter();

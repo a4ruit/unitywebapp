@@ -9,143 +9,294 @@
 <body>
   <div class="bg-grid"></div>
   <div class="flash-overlay" id="flashOverlay"></div>
-<div class="god-pack-banner hidden" id="godPackBanner">
-  <span class="god-banner-star">★</span>
-  <span class="god-banner-text">GOD PACK</span>
-  <span class="god-banner-star">★</span>
-</div>
+  <div class="god-pack-banner hidden" id="godPackBanner">
+    <span class="god-banner-star">★</span>
+    <span class="god-banner-text">GOD PACK</span>
+    <span class="god-banner-star">★</span>
+  </div>
+
   <div class="shell">
 
+    <!-- STATUS BAR -->
     <div class="status-bar">
-      <span class="wordmark">TAMAG4TCHA</span>
       <div class="ws-indicator">
         <div class="ws-dot" id="wsDot"></div>
         <span id="wsLabel">offline</span>
       </div>
     </div>
 
-    <!-- Ticker -->
-    <div class="ticker-wrap">
-      <div class="ticker-track" id="tickerTrack"></div>
-    </div>
-
     <!-- PAGE: Pack -->
     <div class="page" id="page-pack">
 
+      <!-- PACK SCREEN -->
       <div class="screen" id="screen-pack">
-        <!-- Peek stack behind canvas -->
         <div id="packStack" class="pack-stack-behind"></div>
 
-        <!-- Pack counter above canvas -->
+        <!-- Pack type selector -->
+        <div class="pack-type-row">
+          <button class="pack-type-btn active" id="packTypeGarbage" onclick="setPackType('garbage')">
+            <span class="pack-type-icon">♻</span>
+            <span class="pack-type-label">GARBAGE</span>
+          </button>
+          <button class="pack-type-btn" id="packTypeEwaste" onclick="setPackType('ewaste')">
+            <span class="pack-type-icon">⚡</span>
+            <span class="pack-type-label">E-WASTE</span>
+          </button>
+          <button class="pack-type-btn pack-type-btn--adpack" id="packTypeAdpack" onclick="setPackType('adpack')">
+            <span class="pack-type-icon">◈</span>
+            <span class="pack-type-label">AD PACK</span>
+          </button>
+
+        </div>
+
+        <!-- Pack carousel stage -->
+        <div class="pack-carousel-stage" id="packCarouselStage">
+          <div class="pack-carousel-bg" id="packCarouselBg">
+            <div class="carousel-pack" data-pack="garbage"></div>
+            <div class="carousel-pack" data-pack="ewaste"></div>
+            <div class="carousel-pack" data-pack="adpack"></div>
+          </div>
+          <div id="packCanvas" class="pack-canvas-wrap"></div>
+        </div>
+        <p class="pack-hint" id="packHint">swipe left or right</p>
+
+        <!-- Pack counter -->
         <div class="pack-counter" id="packCounter" data-state="ready">
           <div class="counter-led-wrap">
             <span class="counter-packs" id="counterPacks">03</span>
             <div class="counter-meta">
-              <span class="counter-label" id="counterLabel">NEXT: 1 MIN</span>
-              <span class="counter-sub" id="counterSub">then: 5 min</span>
+              <span class="counter-label" id="counterLabel">PACKS</span>
+              <span class="counter-sub" id="counterSub">swipe or tap to open</span>
             </div>
           </div>
           <div class="counter-tag">PACKS</div>
         </div>
 
-        <!-- Three.js canvas -->
-        <div id="packCanvas" class="pack-canvas-wrap"></div>
-        <p class="pack-hint" id="packHint">swipe left or right</p>
-
-        <!-- Nav below pack -->
-        <div class="nav-bar">
-          <button class="nav-btn active" data-page="pack">PACK</button>
-          <button class="nav-btn" data-page="debug">DEBUG</button>
+        <!-- Stars currency + shop button -->
+        <div class="star-counter-row">
+          <div class="star-counter" id="starsDisplay">
+            <span class="star-counter-icon">★</span>
+            <span class="star-counter-value" id="starsValue">0</span>
+            <div class="star-counter-meta">
+              <span class="star-counter-label">STARS</span>
+              <span class="star-counter-sub">50 = 3 packs</span>
+            </div>
+          </div>
+          <button class="star-shop-btn" onclick="openShop()">
+            <span class="star-shop-btn-icon">★</span>
+            <span class="star-shop-btn-label">SHOP</span>
+          </button>
         </div>
+
       </div>
 
-      <div class="screen hidden" id="screen-reveal">
-        <div id="revealPeekStack" class="reveal-peek-stack"></div>
-        <div class="reveal-header">
-          <span class="reveal-counter" id="revealCounter">1 / 4</span>
-        </div>
-        <div class="rev-card" id="revealCard"></div>
-        <div class="reveal-hint" id="revealHint">tap to reveal next</div>
-      </div>
-
+      <!-- CHOOSE SCREEN -->
       <div class="screen hidden" id="screen-choose">
         <div class="choose-header">
-          <span class="choose-title">CHOOSE A RESOURCE</span>
-          <span class="choose-sub">feed your colony</span>
+          <span class="choose-title">CHOOSE YOUR WASTE</span>
+          <span class="choose-sub">one drop per pack</span>
         </div>
         <div class="choice-grid" id="choiceGrid"></div>
       </div>
 
-      <div class="screen hidden" id="screen-dropped">
-        <div class="dropped-wrapper">
-          <div class="dropped-icon" id="droppedIcon">⬇</div>
-          <div class="dropped-text" id="droppedText">RESOURCE DROPPED</div>
-          <div class="dropped-sub" id="droppedSub"></div>
-          <button class="again-btn" id="againBtn">OPEN ANOTHER PACK</button>
+      <!-- SHOP SCREEN -->
+      <div class="screen hidden" id="screen-shop">
+        <div class="shop-wrapper">
+
+          <div class="shop-header">
+            <span class="shop-title">★ STAR SHOP ★</span>
+            <span class="shop-sub">invest in your experience</span>
+            <div class="shop-balance">
+              <span class="shop-balance-icon">★</span>
+              <span class="shop-balance-value" id="shopStarBalance">0</span>
+              <span class="shop-balance-label">STARS</span>
+            </div>
+          </div>
+
+          <div class="shop-items">
+
+            <div class="shop-item">
+              <div class="shop-item-stars">★ 10</div>
+              <div class="shop-item-name">STARTER PACK</div>
+              <div class="shop-item-desc">Enough to skip one ad. One time.</div>
+              <div class="shop-item-price">WATCH 1 AD</div>
+              <button class="shop-btn shop-btn--affordable" onclick="gateWatchAd()">EARN NOW</button>
+            </div>
+
+            <div class="shop-item">
+              <div class="shop-item-stars">★ 50</div>
+              <div class="shop-item-name">3 PACKS</div>
+              <div class="shop-item-desc">Opens 3 more packs. Contents not guaranteed.</div>
+              <div class="shop-item-price">WATCH 5 ADS</div>
+              <div class="shop-item-time">approx. 75 seconds of your life</div>
+              <button class="shop-btn shop-btn--affordable" onclick="shopBuy(50)">BUY</button>
+            </div>
+
+            <div class="shop-item shop-item--locked">
+              <div class="shop-item-stars">★ 500</div>
+              <div class="shop-item-name">PRESTIGE BUNDLE</div>
+              <div class="shop-item-desc">30 packs. Rare drop rate not increased.</div>
+              <div class="shop-item-price">WATCH 50 ADS</div>
+              <div class="shop-item-time">approx. 12.5 minutes of your life</div>
+              <button class="shop-btn" onclick="shopBuy(500)">BUY</button>
+            </div>
+
+            <div class="shop-item shop-item--locked">
+              <div class="shop-item-stars">★ 5,000</div>
+              <div class="shop-item-name">SERIOUS COLLECTOR</div>
+              <div class="shop-item-desc">300 packs. One guaranteed legendary. Probably.</div>
+              <div class="shop-item-price">WATCH 500 ADS</div>
+              <div class="shop-item-time">approx. 2 hours, 5 minutes of your life</div>
+              <button class="shop-btn" onclick="shopBuy(5000)">BUY</button>
+            </div>
+
+            <div class="shop-item shop-item--locked">
+              <div class="shop-item-stars">★ 50,000</div>
+              <div class="shop-item-name">DEVOTED FAN</div>
+              <div class="shop-item-desc">3,000 packs. Your dedication has been noted.</div>
+              <div class="shop-item-price">WATCH 5,000 ADS</div>
+              <div class="shop-item-time">approx. 20 hours, 50 minutes of your life</div>
+              <button class="shop-btn" onclick="shopBuy(50000)">BUY</button>
+            </div>
+
+            <div class="shop-item shop-item--locked">
+              <div class="shop-item-stars">★ 200,000</div>
+              <div class="shop-item-name">TRUE BELIEVER</div>
+              <div class="shop-item-desc">All packs. All rarities. One month.<br>The environment will not recover.</div>
+              <div class="shop-item-price">WATCH 20,000 ADS</div>
+              <div class="shop-item-time">approx. 83 days of continuous ad-watching</div>
+              <button class="shop-btn" onclick="shopBuy(200000)">BUY</button>
+            </div>
+
+            <div class="shop-item shop-item--locked shop-item--whale">
+              <div class="shop-item-stars shop-item-stars--whale">★ 2,000,000</div>
+              <div class="shop-item-name">THE FULL EXPERIENCE</div>
+              <div class="shop-item-desc">Unlimited packs for one year. Every rarity.<br>Every pack. The environment will remember.</div>
+              <div class="shop-item-price">WATCH 200,000 ADS</div>
+              <div class="shop-item-time">approx. 2 years of your undivided attention</div>
+              <div class="shop-item-fine">* assuming 15-second ads, watched continuously, 24 hours a day, without sleeping</div>
+              <button class="shop-btn shop-btn--whale" onclick="shopBuy(2000000)">BUY</button>
+            </div>
+
+          </div>
+
+          <div class="shop-footer">
+            <span class="shop-footnote">Stars have no monetary value. Stars cannot be transferred. Stars expire when you do. CONSUME+ is not responsible for the time spent acquiring stars. By purchasing stars you confirm you have read the terms and conditions (94 pages, updated weekly).</span>
+            <button class="shop-close-btn" onclick="closeShop()">CLOSE SHOP</button>
+          </div>
+
         </div>
       </div>
 
-    </div>
+      <!-- AD PACK PROMPT — watch ad to open -->
+      <div class="screen hidden" id="screen-adpack-prompt">
+        <div class="adpack-prompt-wrapper">
 
-    <!-- PAGE: Debug -->
-    <div class="page hidden" id="page-debug">
-      <div class="debug-header">
-        <span class="debug-title">DEBUG CONTROLS</span>
-        <span class="debug-sub">spawn resources directly</span>
-      </div>
+          <div class="adpack-prompt-shimmer"></div>
 
-      <div class="debug-grid">
-
-        <button class="debug-card" data-command="spawn_small_cube" data-rarity="common">
-          <div class="debug-shape-wrap">
-            <div class="shape-small-cube debug-shape-el"></div>
+          <div class="adpack-prompt-header">
+            <span class="adpack-prompt-star">★</span>
+            <span class="adpack-prompt-title">AD PACK</span>
+            <span class="adpack-prompt-star">★</span>
           </div>
-          <span class="debug-card-name">Small Cube</span>
-          <span class="debug-card-rarity">common</span>
-        </button>
 
-        <button class="debug-card" data-command="spawn_large_cube" data-rarity="uncommon">
-          <div class="debug-shape-wrap">
-            <div class="shape-large-cube debug-shape-el"></div>
+          <div class="adpack-prompt-icon">◈</div>
+
+          <div class="adpack-prompt-body">
+            <span class="adpack-prompt-main">This pack costs one ad.</span>
+            <span class="adpack-prompt-sub">Watch a 15-second ad to open.<br>Or spend 10 stars to skip the ad.</span>
           </div>
-          <span class="debug-card-name">Large Cube</span>
-          <span class="debug-card-rarity">uncommon</span>
-        </button>
 
-        <button class="debug-card" data-command="spawn_sphere" data-rarity="rare">
-          <div class="debug-shape-wrap">
-            <div class="shape-sphere debug-shape-el"></div>
+          <div class="adpack-prompt-actions">
+            <button class="adpack-prompt-btn adpack-prompt-btn--watch" id="adpackWatchBtn" onclick="adpackConfirmWatch()">
+              <span class="adpack-prompt-btn-title">WATCH AD</span>
+              <span class="adpack-prompt-btn-sub">earn 10 ★ · open pack</span>
+            </button>
+            <button class="adpack-prompt-btn adpack-prompt-btn--skip" id="adpackSkipBtn" onclick="adpackConfirmSkip()">
+              <span class="adpack-prompt-btn-title">SPEND 10 ★</span>
+              <span class="adpack-prompt-btn-sub">skip ad · open pack</span>
+            </button>
+            <button class="adpack-prompt-btn adpack-prompt-btn--cancel" onclick="adpackCancel()">
+              <span class="adpack-prompt-btn-title">CANCEL</span>
+            </button>
           </div>
-          <span class="debug-card-name">Sphere</span>
-          <span class="debug-card-rarity">rare</span>
-        </button>
 
-        <button class="debug-card" data-command="spawn_triangle" data-rarity="legendary">
-          <div class="debug-shape-wrap">
-            <div class="shape-triangle debug-shape-el"></div>
-          </div>
-          <span class="debug-card-name">Obelisk</span>
-          <span class="debug-card-rarity">legendary</span>
-        </button>
+          <span class="adpack-prompt-footnote">AD PACK is exclusive. Each pack requires a separate ad.<br>Your attention is the price of admission.</span>
 
-      </div>
-
-      <div class="debug-log-wrap">
-        <div class="debug-log-label">COMMAND LOG</div>
-        <div class="debug-log" id="debugLog">
-          <span class="debug-log-empty">no commands sent yet</span>
         </div>
       </div>
 
-    </div>
+      <!-- GATE SCREEN -->
+      <div class="screen hidden" id="screen-gate">
+        <div class="gate-wrapper">
 
-  </div>
+          <div class="gate-header">
+            <span class="gate-title">PACKS DEPLETED</span>
+            <span class="gate-sub">your packs are gone. this was expected.</span>
+          </div>
+
+          <div class="coal-display">
+            <span class="coal-icon">★</span>
+            <span class="coal-value" id="starsValueGate">0</span>
+            <span class="coal-label">STARS</span>
+          </div>
+
+          <div class="gate-options">
+
+            <button class="gate-btn gate-btn--ad" onclick="gateWatchAd()">
+              <span class="gate-btn-title">WATCH AD</span>
+              <span class="gate-btn-sub">earn 10 stars &middot; receive 3 packs</span>
+            </button>
+
+            <div class="gate-divider">OR</div>
+
+            <button class="gate-btn gate-btn--coal" id="gateSpendBtn" onclick="gateSpendStars()" disabled>
+              <span class="gate-btn-title">SPEND 50 STARS</span>
+              <span class="gate-btn-sub">spend stars to skip &middot; receive 3 packs</span>
+            </button>
+
+          </div>
+
+          <span class="gate-footnote">watching an ad earns exactly enough stars to skip one future ad. the system is working as intended.</span>
+
+        </div>
+      </div>
+
+      <!-- AD SCREEN -->
+      <div class="screen hidden" id="screen-ad">
+        <div class="ad-wrapper">
+          <div class="ad-led-wrap">
+            <canvas id="adLEDCanvas" class="ad-led-canvas"></canvas>
+            <div class="ad-led-scanlines"></div>
+            <div class="ad-corner tl"></div>
+            <div class="ad-corner tr"></div>
+            <div class="ad-corner bl"></div>
+            <div class="ad-corner br"></div>
+          </div>
+          <div class="ad-progress">
+            <div class="ad-progress-fill" id="adProgressFill"></div>
+          </div>
+          <div class="ad-footer">
+            <span class="ad-time" id="adTimeLeft">15s</span>
+            <span class="ad-label">AD</span>
+            <button class="ad-skip-btn" id="adSkipBtn" onclick="adSkip()">
+              SKIP &mdash; <span id="adSkipCost">10 STARS</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- end page-pack -->
+
+  </div><!-- end shell -->
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="js/Pack3d.js"></script>
   <script src="js/cardTextures.js"></script>
   <script src="js/cards3d.js"></script>
   <script src="js/counter.js"></script>
+  <script src="js/adLED.js"></script>
+  <script src="js/ad.js"></script>
   <script src="js/choiceGrid3d.js"></script>
   <script src="js/main.js"></script>
 
