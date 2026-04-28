@@ -34,6 +34,10 @@ const CardTextures = (() => {
   // ─── Shape drawers — reskinned as waste items ────────────────────────────────
 
   function drawShape(ctx, rarity, t) {
+    const packType = typeof window !== 'undefined' ? window.activePackType : 'garbage';
+    if (packType === 'ewaste')  { drawShapeEwaste(ctx, rarity, t);  return; }
+    if (packType === 'adpack')  { drawShapeAdpack(ctx, rarity, t);  return; }
+
     ctx.save();
     ctx.translate(128, 148);
 
@@ -231,6 +235,423 @@ const CardTextures = (() => {
       [[-16,0],[8,12],[-4,-24],[20,-8],[-20,20]].forEach(([x,y]) => {
         ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
       });
+    }
+
+    ctx.restore();
+  }
+
+  // ─── E-WASTE shape drawers ─────────────────────────────────────────────────
+
+  function drawShapeEwaste(ctx, rarity, t, cfg) {
+    ctx.save();
+    ctx.translate(128, 148);
+
+    if (rarity === 'common') {
+      // Tangled cable — coiled USB wire
+      ctx.strokeStyle = '#607060'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(0, 0, 28, 0, Math.PI * 1.5);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -8, 18, 0.3, Math.PI * 1.8);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(4, 4, 10, 0.6, Math.PI * 1.6);
+      ctx.stroke();
+      // USB-A plug at one end
+      ctx.fillStyle = '#607060';
+      ctx.fillRect(24, -8, 10, 6);
+      ctx.strokeStyle = '#404840'; ctx.lineWidth = 1;
+      ctx.strokeRect(24, -8, 10, 6);
+      // Connector pins
+      ctx.fillStyle = '#303830';
+      ctx.fillRect(25, -7, 2, 4); ctx.fillRect(29, -7, 2, 4);
+
+    } else if (rarity === 'uncommon') {
+      // Dead battery — rectangular battery with low charge indicator
+      ctx.fillStyle = 'rgba(74,138,170,0.3)';
+      ctx.strokeStyle = '#4a8aaa'; ctx.lineWidth = 2;
+      // Battery body
+      ctx.beginPath(); ctx.roundRect(-30, -18, 56, 36, 4); ctx.fill(); ctx.stroke();
+      // Battery terminal nub
+      ctx.fillStyle = 'rgba(74,138,170,0.5)';
+      ctx.fillRect(26, -8, 8, 16);
+      ctx.strokeRect(26, -8, 8, 16);
+      // Charge segments — mostly empty
+      ctx.fillStyle = 'rgba(74,138,170,0.8)';
+      ctx.fillRect(-26, -12, 8, 24);  // only first segment filled
+      ctx.fillStyle = 'rgba(74,138,170,0.2)';
+      ctx.fillRect(-14, -12, 8, 24);
+      ctx.fillRect(-2,  -12, 8, 24);
+      ctx.fillRect(10,  -12, 8, 24);
+      // Dividers
+      ctx.strokeStyle = '#4a8aaa'; ctx.lineWidth = 1;
+      [-14,-2,10].forEach(x=>{ ctx.beginPath(); ctx.moveTo(x,-12); ctx.lineTo(x,12); ctx.stroke(); });
+      // Low battery X
+      ctx.strokeStyle = 'rgba(200,50,50,0.8)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-4,-6); ctx.lineTo(4,6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(4,-6); ctx.lineTo(-4,6); ctx.stroke();
+
+    } else if (rarity === 'rare') {
+      // Cracked screen — rectangle with fracture lines
+      ctx.fillStyle = 'rgba(154,106,184,0.25)';
+      ctx.strokeStyle = '#9a6ab8'; ctx.lineWidth = 2;
+      ctx.fillRect(-32, -40, 64, 80);
+      ctx.strokeRect(-32, -40, 64, 80);
+      // Screen bezel
+      ctx.strokeStyle = 'rgba(154,106,184,0.5)'; ctx.lineWidth = 1;
+      ctx.strokeRect(-28, -36, 56, 72);
+      // Crack pattern from impact point
+      ctx.strokeStyle = 'rgba(154,106,184,0.9)'; ctx.lineWidth = 1.5;
+      const cracks = [
+        [[0,-10],[20,-30]],  [[0,-10],[-25,-25]], [[0,-10],[30,10]],
+        [[0,-10],[-30,20]],  [[0,-10],[15,35]],   [[0,-10],[-10,40]],
+        [[20,-30],[32,-38]], [[-25,-25],[-30,-40]],
+        [[30,10],[32,30]],   [[-30,20],[-32,38]],
+      ];
+      for (const [[x1,y1],[x2,y2]] of cracks) {
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      }
+      // Impact point glow
+      ctx.beginPath(); ctx.arc(0,-10,3,0,Math.PI*2);
+      ctx.fillStyle = 'rgba(200,150,255,0.8)'; ctx.fill();
+
+    } else if (rarity === 'legendary') {
+      // Old iPod — classic rounded rectangle with click wheel
+      ctx.fillStyle = 'rgba(200,144,48,0.2)';
+      ctx.strokeStyle = '#c89030'; ctx.lineWidth = 2;
+      // Body
+      ctx.beginPath(); ctx.roundRect(-24, -44, 48, 88, 10); ctx.fill(); ctx.stroke();
+      // Screen
+      ctx.fillStyle = 'rgba(200,144,48,0.15)';
+      ctx.strokeStyle = 'rgba(200,144,48,0.5)'; ctx.lineWidth = 1;
+      ctx.fillRect(-18, -38, 36, 26); ctx.strokeRect(-18,-38,36,26);
+      // Dead screen — X
+      ctx.strokeStyle = 'rgba(200,144,48,0.4)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(-14,-34); ctx.lineTo(14,-16); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(14,-34); ctx.lineTo(-14,-16); ctx.stroke();
+      // Click wheel
+      ctx.beginPath(); ctx.arc(0, 22, 18, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(200,144,48,0.1)'; ctx.fill();
+      ctx.strokeStyle = '#c89030'; ctx.lineWidth = 2; ctx.stroke();
+      // Inner ring
+      ctx.beginPath(); ctx.arc(0, 22, 8, 0, Math.PI*2);
+      ctx.strokeStyle = 'rgba(200,144,48,0.5)'; ctx.lineWidth = 1; ctx.stroke();
+      // Wheel marks at N/S/E/W
+      [[0,-18+22],[0,18+22],[-18,22],[18,22]].forEach(([x,y])=>{
+        ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(200,144,48,0.6)'; ctx.fill();
+      });
+
+    } else if (rarity === 'mythical') {
+      // Laptop shell — open lid perspective
+      const rot = t * Math.PI * 0.15;
+      ctx.rotate(Math.sin(rot) * 0.1);
+      ctx.fillStyle = `rgba(204,34,0,${0.25+Math.sin(t*2)*0.1})`;
+      ctx.strokeStyle = '#cc2200'; ctx.lineWidth = 2;
+      // Base
+      ctx.beginPath();
+      ctx.moveTo(-34, 8); ctx.lineTo(34, 8);
+      ctx.lineTo(30, 28); ctx.lineTo(-30, 28);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Lid — open at angle
+      ctx.beginPath();
+      ctx.moveTo(-34, 8); ctx.lineTo(34, 8);
+      ctx.lineTo(28, -32); ctx.lineTo(-28, -32);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(204,34,0,${0.2+Math.sin(t*2)*0.08})`;
+      ctx.fill(); ctx.stroke();
+      // Screen on lid — dead
+      ctx.fillStyle = 'rgba(10,4,4,0.8)';
+      ctx.fillRect(-22,-28,44,34);
+      ctx.strokeStyle = 'rgba(204,34,0,0.4)'; ctx.lineWidth=1;
+      ctx.strokeRect(-22,-28,44,34);
+      // Hinge
+      ctx.fillStyle = 'rgba(204,34,0,0.6)';
+      ctx.fillRect(-12, 6, 24, 4);
+      // Keyboard dots on base
+      for(let r=0;r<2;r++) for(let c=0;c<8;c++) {
+        ctx.beginPath(); ctx.arc(-28+c*8, 14+r*6, 2, 0, Math.PI*2);
+        ctx.fillStyle=`rgba(204,34,0,${0.3+Math.sin(t*3+c)*0.2})`; ctx.fill();
+      }
+
+    } else if (rarity === 'luck-maxxing') {
+      // Circuit board — three orbiting component chips
+      const orbitR = 20;
+      const circR  = 10 + Math.sin(t * 2) * 2;
+      for (let i = 0; i < 3; i++) {
+        const angle = (i/3)*Math.PI*2 + t * 1.2;
+        const cx    = Math.cos(angle) * orbitR;
+        const cy    = Math.sin(angle) * orbitR;
+        ctx.save(); ctx.translate(cx, cy);
+        // IC chip
+        ctx.fillStyle = `rgba(204,68,170,${0.5+Math.sin(t*3+i)*0.3})`;
+        ctx.strokeStyle = '#cc44aa'; ctx.lineWidth = 1;
+        ctx.fillRect(-8,-5,16,10); ctx.strokeRect(-8,-5,16,10);
+        // Pins on sides
+        for(let p=0;p<3;p++){
+          ctx.fillStyle='rgba(204,68,170,0.7)';
+          ctx.fillRect(-10,-3+p*3,2,2);
+          ctx.fillRect(8,-3+p*3,2,2);
+        }
+        // Glow ring
+        ctx.beginPath(); ctx.arc(0,0,circR,0,Math.PI*2);
+        ctx.strokeStyle=`rgba(255,120,210,${0.2+Math.sin(t*2+i)*0.15})`;
+        ctx.lineWidth=1; ctx.stroke();
+        ctx.restore();
+      }
+      // Centre PCB trace pattern
+      ctx.strokeStyle='rgba(204,68,170,0.4)'; ctx.lineWidth=1;
+      [[-12,0,0,0],[12,0,0,0],[0,-12,0,0],[0,12,0,0]].forEach(([x1,y1,x2,y2])=>{
+        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+      });
+
+    } else if (rarity === 'legendary-alpha') {
+      // RAM stick — long thin board with chips, rainbow shimmer
+      const rot     = t * Math.PI * 0.15;
+      const pulse   = 1 + Math.sin(t * 2) * 0.05;
+      ctx.rotate(rot * 0.3); ctx.scale(pulse, pulse);
+
+      // PCB board
+      const grad = ctx.createLinearGradient(-40, -8, 40, -8);
+      for(let i=0;i<=6;i++) {
+        const h=((t*60+i*60)%360+360)%360;
+        grad.addColorStop(i/6,`hsla(${h},100%,60%,0.8)`);
+      }
+      ctx.fillStyle = grad;
+      ctx.fillRect(-40, -8, 80, 16);
+      ctx.strokeStyle = 'rgba(255,255,255,0.5)'; ctx.lineWidth=1;
+      ctx.strokeRect(-40, -8, 80, 16);
+
+      // Memory chips along top
+      for(let i=0;i<6;i++){
+        const cx=-30+i*12;
+        ctx.fillStyle=`rgba(255,255,255,${0.4+Math.sin(t*4+i)*0.3})`;
+        ctx.fillRect(cx-4,-6,8,7);
+        ctx.strokeStyle='rgba(255,255,255,0.3)'; ctx.lineWidth=0.5;
+        ctx.strokeRect(cx-4,-6,8,7);
+      }
+
+      // Gold edge connector pins at bottom
+      for(let i=0;i<16;i++){
+        const px=-38+i*5;
+        ctx.fillStyle=`rgba(255,220,80,${0.6+Math.sin(t*5+i*0.5)*0.4})`;
+        ctx.fillRect(px,6,3,10);
+      }
+
+      // Notch in connector
+      ctx.fillStyle='rgba(0,0,0,0.8)';
+      ctx.fillRect(-2,6,4,10);
+
+      // White core glow
+      ctx.beginPath(); ctx.arc(0,0,4+Math.sin(t*4)*1,0,Math.PI*2);
+      ctx.fillStyle=`rgba(255,255,255,${0.5+Math.sin(t*5)*0.4})`; ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  // ─── AD PACK shape drawers ──────────────────────────────────────────────────
+
+  function drawShapeAdpack(ctx, rarity, t) {
+    ctx.save();
+    ctx.translate(128, 148);
+    const gold   = '#c8a028';
+    const goldDim = 'rgba(200,160,40,0.4)';
+    const goldGlow = 'rgba(200,160,40,0.7)';
+    const chrome  = 'rgba(220,200,160,0.9)';
+
+    if (rarity === 'common') {
+      // Flyer — crumpled paper sheet with text lines
+      ctx.fillStyle = 'rgba(200,160,40,0.15)';
+      ctx.strokeStyle = gold; ctx.lineWidth = 1.5;
+      // Slightly skewed rectangle
+      ctx.beginPath();
+      ctx.moveTo(-26, -32); ctx.lineTo(28, -30);
+      ctx.lineTo(30, 32);   ctx.lineTo(-28, 34);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Text lines
+      ctx.fillStyle = goldDim;
+      [-18,-10,-2,6,14,22].forEach(y => ctx.fillRect(-20, y, Math.random()*10+28, 2));
+      // Headline bar
+      ctx.fillStyle = 'rgba(200,160,40,0.4)';
+      ctx.fillRect(-20, -26, 44, 6);
+      // Corner fold
+      ctx.fillStyle = 'rgba(200,160,40,0.25)';
+      ctx.beginPath(); ctx.moveTo(18,22); ctx.lineTo(30,22); ctx.lineTo(30,34); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = goldDim; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(18,22); ctx.lineTo(30,22); ctx.lineTo(30,34); ctx.stroke();
+
+    } else if (rarity === 'uncommon') {
+      // Pop-up ad — rectangle with X button, close button you can't click
+      ctx.fillStyle = 'rgba(200,160,40,0.12)';
+      ctx.strokeStyle = gold; ctx.lineWidth = 2;
+      ctx.fillRect(-32, -24, 64, 48); ctx.strokeRect(-32, -24, 64, 48);
+      // Title bar
+      ctx.fillStyle = 'rgba(200,160,40,0.35)';
+      ctx.fillRect(-32, -24, 64, 10);
+      // X button — red, unfunctional
+      ctx.fillStyle = 'rgba(220,50,50,0.8)';
+      ctx.fillRect(20, -23, 10, 8);
+      ctx.strokeStyle = 'rgba(255,100,100,0.9)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(22,-21); ctx.lineTo(28,-17); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(28,-21); ctx.lineTo(22,-17); ctx.stroke();
+      // Ad content lines
+      ctx.fillStyle = goldDim;
+      [-8,0,8].forEach(y => ctx.fillRect(-24, y, 48, 3));
+      // Big CTA button
+      ctx.fillStyle = 'rgba(200,160,40,0.5)';
+      ctx.fillRect(-20, 14, 40, 8);
+      ctx.fillStyle = gold;
+      ctx.font = '8px "Share Tech Mono", monospace';
+      ctx.textAlign = 'center'; ctx.fillText('CLICK HERE', 0, 21);
+
+    } else if (rarity === 'rare') {
+      // Digital billboard — tall rectangle, LED-style display
+      ctx.fillStyle = 'rgba(200,160,40,0.1)';
+      ctx.strokeStyle = gold; ctx.lineWidth = 2;
+      ctx.fillRect(-36, -38, 72, 52); ctx.strokeRect(-36, -38, 72, 52);
+      // LED dot grid
+      ctx.fillStyle = goldDim;
+      for (let r=0;r<5;r++) for (let c=0;c<9;c++)
+        if (Math.random() > 0.4) {
+          ctx.beginPath(); ctx.arc(-30+c*8, -30+r*8, 2, 0, Math.PI*2); ctx.fill();
+        }
+      // Bright brand line
+      ctx.fillStyle = gold;
+      ctx.fillRect(-28, -10, 56, 4);
+      ctx.fillStyle = 'rgba(200,160,40,0.3)';
+      ctx.fillRect(-28, -4, 56, 3); ctx.fillRect(-28, 2, 56, 3);
+      // Billboard legs
+      ctx.strokeStyle = goldDim; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-16,14); ctx.lineTo(-12,38); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(16,14);  ctx.lineTo(12,38);  ctx.stroke();
+      // Glow
+      ctx.shadowColor = goldGlow; ctx.shadowBlur = 8;
+      ctx.strokeStyle = gold; ctx.lineWidth = 1;
+      ctx.strokeRect(-36,-38,72,52);
+      ctx.shadowBlur = 0;
+
+    } else if (rarity === 'legendary') {
+      // Loyalty card — credit-card proportions, holographic sheen
+      ctx.save();
+      ctx.rotate(-0.15);
+      // Card body
+      const grad = ctx.createLinearGradient(-40,-22,40,22);
+      grad.addColorStop(0,   `hsla(${(t*30)%360},70%,40%,0.6)`);
+      grad.addColorStop(0.4, `hsla(${(t*30+60)%360},80%,55%,0.6)`);
+      grad.addColorStop(0.7, `hsla(${(t*30+120)%360},70%,45%,0.6)`);
+      grad.addColorStop(1,   `hsla(${(t*30+180)%360},70%,40%,0.6)`);
+      ctx.fillStyle = grad;
+      ctx.strokeStyle = gold; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(-40,-22,80,44,4);
+      ctx.fill(); ctx.stroke();
+      // Chip
+      ctx.fillStyle = 'rgba(200,160,40,0.6)';
+      ctx.fillRect(-32,-10,18,16); ctx.strokeStyle = gold; ctx.lineWidth=1; ctx.strokeRect(-32,-10,18,16);
+      ctx.strokeStyle='rgba(200,160,40,0.4)';
+      ctx.beginPath();ctx.moveTo(-32,-4);ctx.lineTo(-14,-4);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-32,2);ctx.lineTo(-14,2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-26,-10);ctx.lineTo(-26,6);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-20,-10);ctx.lineTo(-20,6);ctx.stroke();
+      // Numbers
+      ctx.fillStyle = gold; ctx.font = '6px "Share Tech Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('**** **** **** CONSUME', 4, 16);
+      ctx.restore();
+
+    } else if (rarity === 'mythical') {
+      // Sponsored content — document with "AD" stamp, slowly rotates
+      ctx.rotate(Math.sin(t*1.5)*0.08);
+      ctx.fillStyle = 'rgba(200,160,40,0.1)';
+      ctx.strokeStyle = gold; ctx.lineWidth = 1.5;
+      ctx.fillRect(-28,-38,56,72); ctx.strokeRect(-28,-38,56,72);
+      // Content lines (looks like editorial)
+      ctx.fillStyle = goldDim;
+      [-28,-20,-12,-4,4,12,20].forEach(y=>ctx.fillRect(-22,y,Math.random()*10+30,2));
+      // "AD" stamp — diagonal, red
+      ctx.save(); ctx.rotate(0.4);
+      ctx.strokeStyle = 'rgba(220,50,50,0.7)'; ctx.lineWidth=3;
+      ctx.strokeRect(-18,-12,36,24);
+      ctx.fillStyle = 'rgba(220,50,50,0.7)';
+      ctx.font = 'bold 20px "VT323",monospace'; ctx.textAlign='center';
+      ctx.fillText('AD', 0, 8);
+      ctx.restore();
+      // "Sponsored" tiny label
+      ctx.fillStyle = 'rgba(200,160,40,0.4)';
+      ctx.font = '6px "Share Tech Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('SPONSORED CONTENT', 0, -32);
+
+    } else if (rarity === 'luck-maxxing') {
+      // Terms & Conditions — towering stack of pages
+      const pages = 5;
+      for (let i=pages-1;i>=0;i--) {
+        const ox=(i-2)*1.5, oy=(i-2)*2;
+        ctx.fillStyle = `rgba(200,160,40,${0.06+i*0.03})`;
+        ctx.strokeStyle = `rgba(200,160,40,${0.3+i*0.1})`; ctx.lineWidth=1;
+        ctx.fillRect(-24+ox,-36+oy,48,68); ctx.strokeRect(-24+ox,-36+oy,48,68);
+      }
+      // Top page with dense text lines
+      [-26,-18,-10,-2,6,14,22].forEach(y=>{
+        ctx.fillStyle=`rgba(200,160,40,${0.15+Math.random()*0.2})`;
+        ctx.fillRect(-18,y,Math.random()*5+28,1.5);
+      });
+      // Page count badge
+      ctx.fillStyle='rgba(200,160,40,0.5)';
+      ctx.beginPath();ctx.arc(18,-28,8,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=gold; ctx.font='6px "Share Tech Mono",monospace'; ctx.textAlign='center';
+      ctx.fillText('94',18,-25);
+      // Pulsing glow
+      ctx.shadowColor=goldGlow; ctx.shadowBlur=6+Math.sin(t*3)*4;
+      ctx.strokeStyle=gold; ctx.lineWidth=1;
+      ctx.strokeRect(-24,-36,48,68);
+      ctx.shadowBlur=0;
+
+    } else if (rarity === 'legendary-alpha') {
+      // Data Centre — brutalist building with heat exhaust and server racks
+      const pulse = Math.sin(t * 2) * 0.15;
+
+      // Building body
+      const bgrad = ctx.createLinearGradient(-36,-44,36,-44);
+      bgrad.addColorStop(0, `rgba(200,160,40,${0.35+pulse})`);
+      bgrad.addColorStop(0.5, `rgba(220,180,60,${0.5+pulse})`);
+      bgrad.addColorStop(1, `rgba(200,160,40,${0.35+pulse})`);
+      ctx.fillStyle = bgrad;
+      ctx.strokeStyle = gold; ctx.lineWidth = 2;
+      ctx.fillRect(-36,-44,72,68); ctx.strokeRect(-36,-44,72,68);
+
+      // Server rack windows — glowing
+      for(let r=0;r<4;r++) for(let c=0;c<4;c++){
+        const on = Math.sin(t*5+r*1.3+c*0.7)>0;
+        ctx.fillStyle = on ? `rgba(200,160,40,0.8)` : `rgba(60,40,10,0.8)`;
+        ctx.fillRect(-30+c*16,-38+r*14,10,8);
+        if(on){ctx.shadowColor=goldGlow;ctx.shadowBlur=4;}
+        ctx.strokeStyle='rgba(200,160,40,0.3)';ctx.lineWidth=0.5;
+        ctx.strokeRect(-30+c*16,-38+r*14,10,8);
+        ctx.shadowBlur=0;
+      }
+
+      // Cooling tower exhaust — animated
+      for(let i=0;i<3;i++){
+        const ex=-20+i*20;
+        const ey=-44-8-Math.sin(t*3+i)*4;
+        ctx.fillStyle=`rgba(200,200,200,${0.15+Math.sin(t*2+i)*0.1})`;
+        ctx.beginPath();ctx.ellipse(ex,ey,6,10+Math.sin(t*2+i)*3,0,0,Math.PI*2);ctx.fill();
+      }
+
+      // Ground — foundation
+      ctx.fillStyle='rgba(200,160,40,0.3)';
+      ctx.fillRect(-40,24,80,4);
+
+      // "DATA" label
+      ctx.fillStyle=gold; ctx.font='10px "VT323",monospace'; ctx.textAlign='center';
+      ctx.shadowColor=goldGlow; ctx.shadowBlur=8;
+      ctx.fillText('DATA CENTRE',0,36);
+      ctx.shadowBlur=0;
+
+      // Pulsing outer glow
+      ctx.strokeStyle=`rgba(200,160,40,${0.3+pulse*2})`;
+      ctx.lineWidth=1;
+      ctx.strokeRect(-38,-46,76,76);
     }
 
     ctx.restore();

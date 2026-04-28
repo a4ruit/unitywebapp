@@ -476,31 +476,47 @@ body::after {
 /* LED Pack Counter */
 .pack-counter {
   display:flex; flex-direction:column; align-items:center; gap:2px;
-  padding:7px 10px; border:1px solid rgba(232,92,26,0.78); background:rgba(0,0,0,0.62);
+  padding:3px 10px; border:1px solid rgba(232,92,26,0.78); background:rgba(0,0,0,0.62);
   position:relative; flex-shrink:0; min-width:90px;
   box-shadow: 0 0 8px rgba(232,92,26,0.16);
-  min-height: 72px;
+  min-height: 62px;
 }
 .pack-counter::after { content:''; position:absolute; inset:0; background:var(--scanline); pointer-events:none; opacity:0.4; }
 .counter-led-wrap { display:flex; align-items:center; justify-content:center; gap:7px; width:100%; }
 .counter-packs {
-  font-family:'VT323', monospace; font-size:36px; line-height:1; color:var(--orange);
+  font-family:'VT323', monospace; font-size:32px; line-height:1; color:var(--orange);
   text-shadow:0 0 6px rgba(232,92,26,0.85), 0 0 12px rgba(232,92,26,0.42), 2px 2px 0 rgba(0,0,0,0.8);
   letter-spacing:0.06em; font-variant-numeric:tabular-nums;
   animation:ledIdle 3s steps(2) infinite;
 }
 @keyframes ledIdle { 0%,100%{opacity:1} 97%{opacity:0.85} }
-.counter-meta { display:flex; flex-direction:column; align-items:flex-start; gap:1px; }
-.counter-label { font-family:'Share Tech Mono', monospace; font-size:8px; letter-spacing:0.12em; color:rgba(232,92,26,0.95); text-transform:uppercase; line-height:1.2; }
-.counter-sub   { font-family:'Share Tech Mono', monospace; font-size:7px; letter-spacing:0.1em; color:var(--dim); text-transform:uppercase; line-height:1.2; }
+.counter-meta { display:flex; flex-direction:column; align-items:flex-start; gap:0; min-width:92px; }
+.counter-label { font-family:'Share Tech Mono', monospace; font-size:7px; letter-spacing:0.12em; color:rgba(232,92,26,0.95); text-transform:uppercase; line-height:1.15; }
+.counter-sub   { font-family:'Share Tech Mono', monospace; font-size:6px; letter-spacing:0.08em; color:var(--dim); text-transform:uppercase; line-height:1.15; white-space:nowrap; }
 .counter-tag   { font-family:'Share Tech Mono', monospace; font-size:6px; letter-spacing:0.2em; color:rgba(232,92,26,0.92); opacity:0.82; text-transform:uppercase; line-height:1; }
 .pack-counter[data-state="waiting"] { border-color:var(--green); }
+.pack-counter[data-state="waiting"] .counter-led-wrap {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
 .pack-counter[data-state="waiting"] .counter-packs {
-  color:var(--green-lt); font-size:22px;
+  color:var(--green-lt); font-size:18px;
   text-shadow:0 0 6px rgba(58,170,58,0.8), 0 0 12px rgba(58,170,58,0.3);
   animation:ledCountdown 1s steps(2) infinite; letter-spacing:0.04em;
 }
 .pack-counter[data-state="waiting"] .counter-label { color:var(--orange); }
+.pack-counter[data-state="waiting"] .counter-meta {
+  min-width: 0;
+  align-items: center;
+  text-align: center;
+}
+.pack-counter[data-state="waiting"] .counter-label { font-size: 6px; }
+.pack-counter[data-state="waiting"] .counter-sub {
+  font-size: 5px;
+  letter-spacing: 0.06em;
+  white-space: normal;
+}
 @keyframes ledCountdown { 0%,100%{opacity:1} 50%{opacity:0.6} }
 .pack-counter.counter-pulse { animation:counterFlash 0.3s steps(4); }
 @keyframes counterFlash { 0%{background:rgba(232,92,26,0.3)} 100%{background:rgba(0,0,0,0.6)} }
@@ -827,18 +843,22 @@ body::after {
 
 /* ── STAR COUNTER — below pack canvas ───────────────── */
 .star-counter {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-areas:
+    "icon value"
+    "meta meta";
   justify-content: center;
-  gap: 2px;
-  padding: 4px 8px;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 1px;
+  padding: 3px 8px;
   border: 1px solid rgba(232,92,26,0.75);
   background: rgba(0,0,0,0.62);
   position: relative;
   box-shadow: 0 0 8px rgba(232,92,26,0.16);
   width: 240px;
-  min-height: 72px;
+  min-height: 62px;
 }
 .star-counter::after {
   content: '';
@@ -869,7 +889,7 @@ body::after {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  padding: 4px 10px;
+  padding: 5px 10px;
   border: 1px solid rgba(232,92,26,0.85);
   background: rgba(232,92,26,0.08);
   cursor: pointer;
@@ -878,7 +898,7 @@ body::after {
   flex: 0 0 33.333%;
   width: 33.333%;
   min-width: 0;
-  min-height: 72px;
+  min-height: 52px;
   transition: box-shadow 0.1s;
   position: relative;
   overflow: hidden;
@@ -934,6 +954,7 @@ body::after {
   text-shadow: 0 0 8px rgba(232,92,26,0.9), 0 0 18px rgba(232,92,26,0.5);
   animation: starIconIdle 2.5s steps(2) infinite;
   flex-shrink: 0;
+  grid-area: icon;
 }
 @keyframes starIconIdle { 0%,100%{opacity:1} 92%{opacity:0.75} }
 
@@ -948,10 +969,12 @@ body::after {
   letter-spacing: 0.06em;
   font-variant-numeric: tabular-nums;
   animation: starIconIdle 2.5s steps(2) infinite;
+  grid-area: value;
 }
 .star-counter-meta {
   display: flex; flex-direction: column; align-items: center; gap: 0;
   text-align: center;
+  grid-area: meta;
 }
 .star-counter-label {
   font-family: 'Share Tech Mono', monospace;
