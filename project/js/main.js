@@ -2,15 +2,15 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 
 // ─── Card pool ────────────────────────────────────────────────────────────────
 
-// ─── GARBAGE pack ─────────────────────────────────────────────────────────────
+// ─── FLESH pack ───────────────────────────────────────────────────────────────
 const GARBAGE_CARDS = [
-  { id:'small_cube', name:'Plastic Bag',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Lightweight. Permanent. The colony accepts all offerings.' },
-  { id:'large_cube', name:'Cardboard Box',   rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'It contained something once.' },
-  { id:'sphere',     name:'Crushed Can',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Aluminium. Recyclable in theory.' },
-  { id:'triangle',   name:'Glass Bottle',   rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Shatter radius: significant.' },
-  { id:'octagon',    name:'Bottle Cap',      rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Dense. Pointless. Irreducible.' },
-  { id:'triad',      name:'Cigarette Butts', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three.' },
-  { id:'star',       name:'Styrofoam Chunk', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Will outlast everything in this environment including you.' },
+  { id:'small_cube', name:'Unidentified Tissue', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
+  { id:'large_cube', name:'Pale Growth',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Found attached to nothing. Still warm.' },
+  { id:'sphere',     name:'Wet Membrane',        rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Permeable. Spreading.' },
+  { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. Pre-dates the colony.' },
+  { id:'octagon',    name:'Unnamed Organ',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'It has a function. You do not want to know what it is.' },
+  { id:'triad',      name:'Spore Cluster',       rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three. Already airborne.' },
+  { id:'star',       name:'The Flesh',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was here before you. It will be here after.' },
 ];
 
 // ─── E-WASTE pack ──────────────────────────────────────────────────────────────
@@ -286,7 +286,8 @@ function showScreen(id) {
 function initPack() {
   document.getElementById('packStack').innerHTML = '';
   if (typeof Pack3D === 'undefined') { console.error('[initPack] Pack3D not defined'); return; }
-  requestAnimationFrame(() => Pack3D.init());
+  // Wait for fonts (Adobe Fonts/Typekit loads async — canvas falls back without this)
+  document.fonts.ready.then(() => requestAnimationFrame(() => Pack3D.init()));
 
   // Swipe to open
   document.addEventListener('pack3d:swipe', (e) => {

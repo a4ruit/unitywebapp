@@ -5,7 +5,9 @@ const Pack3D = (() => {
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
-  let renderer, scene, camera, packMesh, rimLight;
+  let renderer, scene, camera, packMesh, rimLight, symbolMesh, textMesh;
+  let flyMeshes = [];
+  let flyStates = [];
   let animFrame;
   let isReady = false;
 
@@ -36,6 +38,176 @@ const Pack3D = (() => {
   let borderAnimFrame = 0;
 
   const SWIPE_THRESHOLD = 45;
+
+  // ─── Preloaded pack art ────────────────────────────────────────────────────
+  let _fleshPackImg = null;
+  const _fleshPackImgLoader = new Image();
+  _fleshPackImgLoader.src = 'assets/flesh-pack.png';
+  _fleshPackImgLoader.onload = () => {
+    _fleshPackImg = _fleshPackImgLoader;
+    // If pack already rendered before image loaded, rebuild face texture now
+    if (packMesh && _packTheme === 'garbage') {
+      const prev = packMesh.material[4]?.map;
+      const next = buildFaceTexture();
+      if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+      if (prev) prev.dispose();
+    }
+  };
+
+  // ─── Preloaded flesh symbol ────────────────────────────────────────────────
+  let _fleshSymbolImg = null;
+  const _fleshSymbolImgLoader = new Image();
+  _fleshSymbolImgLoader.src = 'assets/flesh-symbol.png';
+  _fleshSymbolImgLoader.onload = () => {
+    _fleshSymbolImg = _fleshSymbolImgLoader;
+    if (packMesh && _packTheme === 'garbage') { rebuildSymbolMesh(); rebuildTextMesh(); rebuildFlyMeshes(); }
+  };
+
+  function rebuildSymbolMesh() {
+    if (symbolMesh) { packMesh.remove(symbolMesh); symbolMesh.geometry.dispose(); symbolMesh.material.map?.dispose(); symbolMesh.material.dispose(); symbolMesh = null; }
+    if (_packTheme !== 'garbage' || !_fleshSymbolImg) return;
+
+    const c = document.createElement('canvas');
+    c.width = 256; c.height = 256;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(_fleshSymbolImg, 0, 0, 256, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+
+    const geo = new THREE.PlaneGeometry(0.72, 0.72);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.02,
+      emissive: new THREE.Color(0xcc1515),
+      emissiveIntensity: 0.35,
+      roughness: 0.3,
+      metalness: 0.15,
+    });
+    symbolMesh = new THREE.Mesh(geo, mat);
+    symbolMesh.position.set(0, 0.12, 0.09);
+    packMesh.add(symbolMesh);
+  }
+
+  function rebuildTextMesh() {
+    if (textMesh) { packMesh.remove(textMesh); textMesh.geometry.dispose(); textMesh.material.map?.dispose(); textMesh.material.dispose(); textMesh = null; }
+    if (_packTheme !== 'garbage') return;
+
+    // Wait for font — if not ready yet, retry once fonts load
+    const fontReady = document.fonts.check('28px "pf-pixelscript"');
+    if (!fontReady) { document.fonts.ready.then(() => rebuildTextMesh()); return; }
+
+    const c = document.createElement('canvas');
+    c.width = 900; c.height = 190;
+    const ctx = c.getContext('2d');
+
+    // Dark backing plate behind text
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(60, 20, 780, 120);
+
+    // Drop shadow pass
+    ctx.font = '112px "pf-pixelscript", cursive';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.shadowOffsetX = 4; ctx.shadowOffsetY = 5; ctx.shadowBlur = 0;
+    ctx.fillText('Flesh Pack', 450, 130);
+    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+
+    // Colour + glow pass
+    ctx.fillStyle = '#e8d0c8';
+    ctx.shadowColor = 'rgba(200,20,20,0.95)'; ctx.shadowBlur = 20;
+    ctx.fillText('Flesh Pack', 450, 130);
+    ctx.shadowBlur = 0;
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.needsUpdate = true;
+
+    // Geometry aspect 900:190 = 4.74:1
+    const geo = new THREE.PlaneGeometry(1.55, 0.33);
+    const mat = new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      alphaTest: 0.02,
+      emissive: new THREE.Color(0xcc1515),
+      emissiveIntensity: 0.25,
+      roughness: 0.3,
+      metalness: 0.1,
+    });
+    textMesh = new THREE.Mesh(geo, mat);
+    textMesh.position.set(0, -0.38, 0.12);
+    packMesh.add(textMesh);
+  }
+
+  function buildFlyTexture(wingFlap) {
+    // Draw on a tiny canvas — NearestFilter keeps it blocky
+    const c = document.createElement('canvas');
+    c.width = 7; c.height = 7;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const p = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
+
+    // Wings: up when flap=true, down when false
+    const wy = wingFlap ? 1 : 2;
+    p(0, wy,   'rgba(210,225,210,0.7)'); // left wing outer
+    p(1, wy,   'rgba(210,225,210,0.9)'); // left wing inner
+    p(5, wy,   'rgba(210,225,210,0.9)'); // right wing inner
+    p(6, wy,   'rgba(210,225,210,0.7)'); // right wing outer
+
+    // Head
+    p(2, 1, '#1a0800');
+    p(3, 1, '#1a0800');
+    p(4, 1, '#1a0800');
+    p(3, 0, '#1a0800');
+
+    // Eyes
+    p(2, 1, '#cc1010');
+    p(4, 1, '#cc1010');
+
+    // Body
+    p(3, 2, '#0f0500');
+    p(3, 3, '#0f0500');
+    p(2, 3, '#0f0500');
+    p(3, 4, '#0f0500');
+    p(3, 5, '#150800');
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function rebuildFlyMeshes() {
+    flyMeshes.forEach(m => { packMesh.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
+    flyMeshes = []; flyStates = [];
+    if (_packTheme !== 'garbage') return;
+
+    const count = 6;
+    for (let i = 0; i < count; i++) {
+      const geo = new THREE.PlaneGeometry(0.11, 0.11);
+      const mat = new THREE.MeshStandardMaterial({
+        map: buildFlyTexture(true),
+        transparent: true, alphaTest: 0.05,
+        emissive: new THREE.Color(0x331100), emissiveIntensity: 0.3,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      const bx = (Math.random() - 0.5) * 1.1;
+      const by = (Math.random() - 0.5) * 1.8;
+      const bz = 0.10 + Math.random() * 0.08;
+      mesh.position.set(bx, by, bz);
+      packMesh.add(mesh);
+      flyMeshes.push(mesh);
+      flyStates.push({
+        bx, by, bz,
+        angle:  Math.random() * Math.PI * 2,
+        speed:  0.6 + Math.random() * 1.0,
+        radius: 0.04 + Math.random() * 0.10,
+        phase:  Math.random() * Math.PI * 2,
+        flapT:  Math.random() * Math.PI * 2,
+      });
+    }
+  }
 
   // ─── Scanline shard texture ────────────────────────────────────────────────
 
@@ -282,20 +454,14 @@ const Pack3D = (() => {
     // ── BASE BACKGROUND ───────────────────────────────────────────────────────
 
     if (_packTheme === 'garbage') {
-      // Deep green-black gradient base
-      const bg = ctx.createRadialGradient(128, 160, 20, 128, 192, 200);
-      bg.addColorStop(0,   '#1a2a1a');
-      bg.addColorStop(0.6, '#0d150d');
-      bg.addColorStop(1,   '#070d07');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-      // Subtle diagonal grain
-      ctx.strokeStyle = 'rgba(42,122,42,0.12)'; ctx.lineWidth = 1;
-      for (let x = -H; x < W + H; x += 18) {
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x + H, H); ctx.stroke();
+      // Flesh pack art base
+      if (_fleshPackImg) {
+        ctx.drawImage(_fleshPackImg, 0, 0, W, H);
+      } else {
+        ctx.fillStyle = '#0d0505';
+        ctx.fillRect(0, 0, W, H);
       }
-
-      // Prismatic sheen — muted for garbage
+      // Blood-red prismatic sheen over the art
       drawPrismatic(ctx, W, H, 0.06, 0);
 
     } else if (_packTheme === 'ewaste') {
@@ -390,14 +556,14 @@ const Pack3D = (() => {
       drawPrismatic(ctx, W, H, 0.06, 200);
 
     } else {
-      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#e85c1a', 'rgba(232,92,26,0.7)');
-      ctx.strokeStyle = 'rgba(255,140,40,0.3)'; ctx.lineWidth = 1;
+      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#cc1515', 'rgba(200,20,20,0.7)');
+      ctx.strokeStyle = 'rgba(200,20,20,0.3)'; ctx.lineWidth = 1;
       ctx.strokeRect(10, 10, W-20, H-20);
     }
 
     // ── CORNER BRACKETS ───────────────────────────────────────────────────────
     const bPad = 16, bSize = 20, bW = 3;
-    const bracketCol = _packTheme === 'adpack' ? '#ffd700' : _packTheme === 'ewaste' ? '#00dcff' : '#e85c1a';
+    const bracketCol = _packTheme === 'adpack' ? '#ffd700' : _packTheme === 'ewaste' ? '#00dcff' : '#cc1515';
     ctx.strokeStyle = bracketCol; ctx.lineWidth = bW;
     ctx.shadowColor = bracketCol; ctx.shadowBlur = 8;
     [[bPad,bPad,1,1],[W-bPad,bPad,-1,1],[bPad,H-bPad,1,-1],[W-bPad,H-bPad,-1,-1]].forEach(([x,y,sx,sy]) => {
@@ -406,8 +572,10 @@ const Pack3D = (() => {
     ctx.shadowBlur = 0;
 
     // ── SPARKLES ──────────────────────────────────────────────────────────────
-    // More sparkles for adpack, fewer for others
-      const sparkleCount = _packTheme === 'adpack' ? 12 : _packTheme === 'ewaste' ? 8 : 5;
+    // Flesh pack uses fly meshes instead of sparkles
+    if (_packTheme === 'garbage') { /* skipped — flies handle this */ }
+    else {
+      const sparkleCount = _packTheme === 'adpack' ? 12 : 8;
     const sparklePositions = [
       [40,60],[216,60],[40,324],[216,324],
       [128,40],[128,344],[20,192],[236,192],
@@ -418,12 +586,14 @@ const Pack3D = (() => {
       ? ['rgba(255,220,80,0.9)','rgba(255,255,255,0.95)','rgba(255,180,0,0.8)','rgba(200,255,100,0.7)','rgba(100,200,255,0.7)','rgba(255,100,200,0.7)']
       : _packTheme === 'ewaste'
       ? ['rgba(0,220,255,0.9)','rgba(255,255,255,0.9)','rgba(40,140,255,0.8)','rgba(180,100,255,0.7)']
-      : ['rgba(255,140,40,0.85)','rgba(255,255,255,0.9)','rgba(200,80,20,0.7)'];
+      : ['rgba(200,20,20,0.85)','rgba(255,255,255,0.9)','rgba(160,10,10,0.7)'];
     sparklePositions.forEach(([sx,sy], i) => {
       const col   = sparkleColors[i % sparkleColors.length];
       const size  = _packTheme === 'adpack' ? 16 + (i%3)*5 : 12 + (i%3)*4;
-      drawSparkle(ctx, sx, sy, size, col, _packTheme === 'adpack' ? 0.55 + (i%3)*0.08 : 0.7 + (i%3)*0.1);
+      const alpha = _packTheme === 'adpack' ? 0.55 + (i%3)*0.08 : 0.7 + (i%3)*0.1;
+      drawSparkle(ctx, sx, sy, size, col, alpha);
     });
+    } // end non-garbage sparkles
 
     // ── CENTRAL ICON ──────────────────────────────────────────────────────────
     const iconY = 196;
@@ -457,7 +627,7 @@ const Pack3D = (() => {
       // White hot centre sparkle
       drawSparkle(ctx, 128, ringY, 28, 'rgba(255,255,255,0.95)', 0.9);
 
-    } else {
+    } else if (_packTheme !== 'garbage') {
       ctx.font = 'bold 72px "VT323", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = themeHex();
@@ -467,7 +637,7 @@ const Pack3D = (() => {
     }
 
     // ── TEXT ──────────────────────────────────────────────────────────────────
-    const packName = _packTheme === 'ewaste' ? 'E-WASTE PACK' : _packTheme === 'adpack' ? 'AD PACK' : 'GARBAGE PACK';
+    const packName = _packTheme === 'ewaste' ? 'E-WASTE PACK' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH PACK';
 
     if (_packTheme === 'adpack') {
       // Gold gradient name
@@ -485,21 +655,23 @@ const Pack3D = (() => {
       ctx.font = '9px "Share Tech Mono", monospace';
       ctx.fillStyle = 'rgba(255,220,80,0.6)';
       ctx.fillText('✦ EXCLUSIVE ✦', 128, 252);
-    } else {
-      ctx.font = '22px "VT323", monospace'; ctx.textAlign = 'center';
+    } else if (_packTheme !== 'garbage') {
+      ctx.font = '22px "lo-res", sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#e8e0c8';
       ctx.shadowColor = themeGlow(); ctx.shadowBlur = 6;
       ctx.fillText(packName, 128, 222);
       ctx.shadowBlur = 0;
     }
 
-    ctx.font = '11px "Share Tech Mono", monospace';
-    ctx.fillStyle = 'rgba(232,224,200,0.35)';
-    ctx.fillText('4 cards inside', 128, 264);
+    if (_packTheme !== 'garbage') {
+      ctx.font = '11px "lo-res", sans-serif';
+      ctx.fillStyle = 'rgba(232,224,200,0.35)';
+      ctx.fillText('4 cards inside', 128, 264);
 
-    ctx.font = '11px "Share Tech Mono", monospace';
-    ctx.fillStyle = themeAccent();
-    ctx.fillText('← swipe to open →', 128, 352);
+      ctx.font = '11px "lo-res", sans-serif';
+      ctx.fillStyle = themeAccent();
+      ctx.fillText('← swipe to open →', 128, 352);
+    }
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -572,7 +744,7 @@ const Pack3D = (() => {
     } else {
       ctx.fillStyle = themeCol(0.22);
     }
-    ctx.fillText(_packTheme === 'ewaste' ? 'E-WASTE' : _packTheme === 'adpack' ? 'AD PACK' : 'GARBAGE', 128, 200);
+    ctx.fillText(_packTheme === 'ewaste' ? 'E-WASTE' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH', 128, 200);
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -633,6 +805,9 @@ const Pack3D = (() => {
     packMesh = new THREE.Mesh(geo, [edgeMat, edgeMat, edgeMat, edgeMat, frontMat, backMat]);
     scene.add(packMesh);
 
+    rebuildSymbolMesh();
+    rebuildTextMesh();
+    rebuildFlyMeshes();
     attachEvents(wrap);
     isReady = true;
     animate();
@@ -687,6 +862,35 @@ const Pack3D = (() => {
       packMesh.rotation.x = rotX;
       packMesh.rotation.y = rotY;
     }
+
+    // Float symbol and text meshes independently above the pack face
+    if (symbolMesh) {
+      symbolMesh.position.y = 0.12 + Math.sin(idleT * 1.5) * 0.055;
+      symbolMesh.position.z = 0.09 + Math.sin(idleT * 0.9) * 0.018;
+      symbolMesh.rotation.z = Math.sin(idleT * 0.55) * 0.06;
+    }
+    if (textMesh) {
+      textMesh.position.y = -0.38 + Math.sin(idleT * 1.5 + 0.4) * 0.04;
+      textMesh.position.z = 0.12 + Math.sin(idleT * 0.9 + 0.3) * 0.012;
+    }
+
+    // Fly swarm animation
+    flyMeshes.forEach((m, i) => {
+      const s = flyStates[i];
+      s.angle += s.speed * 0.02;
+      s.flapT += 0.18;
+      m.position.x = s.bx + Math.cos(s.angle) * s.radius;
+      m.position.y = s.by + Math.sin(s.angle * 1.3 + s.phase) * s.radius * 0.7;
+      m.position.z = s.bz + Math.sin(s.angle * 0.6 + s.phase) * 0.02;
+      // Wing flap — rebuild texture at low frequency to avoid GPU thrash
+      if (Math.floor(s.flapT) % 4 === 0 && Math.floor(s.flapT) !== m._lastFlap) {
+        m._lastFlap = Math.floor(s.flapT);
+        const prev = m.material.map;
+        m.material.map = buildFlyTexture(Math.floor(s.flapT / 2) % 2 === 0);
+        m.material.needsUpdate = true;
+        if (prev) prev.dispose();
+      }
+    });
 
     updateParticles();
 
@@ -806,11 +1010,18 @@ const Pack3D = (() => {
         rimLight.intensity = 2.5;
       }
     }
+    rebuildSymbolMesh();
+    rebuildTextMesh();
+    rebuildFlyMeshes();
     clearParticles();
   }
 
   function destroy() {
     cancelAnimationFrame(animFrame);
+    if (symbolMesh) { packMesh?.remove(symbolMesh); symbolMesh.geometry.dispose(); symbolMesh.material.map?.dispose(); symbolMesh.material.dispose(); symbolMesh = null; }
+    if (textMesh)   { packMesh?.remove(textMesh);   textMesh.geometry.dispose();   textMesh.material.map?.dispose();   textMesh.material.dispose();   textMesh = null; }
+    flyMeshes.forEach(m => { packMesh?.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
+    flyMeshes = []; flyStates = [];
     clearParticles();
     renderer?.dispose();
   }

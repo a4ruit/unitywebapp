@@ -58,12 +58,12 @@ function updateCounterDisplay() {
   pEl.textContent = String(packsLeft).padStart(2, '0');
 
   if (packsLeft > 0) {
-    lEl.textContent = 'PACKS';
-    sEl.textContent = 'swipe or tap to open';
+    if (lEl) lEl.textContent = 'PACKS';
+    if (sEl) sEl.textContent = 'swipe or tap to open';
     if (cEl) cEl.dataset.state = 'ready';
   } else {
-    lEl.textContent = 'EMPTY';
-    sEl.textContent = 'watch ad or spend stars';
+    if (lEl) lEl.textContent = 'EMPTY';
+    if (sEl) sEl.textContent = 'watch ad or spend stars';
     if (cEl) cEl.dataset.state = 'waiting';
   }
 }

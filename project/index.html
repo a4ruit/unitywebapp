@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>TAMAG4TCHA</title>
+  <link rel="stylesheet" href="https://use.typekit.net/yki8oca.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -35,8 +36,8 @@
         <!-- Pack type selector -->
         <div class="pack-type-row">
           <button class="pack-type-btn active" id="packTypeGarbage" onclick="setPackType('garbage')">
-            <span class="pack-type-icon">♻</span>
-            <span class="pack-type-label">GARBAGE</span>
+            <span class="pack-type-icon">☣</span>
+            <span class="pack-type-label">FLESH</span>
           </button>
           <button class="pack-type-btn" id="packTypeEwaste" onclick="setPackType('ewaste')">
             <span class="pack-type-icon">⚡</span>
@@ -58,28 +59,22 @@
           </div>
           <div id="packCanvas" class="pack-canvas-wrap"></div>
         </div>
-        <p class="pack-hint" id="packHint">swipe left or right</p>
 
-        <!-- Pack counter -->
-        <div class="pack-counter" id="packCounter" data-state="ready">
-          <div class="counter-led-wrap">
-            <span class="counter-packs" id="counterPacks">03</span>
-            <div class="counter-meta">
-              <span class="counter-label" id="counterLabel">PACKS</span>
-              <span class="counter-sub" id="counterSub">swipe or tap to open</span>
+        <!-- Bottom row: pack counter + stars + shop -->
+        <div class="star-counter-row">
+          <div class="pack-counter" id="packCounter" data-state="ready">
+            <div class="counter-led-wrap">
+              <span class="counter-packs" id="counterPacks">03</span>
+              <div class="counter-meta">
+                <span class="counter-label" id="counterLabel">PACKS</span>
+              </div>
             </div>
           </div>
-          <div class="counter-tag">PACKS</div>
-        </div>
-
-        <!-- Stars currency + shop button -->
-        <div class="star-counter-row">
           <div class="star-counter" id="starsDisplay">
             <span class="star-counter-icon">★</span>
             <span class="star-counter-value" id="starsValue">0</span>
             <div class="star-counter-meta">
               <span class="star-counter-label">STARS</span>
-              <span class="star-counter-sub">50 = 3 packs</span>
             </div>
           </div>
           <button class="star-shop-btn" onclick="openShop()">
@@ -93,8 +88,6 @@
       <!-- CHOOSE SCREEN -->
       <div class="screen hidden" id="screen-choose">
         <div class="choose-header">
-          <span class="choose-title">CHOOSE YOUR WASTE</span>
-          <span class="choose-sub">one drop per pack</span>
         </div>
         <div class="choice-grid" id="choiceGrid"></div>
       </div>
