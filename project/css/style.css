@@ -818,7 +818,7 @@ body::after {
 .pack-type-btn {
   flex: 1 1 0;
   display: flex;
-  opacity: 100%;
+ 
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -864,7 +864,7 @@ body::after {
   row-gap: 1px;
   padding: 3px 8px;
   border: 1px solid rgba(200,20,20,0.75);
-  background: rgba(0,0,0,0.35);
+  background: #000;
   position: relative;
   box-shadow: 0 0 8px rgba(200,20,20,0.16);
   width: 240px;
@@ -901,7 +901,7 @@ body::after {
   gap: 3px;
   padding: 5px 10px;
   border: 1px solid rgba(200,20,20,0.85);
-  background: rgba(200,20,20,0.08);
+  background: #130303;
   cursor: pointer;
   font-family: inherit;
   box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(200,20,20,0.18);
@@ -939,7 +939,7 @@ body::after {
   animation: adpackBtnRainbow 2.4s linear infinite;
 }
 .star-shop-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
-.star-shop-btn:hover  { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(200,20,20,0.34); background: rgba(200,20,20,0.13); }
+.star-shop-btn:hover  { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(200,20,20,0.34); background: #1a0404; }
 
 .star-shop-btn-icon {
   font-family: 'lo-res', sans-serif;
@@ -1050,7 +1050,7 @@ body::after {
 /* E-waste pack type button — blue active state */
 #packTypeEwaste.active {
   border-color: #288cff;
-  background: rgba(40,140,255,0.08);
+  background: #030712;
 }
 #packTypeEwaste.active .pack-type-label,
 #packTypeEwaste.active .pack-type-icon {
@@ -1256,7 +1256,7 @@ body::after {
 /* ── AD PACK button — gold/exclusive ─────────────── */
 .pack-type-btn--adpack {
   border-color: rgba(200,160,40,0.35) !important;
-  background: rgba(200,160,40,0.04) !important;
+  background: #0c0a03 !important;
   position: relative;
   overflow: hidden;
 }
@@ -1296,7 +1296,7 @@ body::after {
 }
 .pack-type-btn--adpack.active {
   border-color: transparent !important;
-  background: rgba(200,160,40,0.09) !important;
+  background: #130f03 !important;
   box-shadow: 0 0 10px rgba(200,160,40,0.24);
   animation: adpackGlow 2.8s ease-in-out infinite;
 }
