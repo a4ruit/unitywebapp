@@ -180,6 +180,100 @@ const BloodDrip = (() => {
     }
   }
 
+  // ── Smear interaction ─────────────────────────────────────────────────────
+
+  function smearAt(gx, gy, vx, vy) {
+    const speed = Math.sqrt(vx * vx + vy * vy);
+    if (speed < 0.4) return;
+
+    const radius   = 4;
+    const smearLen = Math.min(Math.round(speed * 2), 7);
+    const nx = vx / speed;
+    const ny = vy / speed;
+
+    // Only read/write the small patch around the cursor for performance
+    const pad = radius + smearLen + 1;
+    const rx  = Math.max(0, gx - pad);
+    const ry  = Math.max(0, gy - pad);
+    const rw  = Math.min(GW - rx, pad * 2 + 1);
+    const rh  = Math.min(GH - ry, pad * 2 + 1);
+
+    const img = stainCtx.getImageData(rx, ry, rw, rh);
+    const d   = img.data;
+
+    function idx(x, y) {
+      const lx = x - rx, ly = y - ry;
+      if (lx < 0 || ly < 0 || lx >= rw || ly >= rh) return -1;
+      return (ly * rw + lx) * 4;
+    }
+
+    // Collect blood pixels inside brush radius (read before any writes)
+    const sources = [];
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (dx * dx + dy * dy > radius * radius) continue;
+        const sx = gx + dx, sy = gy + dy;
+        const si = idx(sx, sy);
+        if (si < 0) continue;
+        const a = d[si + 3];
+        if (a < 15) continue;
+        sources.push({ sx, sy, si, r: d[si], g: d[si+1], b: d[si+2], a });
+      }
+    }
+
+    for (const src of sources) {
+      // Wipe: fade the source pixel
+      d[src.si + 3] = Math.max(0, src.a - Math.round(src.a * 0.22));
+
+      // Smear: push blood forward along drag direction with falloff
+      for (let s = 1; s <= smearLen; s++) {
+        const tx = Math.round(src.sx + nx * s);
+        const ty = Math.round(src.sy + ny * s);
+        const ti = idx(tx, ty);
+        if (ti < 0) break;
+
+        const t      = 1 - s / (smearLen + 1);
+        const addA   = Math.round(src.a * t * 0.55);
+        const newA   = Math.min(255, d[ti + 3] + addA);
+        if (newA <= d[ti + 3]) continue;
+
+        const blend  = addA / newA;
+        d[ti]     = Math.round(d[ti]     * (1 - blend) + src.r * blend);
+        d[ti + 1] = Math.round(d[ti + 1] * (1 - blend) + src.g * blend);
+        d[ti + 2] = Math.round(d[ti + 2] * (1 - blend) + src.b * blend);
+        d[ti + 3] = newA;
+      }
+    }
+
+    stainCtx.putImageData(img, rx, ry);
+  }
+
+  function initInteraction() {
+    let down = false;
+    let lgx = 0, lgy = 0;
+
+    function toGrid(clientX, clientY) {
+      return [Math.floor(clientX / PIXEL), Math.floor(clientY / PIXEL)];
+    }
+
+    function onDown(cx, cy) {
+      down = true;
+      [lgx, lgy] = toGrid(cx, cy);
+    }
+
+    function onMove(cx, cy) {
+      if (!down) return;
+      const [gx, gy] = toGrid(cx, cy);
+      const vx = gx - lgx, vy = gy - lgy;
+      if (vx !== 0 || vy !== 0) smearAt(gx, gy, vx, vy);
+      lgx = gx; lgy = gy;
+    }
+
+    window.addEventListener('pointerdown', e => onDown(e.clientX, e.clientY));
+    window.addEventListener('pointerup',   () => { down = false; });
+    window.addEventListener('pointermove', e => onMove(e.clientX, e.clientY));
+  }
+
   // ── Animation loop ────────────────────────────────────────────────────────
 
   function update() {
