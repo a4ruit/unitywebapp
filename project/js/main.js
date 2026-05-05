@@ -349,6 +349,7 @@ function adpackCancel() {
 
 function doPackOpen(dir) {
   send('pack_opened');
+  BloodDrip.onPackOpened();
 
   packCards      = rollPack();
   revealIndex    = 0;
