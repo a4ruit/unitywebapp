@@ -6,8 +6,10 @@ const Pack3D = (() => {
   // ─── State ─────────────────────────────────────────────────────────────────
 
   let renderer, scene, camera, packMesh, rimLight, symbolMesh, textMesh;
-  let flyMeshes = [];
-  let flyStates = [];
+  let flyMeshes    = [];
+  let flyStates    = [];
+  let cloudMeshes  = [];
+  let cloudStates  = [];
   let animFrame;
   let isReady = false;
 
@@ -72,23 +74,60 @@ const Pack3D = (() => {
     if (packMesh && _packTheme === 'garbage') rebuildTextMesh();
   };
 
+  // ─── Preloaded scourge art ─────────────────────────────────────────────────
+  let _scourgePackImg = null;
+  const _scourgePackImgLoader = new Image();
+  _scourgePackImgLoader.src = 'assets/scourge-bg.png';
+  _scourgePackImgLoader.onload = () => {
+    _scourgePackImg = _scourgePackImgLoader;
+    if (packMesh && _packTheme === 'ewaste') {
+      const prev = packMesh.material[4]?.map;
+      const next = buildFaceTexture();
+      if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+      if (prev) prev.dispose();
+    }
+  };
+
+  let _scourgeSymbolImg = null;
+  const _scourgeSymbolImgLoader = new Image();
+  _scourgeSymbolImgLoader.src = 'assets/scourge-symbol.png';
+  _scourgeSymbolImgLoader.onload = () => {
+    _scourgeSymbolImg = _scourgeSymbolImgLoader;
+    if (packMesh && _packTheme === 'ewaste') { rebuildSymbolMesh(); rebuildTextMesh(); }
+  };
+
+  let _scourgeTextImg = null;
+  const _scourgeTextImgLoader = new Image();
+  _scourgeTextImgLoader.src = 'assets/scourge-text.png';
+  _scourgeTextImgLoader.onload = () => {
+    _scourgeTextImg = _scourgeTextImgLoader;
+    if (packMesh && _packTheme === 'ewaste') rebuildTextMesh();
+  };
+
   function rebuildSymbolMesh() {
     if (symbolMesh) { packMesh.remove(symbolMesh); symbolMesh.geometry.dispose(); symbolMesh.material.map?.dispose(); symbolMesh.material.dispose(); symbolMesh = null; }
-    if (_packTheme !== 'garbage' || !_fleshSymbolImg) return;
+
+    let img = null, emissiveCol = 0xcc1515;
+    if      (_packTheme === 'garbage' && _fleshSymbolImg)   { img = _fleshSymbolImg;   emissiveCol = 0xcc1515; }
+    else if (_packTheme === 'ewaste'  && _scourgeSymbolImg) { img = _scourgeSymbolImg;  emissiveCol = 0x50c010; }
+    if (!img) return;
 
     const c = document.createElement('canvas');
-    c.width = 256; c.height = 256;
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
     const ctx = c.getContext('2d');
-    ctx.drawImage(_fleshSymbolImg, 0, 0, 256, 256);
+    ctx.drawImage(img, 0, 0);
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
 
-    const geo = new THREE.PlaneGeometry(0.72, 0.72);
+    // Preserve natural aspect ratio so the symbol isn't squished
+    const aspect = img.naturalWidth / img.naturalHeight;
+    const symH = _packTheme === 'ewaste' ? 0.88 : 0.72, symW = symH * aspect;
+    const geo = new THREE.PlaneGeometry(symW, symH);
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
       transparent: true,
       alphaTest: 0.02,
-      emissive: new THREE.Color(0xcc1515),
+      emissive: new THREE.Color(emissiveCol),
       emissiveIntensity: 0.35,
       roughness: 0.3,
       metalness: 0.15,
@@ -100,7 +139,71 @@ const Pack3D = (() => {
 
   function rebuildTextMesh() {
     if (textMesh) { packMesh.remove(textMesh); textMesh.geometry.dispose(); textMesh.material.map?.dispose(); textMesh.material.dispose(); textMesh = null; }
-    if (_packTheme !== 'garbage') return;
+    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') return;
+
+    if (_packTheme === 'ewaste') {
+      if (!_scourgeTextImg) return; // wait for image
+
+      const c = document.createElement('canvas');
+      c.width = 900; c.height = 320;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      const ih = 240;
+      const iw = Math.round(_scourgeTextImg.naturalWidth * (ih / _scourgeTextImg.naturalHeight));
+      const ix = Math.round((900 - iw) / 2);
+      const iy = Math.round((320 - ih) / 2);
+
+      // Dark outline tracing the text shape
+      const tmp = document.createElement('canvas');
+      tmp.width = c.width; tmp.height = c.height;
+      const tCtx = tmp.getContext('2d');
+      tCtx.imageSmoothingEnabled = false;
+      tCtx.drawImage(_scourgeTextImg, ix, iy, iw, ih);
+      tCtx.globalCompositeOperation = 'source-in';
+      tCtx.fillStyle = 'rgba(0,0,0,0.88)';
+      tCtx.fillRect(0, 0, tmp.width, tmp.height);
+      const r = 4;
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (dx * dx + dy * dy > r * r) continue;
+          ctx.drawImage(tmp, dx, dy);
+        }
+      }
+
+      // Lime-tinted image pass
+      const tinted = document.createElement('canvas');
+      tinted.width = c.width; tinted.height = c.height;
+      const tCtx2 = tinted.getContext('2d');
+      tCtx2.imageSmoothingEnabled = false;
+      tCtx2.drawImage(_scourgeTextImg, ix, iy, iw, ih);
+      tCtx2.globalCompositeOperation = 'source-in';
+      tCtx2.fillStyle = '#c8e840';
+      tCtx2.fillRect(0, 0, tinted.width, tinted.height);
+
+      // Glow pass
+      ctx.shadowColor = 'rgba(80,200,20,0.95)'; ctx.shadowBlur = 28;
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(tinted, -6, -6);
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+      // Crisp tinted pass
+      ctx.drawImage(tinted, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      const geo = new THREE.PlaneGeometry(1.68, 0.60);
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex, transparent: true, alphaTest: 0.02,
+        emissive: new THREE.Color(0x50c010), emissiveIntensity: 0.25,
+        roughness: 0.3, metalness: 0.1,
+      });
+      textMesh = new THREE.Mesh(geo, mat);
+      textMesh.position.set(0, -0.50, 0.12);
+      packMesh.add(textMesh);
+      return;
+    }
+
     if (!_fleshTextImg) return; // wait for image
 
     const c = document.createElement('canvas');
@@ -240,6 +343,97 @@ const Pack3D = (() => {
         flapT:  Math.random() * Math.PI * 2,
       });
     }
+  }
+
+  // ─── Pestilence cloud meshes (scourge pack) ───────────────────────────────
+
+  function buildCloudTexture(seed) {
+    const W = 20, H = 13;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    // Seeded-ish random so each cloud looks distinct
+    let r = seed * 9301 + 49297;
+    const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+
+    const p = (x, y, a) => {
+      const g = 160 + Math.floor(rnd() * 60);
+      const gr = Math.floor(rnd() * 30);
+      ctx.fillStyle = `rgba(${gr},${g},${Math.floor(rnd() * 20)},${a.toFixed(2)})`;
+      ctx.fillRect(x, y, 1, 1);
+    };
+
+    // Cloud shape: diamond-ish blob centred at (10,6)
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const dx = (x - 10) / 9, dy = (y - 6) / 5;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 1.0) continue;
+        // Core is denser, edges wispy
+        const base = dist < 0.45 ? 0.55 + rnd() * 0.25
+                   : dist < 0.75 ? 0.30 + rnd() * 0.25
+                   :                0.08 + rnd() * 0.18;
+        p(x, y, base);
+      }
+    }
+
+    // Scatter a few bright highlight pixels
+    for (let i = 0; i < 6; i++) {
+      const hx = 4 + Math.floor(rnd() * 12);
+      const hy = 2 + Math.floor(rnd() * 8);
+      ctx.fillStyle = `rgba(180,255,80,${(0.15 + rnd()*0.15).toFixed(2)})`;
+      ctx.fillRect(hx, hy, 1, 1);
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
+  function rebuildCloudMeshes() {
+    cloudMeshes.forEach(m => { packMesh.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
+    cloudMeshes = []; cloudStates = [];
+    if (_packTheme !== 'ewaste') return;
+
+    const configs = [
+      // [bx,   by,    bz,   w,    baseOpacity]
+      [ 0.50,  0.65,  0.14, 1.40, 0.58 ],  // large, top-right
+      [-0.70,  0.25,  0.16, 0.60, 0.52 ],  // small, left
+      [ 0.75, -0.30,  0.13, 1.10, 0.50 ],  // wide, right
+      [-0.45, -0.60,  0.15, 1.60, 0.55 ],  // very large, bottom-left
+      [ 0.05,  0.90,  0.17, 0.75, 0.48 ],  // medium, top-centre
+      [-0.20, -0.85,  0.14, 1.20, 0.52 ],  // large, bottom
+      [ 0.85,  0.10,  0.12, 0.45, 0.44 ],  // small, far right
+      [-0.80,  0.70,  0.18, 0.90, 0.50 ],  // medium, top-left
+      [ 0.30, -0.50,  0.16, 1.80, 0.46 ],  // very wide, bottom-centre
+    ];
+
+    configs.forEach(([bx, by, bz, w, baseOpacity], i) => {
+      const geo = new THREE.PlaneGeometry(w, w * (13 / 20));
+      const mat = new THREE.MeshBasicMaterial({
+        map: buildCloudTexture(i + 1),
+        transparent: true,
+        depthWrite: false,
+        opacity: baseOpacity,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(bx, by, bz);
+      packMesh.add(mesh);
+      cloudMeshes.push(mesh);
+      cloudStates.push({
+        bx, by, bz,
+        pulsePhase: Math.random() * Math.PI * 2,
+        pulseSpeed: 0.006 + Math.random() * 0.006,
+        driftX:     (Math.random() - 0.5) * 0.0018,
+        driftY:     (Math.random() - 0.5) * 0.0008,
+        offsetX: 0, offsetY: 0,
+        baseOpacity,
+      });
+    });
   }
 
   // ─── Scanline shard texture ────────────────────────────────────────────────
@@ -444,6 +638,7 @@ const Pack3D = (() => {
   function rebuildPackBlood() {
     pbDrips = [];
     if (pbCtx) pbCtx.clearRect(0, 0, PBW, PBH);
+    if (pbTex) pbTex.needsUpdate = true;
     clearTimeout(pbTimer);
     pbTimer = null;
     if (_packTheme !== 'garbage') return;
@@ -491,37 +686,37 @@ const Pack3D = (() => {
 
   // ─── Canvas textures ───────────────────────────────────────────────────────
 
-  // Theme: 'garbage' = orange, 'ewaste' = blue
+  // Theme: 'garbage' = flesh/red, 'ewaste' = scourge/green, 'adpack' = gold
   let _packTheme = 'garbage';
   function setPackTheme(theme) { _packTheme = theme; }
 
   function themeCol(alpha = 1) {
-    if (_packTheme === 'ewaste')  return `rgba(40,140,255,${alpha})`;
+    if (_packTheme === 'ewaste')  return `rgba(100,200,30,${alpha})`;
     if (_packTheme === 'adpack')  return `rgba(200,160,40,${alpha})`;
     return `rgba(232,92,26,${alpha})`;
   }
   function themeBg() {
-    if (_packTheme === 'ewaste') return '#0a0f18';
+    if (_packTheme === 'ewaste') return '#0a140a';
     if (_packTheme === 'adpack') return '#12100a';
     return '#0f160f';
   }
   function themeGrid() {
-    if (_packTheme === 'ewaste') return 'rgba(40,100,255,0.15)';
+    if (_packTheme === 'ewaste') return 'rgba(80,180,20,0.15)';
     if (_packTheme === 'adpack') return 'rgba(200,160,40,0.18)';
     return 'rgba(42,122,42,0.18)';
   }
   function themeHex() {
-    if (_packTheme === 'ewaste') return '#288cff';
+    if (_packTheme === 'ewaste') return '#8bc820';
     if (_packTheme === 'adpack') return '#c8a028';
     return '#e85c1a';
   }
   function themeGlow() {
-    if (_packTheme === 'ewaste') return 'rgba(40,140,255,0.6)';
+    if (_packTheme === 'ewaste') return 'rgba(100,200,20,0.6)';
     if (_packTheme === 'adpack') return 'rgba(200,160,40,0.8)';
     return 'rgba(232,92,26,0.6)';
   }
   function themeAccent() {
-    if (_packTheme === 'ewaste') return 'rgba(0,220,255,0.5)';
+    if (_packTheme === 'ewaste') return 'rgba(140,220,40,0.5)';
     if (_packTheme === 'adpack') return 'rgba(255,220,80,0.7)';
     return 'rgba(58,170,58,0.6)';
   }
@@ -606,24 +801,13 @@ const Pack3D = (() => {
       drawPrismatic(ctx, W, H, 0.06, 0);
 
     } else if (_packTheme === 'ewaste') {
-      // Deep blue-black
-      const bg = ctx.createRadialGradient(128, 160, 20, 128, 192, 200);
-      bg.addColorStop(0,   '#0a1220');
-      bg.addColorStop(0.6, '#060c18');
-      bg.addColorStop(1,   '#030609');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-      // Circuit traces
-      ctx.strokeStyle = 'rgba(40,100,220,0.14)'; ctx.lineWidth = 1;
-      for (let y = 16; y < H; y += 24) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
-      for (let x = 16; x < W; x += 24) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
-      ctx.fillStyle = 'rgba(40,100,220,0.14)';
-      for (let y = 16; y < H; y += 24) for (let x = 16; x < W; x += 24) {
-        ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill();
+      // Scourge bg art
+      if (_scourgePackImg) {
+        ctx.drawImage(_scourgePackImg, 0, 0, W, H);
+      } else {
+        ctx.fillStyle = '#0a140a';
+        ctx.fillRect(0, 0, W, H);
       }
-
-      // Blue-cyan prismatic sheen
-      drawPrismatic(ctx, W, H, 0.08, 180);
 
     } else if (_packTheme === 'adpack') {
       // Premium black with gold tint
@@ -689,12 +873,10 @@ const Pack3D = (() => {
       });
 
     } else if (_packTheme === 'ewaste') {
-      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#288cff', 'rgba(40,140,255,0.8)');
-      // Cyan inner line
-      ctx.strokeStyle = 'rgba(0,220,255,0.3)'; ctx.lineWidth = 1;
+      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8bc820', 'rgba(100,200,20,0.8)');
+      ctx.strokeStyle = 'rgba(140,220,40,0.3)'; ctx.lineWidth = 1;
       ctx.strokeRect(10, 10, W-20, H-20);
-      // Prismatic shimmer on border
-      drawPrismatic(ctx, W, H, 0.06, 200);
+      drawPrismatic(ctx, W, H, 0.05, 100);
 
     } else {
       drawGlowBorder(ctx, 4, 4, W-8, H-8, '#cc1515', 'rgba(200,20,20,0.7)');
@@ -704,7 +886,7 @@ const Pack3D = (() => {
 
     // ── CORNER BRACKETS ───────────────────────────────────────────────────────
     const bPad = 16, bSize = 20, bW = 3;
-    const bracketCol = _packTheme === 'adpack' ? '#ffd700' : _packTheme === 'ewaste' ? '#00dcff' : '#cc1515';
+    const bracketCol = _packTheme === 'adpack' ? '#ffd700' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
     ctx.strokeStyle = bracketCol; ctx.lineWidth = bW;
     ctx.shadowColor = bracketCol; ctx.shadowBlur = 8;
     [[bPad,bPad,1,1],[W-bPad,bPad,-1,1],[bPad,H-bPad,1,-1],[W-bPad,H-bPad,-1,-1]].forEach(([x,y,sx,sy]) => {
@@ -713,8 +895,8 @@ const Pack3D = (() => {
     ctx.shadowBlur = 0;
 
     // ── SPARKLES ──────────────────────────────────────────────────────────────
-    // Flesh pack uses fly meshes instead of sparkles
-    if (_packTheme === 'garbage') { /* skipped — flies handle this */ }
+    // Flesh + scourge use meshes instead of sparkles
+    if (_packTheme === 'garbage' || _packTheme === 'ewaste') { /* skipped */ }
     else {
       const sparkleCount = _packTheme === 'adpack' ? 12 : 8;
     const sparklePositions = [
@@ -726,7 +908,7 @@ const Pack3D = (() => {
     const sparkleColors = _packTheme === 'adpack'
       ? ['rgba(255,220,80,0.9)','rgba(255,255,255,0.95)','rgba(255,180,0,0.8)','rgba(200,255,100,0.7)','rgba(100,200,255,0.7)','rgba(255,100,200,0.7)']
       : _packTheme === 'ewaste'
-      ? ['rgba(0,220,255,0.9)','rgba(255,255,255,0.9)','rgba(40,140,255,0.8)','rgba(180,100,255,0.7)']
+      ? ['rgba(140,220,40,0.9)','rgba(255,255,255,0.9)','rgba(80,200,20,0.8)','rgba(200,240,60,0.7)']
       : ['rgba(200,20,20,0.85)','rgba(255,255,255,0.9)','rgba(160,10,10,0.7)'];
     sparklePositions.forEach(([sx,sy], i) => {
       const col   = sparkleColors[i % sparkleColors.length];
@@ -768,7 +950,7 @@ const Pack3D = (() => {
       // White hot centre sparkle
       drawSparkle(ctx, 128, ringY, 28, 'rgba(255,255,255,0.95)', 0.9);
 
-    } else if (_packTheme !== 'garbage') {
+    } else if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') {
       ctx.font = 'bold 72px "VT323", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = themeHex();
@@ -778,7 +960,7 @@ const Pack3D = (() => {
     }
 
     // ── TEXT ──────────────────────────────────────────────────────────────────
-    const packName = _packTheme === 'ewaste' ? 'E-WASTE PACK' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH PACK';
+    const packName = _packTheme === 'ewaste' ? 'SCOURGE PACK' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH PACK';
 
     if (_packTheme === 'adpack') {
       // Gold gradient name
@@ -796,7 +978,7 @@ const Pack3D = (() => {
       ctx.font = '9px "Share Tech Mono", monospace';
       ctx.fillStyle = 'rgba(255,220,80,0.6)';
       ctx.fillText('✦ EXCLUSIVE ✦', 128, 252);
-    } else if (_packTheme !== 'garbage') {
+    } else if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') {
       ctx.font = '22px "lo-res", sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#e8e0c8';
       ctx.shadowColor = themeGlow(); ctx.shadowBlur = 6;
@@ -804,7 +986,7 @@ const Pack3D = (() => {
       ctx.shadowBlur = 0;
     }
 
-    if (_packTheme !== 'garbage') {
+    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') {
       ctx.font = '11px "lo-res", sans-serif';
       ctx.fillStyle = 'rgba(232,224,200,0.35)';
       ctx.fillText('4 cards inside', 128, 264);
@@ -885,7 +1067,7 @@ const Pack3D = (() => {
     } else {
       ctx.fillStyle = themeCol(0.22);
     }
-    ctx.fillText(_packTheme === 'ewaste' ? 'E-WASTE' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH', 128, 200);
+    ctx.fillText(_packTheme === 'ewaste' ? 'SCOURGE' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH', 128, 200);
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -949,6 +1131,7 @@ const Pack3D = (() => {
     rebuildSymbolMesh();
     rebuildTextMesh();
     rebuildFlyMeshes();
+    rebuildCloudMeshes();
     initPackBlood();
     attachEvents(wrap);
     isReady = true;
@@ -1034,10 +1217,24 @@ const Pack3D = (() => {
       }
     });
 
+    // Pestilence cloud animation
+    cloudMeshes.forEach((m, i) => {
+      const s = cloudStates[i];
+      s.pulsePhase += s.pulseSpeed;
+      s.offsetX    += s.driftX;
+      s.offsetY    += s.driftY;
+      // Soft bounce at edges so clouds stay near the pack
+      if (Math.abs(s.bx + s.offsetX) > 0.9) s.driftX *= -1;
+      if (Math.abs(s.by + s.offsetY) > 1.2) s.driftY *= -1;
+      m.position.x = s.bx + s.offsetX;
+      m.position.y = s.by + s.offsetY;
+      m.material.opacity = s.baseOpacity * (0.55 + 0.45 * Math.sin(s.pulsePhase));
+    });
+
     updateParticles();
     updatePackBlood();
 
-    const baseIntensity = _packTheme === 'adpack' ? 3.1 : _packTheme === 'ewaste' ? 3.0 : 2.5;
+    const baseIntensity = _packTheme === 'adpack' ? 3.1 : _packTheme === 'ewaste' ? 2.8 : 2.5;
     rimLight.intensity = baseIntensity + Math.sin(idleT * 1.2) * (baseIntensity * 0.15);
 
     // Add subtle continuous motion on adpack textures so the face feels alive.
@@ -1146,7 +1343,7 @@ const Pack3D = (() => {
         rimLight.color.setStyle('#c8a028');
         rimLight.intensity = 3.1;
       } else if (_packTheme === 'ewaste') {
-        rimLight.color.setStyle('#288cff');
+        rimLight.color.setStyle('#8bc820');
         rimLight.intensity = 3.0;
       } else {
         rimLight.color.setStyle('#e85c1a');
@@ -1156,6 +1353,7 @@ const Pack3D = (() => {
     rebuildSymbolMesh();
     rebuildTextMesh();
     rebuildFlyMeshes();
+    rebuildCloudMeshes();
     rebuildPackBlood();
     clearParticles();
   }
@@ -1166,6 +1364,8 @@ const Pack3D = (() => {
     if (textMesh)   { packMesh?.remove(textMesh);   textMesh.geometry.dispose();   textMesh.material.map?.dispose();   textMesh.material.dispose();   textMesh = null; }
     flyMeshes.forEach(m => { packMesh?.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
     flyMeshes = []; flyStates = [];
+    cloudMeshes.forEach(m => { packMesh?.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
+    cloudMeshes = []; cloudStates = [];
     clearTimeout(pbTimer); pbTimer = null; pbDrips = [];
     if (pbMesh) { packMesh?.remove(pbMesh); pbMesh.geometry.dispose(); pbMesh.material.map?.dispose(); pbMesh.material.dispose(); pbMesh = null; }
     pbTex = null; pbCtx = null; pbCanvas = null;

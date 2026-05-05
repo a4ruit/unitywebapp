@@ -113,6 +113,7 @@ function setPackType(type) {
   document.getElementById('packTypeGarbage')?.classList.toggle('active', type === 'garbage');
   document.getElementById('packTypeEwaste')?.classList.toggle('active',  type === 'ewaste');
   document.getElementById('packTypeAdpack')?.classList.toggle('active',  type === 'adpack');
+  document.body.classList.toggle('scourge-active', type === 'ewaste');
   updatePackCarousel(type);
   animatePackTypeSwitch(prevType, type);
   // Toggle adpack glow on screen-pack

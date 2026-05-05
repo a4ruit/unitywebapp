@@ -30,7 +30,7 @@
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body {
   height:100%; width:100%; overflow:hidden;
-  background: #0a100a url('../assets/flesh-bg.png') no-repeat center center / cover fixed;
+  background: #0a100a;
   font-family:'lo-res', sans-serif;
   color:var(--cream);
   image-rendering:pixelated;
@@ -44,6 +44,18 @@ body::before {
     linear-gradient(90deg, rgba(42,122,42,0.08) 1px, transparent 1px);
   background-size:24px 24px;
   pointer-events:none; z-index:0;
+  transition: opacity 0.6s ease;
+}
+
+.bg-grid {
+  position:fixed; inset:0;
+  background: #0a100a url('../assets/flesh-bg.png') no-repeat center center / cover;
+  pointer-events:none; z-index:0;
+  transition: filter 0.7s ease;
+}
+
+body.scourge-active .bg-grid {
+  filter: hue-rotate(90deg) saturate(1.2) brightness(1.1);
 }
 
 body::after {
@@ -1046,14 +1058,14 @@ body::after {
   min-width: 0;
 }
 
-/* E-waste pack type button — blue active state */
+/* Scourge pack type button — green active state */
 #packTypeEwaste.active {
-  border-color: #288cff;
-  background: #030712;
+  border-color: #8bc820;
+  background: #071203;
 }
 #packTypeEwaste.active .pack-type-label,
 #packTypeEwaste.active .pack-type-icon {
-  color: #288cff;
+  color: #8bc820;
 }
 
 /* ── SHOP SCREEN ─────────────────────────────────── */
@@ -1543,4 +1555,52 @@ body::after {
 @keyframes adpackCanvasGlow {
   0%,100% { filter: drop-shadow(0 0 8px rgba(200,160,40,0.32)) drop-shadow(0 0 18px rgba(200,160,40,0.12)); }
   50%     { filter: drop-shadow(0 0 13px rgba(200,160,40,0.5)) drop-shadow(0 0 30px rgba(200,160,40,0.2)); }
+}
+
+/* ── SCOURGE: bottom row green theme ──────────────── */
+body.scourge-active .pack-counter {
+  border-color: rgba(100,200,20,0.78);
+  box-shadow: 0 0 8px rgba(100,200,20,0.16);
+}
+body.scourge-active .counter-packs {
+  color: #8bc820;
+  text-shadow: 0 0 6px rgba(100,200,20,0.85), 0 0 12px rgba(100,200,20,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.scourge-active .counter-label,
+body.scourge-active .counter-tag {
+  color: rgba(100,200,20,0.95);
+}
+
+body.scourge-active .star-counter {
+  border-color: rgba(100,200,20,0.78);
+  box-shadow: 0 0 8px rgba(100,200,20,0.16);
+}
+body.scourge-active .star-counter-icon {
+  color: #8bc820;
+  text-shadow: 0 0 6px rgba(100,200,20,0.8), 0 0 12px rgba(100,200,20,0.35);
+}
+body.scourge-active .star-counter-value {
+  color: #8bc820;
+  text-shadow: 0 0 6px rgba(100,200,20,0.7);
+}
+body.scourge-active .star-counter-label {
+  color: rgba(100,200,20,0.95);
+}
+
+body.scourge-active .star-shop-btn {
+  border-color: rgba(100,200,20,0.85);
+  background: #031303;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(100,200,20,0.18);
+}
+body.scourge-active .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(100,200,20,0.34);
+  background: #041a04;
+}
+body.scourge-active .star-shop-btn-icon {
+  color: #8bc820;
+  text-shadow: 0 0 8px rgba(100,200,20,0.8);
+}
+body.scourge-active .star-shop-btn-label {
+  color: rgba(100,200,20,0.9);
+}
 }
