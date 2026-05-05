@@ -1239,7 +1239,7 @@ body::after {
 .pack-type-btn--shop.active,
 .pack-type-btn--shop:hover {
   border-color: var(--legendary) !important;
-  background: rgba(200,144,48,0.08) !important;
+  background: #0c0a02 !important;
 }
 .pack-type-btn--shop .pack-type-icon,
 .pack-type-btn--shop .pack-type-label {
