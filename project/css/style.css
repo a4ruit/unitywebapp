@@ -485,7 +485,7 @@ body::after {
 /* LED Pack Counter */
 .pack-counter {
   display:flex; flex-direction:column; align-items:center; gap:2px;
-  padding:3px 10px; border:1px solid rgba(200,20,20,0.78); background:rgba(0,0,0,0.35);
+  padding:3px 10px; border:1px solid rgba(200,20,20,0.78); background:#000;
   position:relative; flex-shrink:0; min-width:90px;
   box-shadow: 0 0 8px rgba(200,20,20,0.16);
   min-height: 62px;
@@ -825,7 +825,7 @@ body::after {
   min-height: 62px;
   gap: 4px;
   padding: 12px 6px;
-  background: var(--panel);
+  background: #0a0e0a;
   border: 2px solid var(--border);
   cursor: pointer;
   transition: border-color 0.14s, background 0.14s, transform 0.12s, box-shadow 0.14s;
@@ -835,7 +835,7 @@ body::after {
 .pack-type-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
 .pack-type-btn.active {
   border-color: var(--orange);
-  background: rgba(200,20,20,0.09);
+  background: #130303;
   box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(200,20,20,0.2);
   transform: translateY(-1px);
 }
