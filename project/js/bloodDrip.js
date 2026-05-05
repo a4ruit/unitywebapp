@@ -213,9 +213,11 @@ const BloodDrip = (() => {
     if (speed < 0.4) return;
 
     const radius   = 4;
-    const smearLen = Math.min(Math.round(speed * 2), 7);
+    const smearLen = Math.min(Math.round(speed * 1.2), 4);
     const nx = vx / speed;
     const ny = vy / speed;
+    // Fast strokes deposit less per step so rapid movement doesn't stack blood
+    const depositScale = 0.40 / Math.max(1, speed * 0.5);
 
     const pad = radius + smearLen + 1;
     const rx  = Math.max(0, gx - pad);
@@ -256,7 +258,7 @@ const BloodDrip = (() => {
         if (ti < 0) break;
 
         const t      = 1 - s / (smearLen + 1);
-        const addA   = Math.round(src.a * t * 0.55);
+        const addA   = Math.round(src.a * t * depositScale);
         const newA   = Math.min(255, d[ti + 3] + addA);
         if (newA <= d[ti + 3]) continue;
 
