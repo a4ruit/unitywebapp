@@ -1,6 +1,7 @@
 // Blood drip overlay — pixelated, two-layer canvas system.
 // Renders at 1/PIXEL resolution, scaled up with image-rendering:pixelated.
 // Triggered after 3 pack opens. Stains accumulate permanently until reload.
+// Pack drips are ephemeral — they fade out without staining.
 
 const BloodDrip = (() => {
   const PIXEL = 5; // each grid unit = 5×5 screen pixels
@@ -9,15 +10,20 @@ const BloodDrip = (() => {
   let dripCanvas,  dripCtx;  // active drip layer — cleared each frame
   let GW, GH;                // grid dimensions
 
-  let drips       = [];
-  let packsOpened = 0;
-  let running     = false;
-  let raf         = null;
-  let spawnTimer  = null;
+  let drips         = [];
+  let packsOpened   = 0;
+  let initialized   = false; // canvases + loop exist
+  let running       = false; // full stain system active (packsOpened >= 3)
+  let raf           = null;
+  let spawnTimer    = null;
+  let packDripTimer = null;
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
-  function init() {
+  function ensureInit() {
+    if (initialized) return;
+    initialized = true;
+
     GW = Math.ceil(window.innerWidth  / PIXEL);
     GH = Math.ceil(window.innerHeight / PIXEL);
 
@@ -44,6 +50,9 @@ const BloodDrip = (() => {
 
     document.body.appendChild(stainCanvas);
     document.body.appendChild(dripCanvas);
+
+    initInteraction();
+    loop();
   }
 
   // ── Colour ───────────────────────────────────────────────────────────────
@@ -109,18 +118,45 @@ const BloodDrip = (() => {
       baseX:    1 + Math.floor(Math.random() * (GW - 2)),
       startY:   -headR,
       y:        -headR,
-      // Slower: roughly one grid-pixel every 12–25 frames
       vy:       0.04 + Math.random() * 0.06 + Math.min(level, 10) * 0.006,
       headR,
       color:    bloodColor(Math.min(level, 12)),
-      // S-bend: one full curve spans roughly 80–160 grid pixels (most of screen height)
       phase:      Math.random() * Math.PI * 2,
       bendFreq:   0.035 + Math.random() * 0.035,
       bendAmp:    1 + Math.random() * 1.5,
-      // Width variation: slow bulge/narrow cycle along the streak
       widthPhase: Math.random() * Math.PI * 2,
       widthFreq:  0.08 + Math.random() * 0.10,
       widthAmp:   0.6 + Math.random() * 1.4,
+    });
+  }
+
+  // Spawn a temporary drip from the bottom edge of the pack canvas.
+  // Fades out after maxLen grid pixels — never commits to the stain layer.
+  function spawnPackDrip() {
+    if (!initialized) return;
+    const packEl = document.getElementById('packCanvas');
+    if (!packEl) return;
+
+    const rect   = packEl.getBoundingClientRect();
+    const spread = rect.width * 0.28;
+    const cx     = rect.left + rect.width  * 0.5 + (Math.random() - 0.5) * spread;
+    const cy     = rect.top  + rect.height * 0.85; // near pack bottom
+
+    drips.push({
+      baseX:    Math.floor(cx / PIXEL),
+      startY:   Math.floor(cy / PIXEL),
+      y:        Math.floor(cy / PIXEL),
+      vy:       0.018 + Math.random() * 0.018,
+      headR:    1,
+      color:    bloodColor(4),
+      phase:      Math.random() * Math.PI * 2,
+      bendFreq:   0.04  + Math.random() * 0.02,
+      bendAmp:    0.3   + Math.random() * 0.5,
+      widthPhase: Math.random() * Math.PI * 2,
+      widthFreq:  0.09  + Math.random() * 0.06,
+      widthAmp:   0.2   + Math.random() * 0.4,
+      temporary: true,
+      maxLen:    18 + Math.floor(Math.random() * 22),
     });
   }
 
@@ -138,11 +174,8 @@ const BloodDrip = (() => {
 
   function drawActiveDrip(d) {
     dripCtx.fillStyle = d.color;
-    // Anchor blob at the top of the drip
     if (d.startY >= -d.headR) blob(dripCtx, getX(d, d.startY), d.startY, d.headR);
-    // Full S-bend streak from anchor to current tip
     drawStreak(dripCtx, d, d.startY + d.headR, d.y - d.headR);
-    // Falling teardrop at current tip
     blob(dripCtx, getX(d, d.y), d.y, d.headR);
   }
 
@@ -151,23 +184,16 @@ const BloodDrip = (() => {
   function commitStain(d) {
     stainCtx.fillStyle = d.color;
 
-    // Bake anchor blob
     const anchorY = Math.max(0, d.startY);
     blob(stainCtx, getX(d, d.startY), anchorY, d.headR);
-
-    // Bake full S-bend streak
     drawStreak(stainCtx, d, d.startY + d.headR, d.y);
 
-    // Splat pool at landing
     const ex     = getX(d, d.y);
     const ey     = Math.min(GH - 1, Math.floor(d.y));
     const splatR = d.headR + 1 + Math.floor(Math.random() * 3);
     blob(stainCtx, ex, ey, splatR);
-
-    // Scattered droplets around splat
     splatter(stainCtx, ex, ey, splatR + 1, splatR + 5, 6 + Math.floor(Math.random() * 8));
 
-    // 1–3 sub-drips hanging below the splat
     const subCount = 1 + Math.floor(Math.random() * 3);
     for (let i = 0; i < subCount; i++) {
       const sx = ex + Math.floor((Math.random() - 0.5) * splatR * 2);
@@ -175,7 +201,7 @@ const BloodDrip = (() => {
       const sl = 3 + Math.floor(Math.random() * 6);
       if (sy < GH) {
         stainCtx.fillRect(sx, sy, 1, Math.min(sl, GH - sy));
-        stainCtx.fillRect(sx - 1, sy + sl, 3, 1); // pixel at sub-drip tip
+        stainCtx.fillRect(sx - 1, sy + sl, 3, 1);
       }
     }
   }
@@ -191,12 +217,12 @@ const BloodDrip = (() => {
     const nx = vx / speed;
     const ny = vy / speed;
 
-    // Only read/write the small patch around the cursor for performance
     const pad = radius + smearLen + 1;
     const rx  = Math.max(0, gx - pad);
     const ry  = Math.max(0, gy - pad);
     const rw  = Math.min(GW - rx, pad * 2 + 1);
     const rh  = Math.min(GH - ry, pad * 2 + 1);
+    if (rw <= 0 || rh <= 0) return;
 
     const img = stainCtx.getImageData(rx, ry, rw, rh);
     const d   = img.data;
@@ -207,7 +233,6 @@ const BloodDrip = (() => {
       return (ly * rw + lx) * 4;
     }
 
-    // Collect blood pixels inside brush radius (read before any writes)
     const sources = [];
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
@@ -222,10 +247,8 @@ const BloodDrip = (() => {
     }
 
     for (const src of sources) {
-      // Wipe: fade the source pixel
-      d[src.si + 3] = Math.max(0, src.a - Math.round(src.a * 0.22));
+      d[src.si + 3] = Math.max(0, src.a - Math.round(src.a * 0.42));
 
-      // Smear: push blood forward along drag direction with falloff
       for (let s = 1; s <= smearLen; s++) {
         const tx = Math.round(src.sx + nx * s);
         const ty = Math.round(src.sy + ny * s);
@@ -282,6 +305,17 @@ const BloodDrip = (() => {
     drips = drips.filter(d => {
       d.y += d.vy;
 
+      if (d.temporary) {
+        const progress = (d.y - d.startY) / d.maxLen;
+        if (progress >= 1 || d.y >= GH) return false;
+        // Fade out over the last 35% of the drip's travel
+        const alpha = progress > 0.65 ? 1 - (progress - 0.65) / 0.35 : 1;
+        dripCtx.globalAlpha = alpha;
+        drawActiveDrip(d);
+        dripCtx.globalAlpha = 1;
+        return true;
+      }
+
       if (d.y >= GH) {
         commitStain(d);
         return false;
@@ -316,6 +350,15 @@ const BloodDrip = (() => {
     }, interval + Math.random() * interval * 0.5);
   }
 
+  function schedulePackDrips() {
+    if (packDripTimer) return;
+    function next() {
+      spawnPackDrip();
+      packDripTimer = setTimeout(next, 6000 + Math.random() * 8000);
+    }
+    packDripTimer = setTimeout(next, 3000 + Math.random() * 4000);
+  }
+
   // ── Public API ────────────────────────────────────────────────────────────
 
   function onPackOpened() {
@@ -323,8 +366,7 @@ const BloodDrip = (() => {
 
     if (!running && packsOpened >= 3) {
       running = true;
-      init();
-      loop();
+      ensureInit();
       scheduleNextSpawn();
     }
 
@@ -339,5 +381,10 @@ const BloodDrip = (() => {
     if (packsOpened >= 12) setTimeout(() => { for (let i = 0; i < 3; i++) spawnDrip(); }, 900);
   }
 
-  return { onPackOpened };
+  function startPackDrips() {
+    ensureInit();
+    schedulePackDrips();
+  }
+
+  return { onPackOpened, startPackDrips };
 })();

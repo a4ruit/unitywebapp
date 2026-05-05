@@ -63,6 +63,15 @@ const Pack3D = (() => {
     if (packMesh && _packTheme === 'garbage') { rebuildSymbolMesh(); rebuildTextMesh(); rebuildFlyMeshes(); }
   };
 
+  // ─── Preloaded flesh text ──────────────────────────────────────────────────
+  let _fleshTextImg = null;
+  const _fleshTextImgLoader = new Image();
+  _fleshTextImgLoader.src = 'assets/flesh-text.png';
+  _fleshTextImgLoader.onload = () => {
+    _fleshTextImg = _fleshTextImgLoader;
+    if (packMesh && _packTheme === 'garbage') rebuildTextMesh();
+  };
+
   function rebuildSymbolMesh() {
     if (symbolMesh) { packMesh.remove(symbolMesh); symbolMesh.geometry.dispose(); symbolMesh.material.map?.dispose(); symbolMesh.material.dispose(); symbolMesh = null; }
     if (_packTheme !== 'garbage' || !_fleshSymbolImg) return;
@@ -92,38 +101,62 @@ const Pack3D = (() => {
   function rebuildTextMesh() {
     if (textMesh) { packMesh.remove(textMesh); textMesh.geometry.dispose(); textMesh.material.map?.dispose(); textMesh.material.dispose(); textMesh = null; }
     if (_packTheme !== 'garbage') return;
-
-    // Wait for font — if not ready yet, retry once fonts load
-    const fontReady = document.fonts.check('28px "pf-pixelscript"');
-    if (!fontReady) { document.fonts.ready.then(() => rebuildTextMesh()); return; }
+    if (!_fleshTextImg) return; // wait for image
 
     const c = document.createElement('canvas');
-    c.width = 900; c.height = 190;
+    c.width = 900; c.height = 320;
     const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
 
-    // Dark backing plate behind text
-    ctx.fillStyle = 'rgba(0,0,0,0.55)';
-    ctx.fillRect(60, 20, 780, 120);
+    // Scale image to fill most of the canvas, centred, with red glow
+    const ih = 240;
+    const iw = Math.round(_fleshTextImg.naturalWidth * (ih / _fleshTextImg.naturalHeight));
+    const ix = Math.round((900 - iw) / 2);
+    const iy = Math.round((320 - ih) / 2);
 
-    // Drop shadow pass
-    ctx.font = '112px "pf-pixelscript", cursive';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(0,0,0,0.65)';
-    ctx.shadowOffsetX = 4; ctx.shadowOffsetY = 5; ctx.shadowBlur = 0;
-    ctx.fillText('Flesh Pack', 450, 130);
-    ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
+    // Build a dark silhouette of the text on a temp canvas
+    const tmp = document.createElement('canvas');
+    tmp.width = c.width; tmp.height = c.height;
+    const tCtx = tmp.getContext('2d');
+    tCtx.imageSmoothingEnabled = false;
+    tCtx.drawImage(_fleshTextImg, ix, iy, iw, ih);
+    tCtx.globalCompositeOperation = 'source-in';
+    tCtx.fillStyle = 'rgba(0,0,0,0.88)';
+    tCtx.fillRect(0, 0, tmp.width, tmp.height);
 
-    // Colour + glow pass
-    ctx.fillStyle = '#e8d0c8';
-    ctx.shadowColor = 'rgba(200,20,20,0.95)'; ctx.shadowBlur = 20;
-    ctx.fillText('Flesh Pack', 450, 130);
-    ctx.shadowBlur = 0;
+    // Stamp silhouette at every offset within radius to trace the outline
+    const r = 4;
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dy = -r; dy <= r; dy++) {
+        if (dx * dx + dy * dy > r * r) continue;
+        ctx.drawImage(tmp, dx, dy);
+      }
+    }
+
+    // Build bone-tinted version of the text
+    const tinted = document.createElement('canvas');
+    tinted.width = c.width; tinted.height = c.height;
+    const tCtx2 = tinted.getContext('2d');
+    tCtx2.imageSmoothingEnabled = false;
+    tCtx2.drawImage(_fleshTextImg, ix, iy, iw, ih);
+    tCtx2.globalCompositeOperation = 'source-in';
+    tCtx2.fillStyle = '#ede0c8';
+    tCtx2.fillRect(0, 0, tinted.width, tinted.height);
+
+    // Glow pass
+    ctx.shadowColor = 'rgba(200,20,20,0.95)'; ctx.shadowBlur = 28;
+    ctx.globalAlpha = 0.6;
+    ctx.drawImage(tinted, -6, -6);
+    ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+    // Crisp bone-coloured pass
+    ctx.drawImage(tinted, 0, 0);
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
 
-    // Geometry aspect 900:190 = 4.74:1
-    const geo = new THREE.PlaneGeometry(1.55, 0.33);
+    // Geometry aspect 900:320 = 2.81:1
+    const geo = new THREE.PlaneGeometry(1.55, 0.55);
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
       transparent: true,
@@ -346,6 +379,114 @@ const Pack3D = (() => {
       p.mat.dispose();
     });
     particles = [];
+  }
+
+  // ─── Pack blood drips ─────────────────────────────────────────────────────
+  // 32×48 canvas (PIXEL=5 aesthetic) rendered as a transparent child mesh so
+  // drips rotate with the pack. Flesh pack only. Temporary — no staining.
+
+  const PBW = 32, PBH = 48;
+  let pbCanvas, pbCtx, pbTex, pbMesh;
+  let pbDrips = [];
+  let pbTimer = null;
+
+  function pbBlob(cx, cy) {
+    cx = Math.floor(cx); cy = Math.floor(cy);
+    pbCtx.fillRect(cx, cy, 1, 1);
+    if (Math.random() > 0.55) pbCtx.fillRect(cx + (Math.random() > 0.5 ? 1 : -1), cy, 1, 1);
+  }
+
+  function pbGetX(d, y) {
+    return Math.floor(d.bx + Math.sin(y * d.bendFreq + d.phase) * d.bendAmp);
+  }
+
+  function pbGetW(d, y) {
+    return Math.max(1, Math.round(1 + d.widthAmp * (0.5 + 0.5 * Math.sin(y * d.widthFreq + d.widthPhase))));
+  }
+
+  function spawnPackBloodDrip() {
+    if (!pbCtx) return;
+    const sy = 2 + Math.floor(Math.random() * 18);
+    pbDrips.push({
+      bx:         3 + Math.floor(Math.random() * (PBW - 6)),
+      startY:     sy,
+      y:          sy,
+      vy:         0.007 + Math.random() * 0.010,
+      phase:      Math.random() * Math.PI * 2,
+      bendFreq:   0.20  + Math.random() * 0.12,
+      bendAmp:    0.25  + Math.random() * 0.40,
+      widthPhase: Math.random() * Math.PI * 2,
+      widthFreq:  0.28  + Math.random() * 0.14,
+      widthAmp:   0.15  + Math.random() * 0.25,
+      maxLen:     7     + Math.floor(Math.random() * 9),
+    });
+  }
+
+  function initPackBlood() {
+    pbCanvas = document.createElement('canvas');
+    pbCanvas.width = PBW; pbCanvas.height = PBH;
+    pbCtx = pbCanvas.getContext('2d');
+    pbCtx.imageSmoothingEnabled = false;
+
+    pbTex = new THREE.CanvasTexture(pbCanvas);
+    pbTex.magFilter = THREE.NearestFilter;
+    pbTex.minFilter = THREE.NearestFilter;
+
+    const geo = new THREE.PlaneGeometry(1.6, 2.4);
+    const mat = new THREE.MeshBasicMaterial({ map: pbTex, transparent: true, depthWrite: false });
+    pbMesh = new THREE.Mesh(geo, mat);
+    pbMesh.position.z = 0.065;
+    packMesh.add(pbMesh);
+
+    rebuildPackBlood();
+  }
+
+  function rebuildPackBlood() {
+    pbDrips = [];
+    if (pbCtx) pbCtx.clearRect(0, 0, PBW, PBH);
+    clearTimeout(pbTimer);
+    pbTimer = null;
+    if (_packTheme !== 'garbage') return;
+    function schedNext() {
+      pbTimer = setTimeout(() => { spawnPackBloodDrip(); schedNext(); }, 5000 + Math.random() * 8000);
+    }
+    pbTimer = setTimeout(() => { spawnPackBloodDrip(); schedNext(); }, 1500 + Math.random() * 3000);
+  }
+
+  function updatePackBlood() {
+    if (!pbCtx || (!pbDrips.length && _packTheme === 'garbage')) {
+      if (pbTex && !pbDrips.length) { pbCtx?.clearRect(0, 0, PBW, PBH); pbTex.needsUpdate = true; }
+      if (!pbDrips.length) return;
+    }
+    if (!pbDrips.length) return;
+
+    pbCtx.clearRect(0, 0, PBW, PBH);
+
+    pbDrips = pbDrips.filter(d => {
+      d.y += d.vy;
+      const progress = (d.y - d.startY) / d.maxLen;
+      if (progress >= 1 || d.y >= PBH) return false;
+
+      const alpha = progress > 0.6 ? 1 - (progress - 0.6) / 0.4 : 1;
+      pbCtx.globalAlpha = alpha;
+      pbCtx.fillStyle = `rgb(${110 + Math.floor(progress * 20)},4,4)`;
+
+      pbBlob(pbGetX(d, d.startY), d.startY);
+
+      const ya = Math.max(0, Math.floor(d.startY + 1));
+      const yb = Math.min(PBH - 1, Math.floor(d.y - 1));
+      for (let y = ya; y <= yb; y++) {
+        const cx = pbGetX(d, y);
+        const w  = pbGetW(d, y);
+        pbCtx.fillRect(cx - Math.floor(w / 2), y, w, 1);
+      }
+
+      pbBlob(pbGetX(d, d.y), Math.floor(d.y));
+      pbCtx.globalAlpha = 1;
+      return true;
+    });
+
+    pbTex.needsUpdate = true;
   }
 
   // ─── Canvas textures ───────────────────────────────────────────────────────
@@ -808,6 +949,7 @@ const Pack3D = (() => {
     rebuildSymbolMesh();
     rebuildTextMesh();
     rebuildFlyMeshes();
+    initPackBlood();
     attachEvents(wrap);
     isReady = true;
     animate();
@@ -893,6 +1035,7 @@ const Pack3D = (() => {
     });
 
     updateParticles();
+    updatePackBlood();
 
     const baseIntensity = _packTheme === 'adpack' ? 3.1 : _packTheme === 'ewaste' ? 3.0 : 2.5;
     rimLight.intensity = baseIntensity + Math.sin(idleT * 1.2) * (baseIntensity * 0.15);
@@ -1013,6 +1156,7 @@ const Pack3D = (() => {
     rebuildSymbolMesh();
     rebuildTextMesh();
     rebuildFlyMeshes();
+    rebuildPackBlood();
     clearParticles();
   }
 
@@ -1022,6 +1166,9 @@ const Pack3D = (() => {
     if (textMesh)   { packMesh?.remove(textMesh);   textMesh.geometry.dispose();   textMesh.material.map?.dispose();   textMesh.material.dispose();   textMesh = null; }
     flyMeshes.forEach(m => { packMesh?.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
     flyMeshes = []; flyStates = [];
+    clearTimeout(pbTimer); pbTimer = null; pbDrips = [];
+    if (pbMesh) { packMesh?.remove(pbMesh); pbMesh.geometry.dispose(); pbMesh.material.map?.dispose(); pbMesh.material.dispose(); pbMesh = null; }
+    pbTex = null; pbCtx = null; pbCanvas = null;
     clearParticles();
     renderer?.dispose();
   }
