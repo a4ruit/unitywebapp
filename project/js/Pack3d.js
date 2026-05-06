@@ -10,6 +10,9 @@ const Pack3D = (() => {
   let flyStates    = [];
   let cloudMeshes  = [];
   let cloudStates  = [];
+  let circleGroup  = null;
+  let circleMesh   = null;
+  let circleAngle  = 0;
   let animFrame;
   let isReady = false;
 
@@ -104,12 +107,43 @@ const Pack3D = (() => {
     if (packMesh && _packTheme === 'ewaste') rebuildTextMesh();
   };
 
+  // ─── Preloaded ritual art ──────────────────────────────────────────────────
+  let _ritualPackImg = null;
+  const _ritualPackImgLoader = new Image();
+  _ritualPackImgLoader.src = 'assets/ritual-bg.png';
+  _ritualPackImgLoader.onload = () => {
+    _ritualPackImg = _ritualPackImgLoader;
+    if (packMesh && _packTheme === 'adpack') {
+      const prev = packMesh.material[4]?.map;
+      const next = buildFaceTexture();
+      if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+      if (prev) prev.dispose();
+    }
+  };
+
+  let _ritualSymbolImg = null;
+  const _ritualSymbolImgLoader = new Image();
+  _ritualSymbolImgLoader.src = 'assets/ritual-symbol.png';
+  _ritualSymbolImgLoader.onload = () => {
+    _ritualSymbolImg = _ritualSymbolImgLoader;
+    if (packMesh && _packTheme === 'adpack') rebuildSymbolMesh();
+  };
+
+  let _ritualTextImg = null;
+  const _ritualTextImgLoader = new Image();
+  _ritualTextImgLoader.src = 'assets/ritual-text.png';
+  _ritualTextImgLoader.onload = () => {
+    _ritualTextImg = _ritualTextImgLoader;
+    if (packMesh && _packTheme === 'adpack') rebuildTextMesh();
+  };
+
   function rebuildSymbolMesh() {
     if (symbolMesh) { packMesh.remove(symbolMesh); symbolMesh.geometry.dispose(); symbolMesh.material.map?.dispose(); symbolMesh.material.dispose(); symbolMesh = null; }
 
     let img = null, emissiveCol = 0xcc1515;
     if      (_packTheme === 'garbage' && _fleshSymbolImg)   { img = _fleshSymbolImg;   emissiveCol = 0xcc1515; }
     else if (_packTheme === 'ewaste'  && _scourgeSymbolImg) { img = _scourgeSymbolImg;  emissiveCol = 0x50c010; }
+    else if (_packTheme === 'adpack'  && _ritualSymbolImg)  { img = _ritualSymbolImg;   emissiveCol = 0xc8a028; }
     if (!img) return;
 
     const c = document.createElement('canvas');
@@ -121,7 +155,7 @@ const Pack3D = (() => {
 
     // Preserve natural aspect ratio so the symbol isn't squished
     const aspect = img.naturalWidth / img.naturalHeight;
-    const symH = _packTheme === 'ewaste' ? 0.88 : 0.72, symW = symH * aspect;
+    const symH = _packTheme === 'ewaste' ? 0.88 : _packTheme === 'adpack' ? 1.00 : 0.72, symW = symH * aspect;
     const geo = new THREE.PlaneGeometry(symW, symH);
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
@@ -133,13 +167,77 @@ const Pack3D = (() => {
       metalness: 0.15,
     });
     symbolMesh = new THREE.Mesh(geo, mat);
-    symbolMesh.position.set(0, 0.12, 0.09);
+    const symY = _packTheme === 'adpack' ? 0.28 : 0.12;
+    symbolMesh.position.set(0, symY, 0.09);
     packMesh.add(symbolMesh);
   }
 
   function rebuildTextMesh() {
     if (textMesh) { packMesh.remove(textMesh); textMesh.geometry.dispose(); textMesh.material.map?.dispose(); textMesh.material.dispose(); textMesh = null; }
-    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') return;
+    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste' && _packTheme !== 'adpack') return;
+
+    if (_packTheme === 'adpack') {
+      if (!_ritualTextImg) return;
+
+      const c = document.createElement('canvas');
+      c.width = 900; c.height = 320;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      const ih = 240;
+      const iw = Math.round(_ritualTextImg.naturalWidth * (ih / _ritualTextImg.naturalHeight));
+      const ix = Math.round((900 - iw) / 2);
+      const iy = Math.round((320 - ih) / 2);
+
+      // Dark outline
+      const tmp = document.createElement('canvas');
+      tmp.width = c.width; tmp.height = c.height;
+      const tCtx = tmp.getContext('2d');
+      tCtx.imageSmoothingEnabled = false;
+      tCtx.drawImage(_ritualTextImg, ix, iy, iw, ih);
+      tCtx.globalCompositeOperation = 'source-in';
+      tCtx.fillStyle = 'rgba(0,0,0,0.88)';
+      tCtx.fillRect(0, 0, tmp.width, tmp.height);
+      const r = 4;
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (dx * dx + dy * dy > r * r) continue;
+          ctx.drawImage(tmp, dx, dy);
+        }
+      }
+
+      // Orange-tinted pass
+      const tinted = document.createElement('canvas');
+      tinted.width = c.width; tinted.height = c.height;
+      const tCtx2 = tinted.getContext('2d');
+      tCtx2.imageSmoothingEnabled = false;
+      tCtx2.drawImage(_ritualTextImg, ix, iy, iw, ih);
+      tCtx2.globalCompositeOperation = 'source-in';
+      tCtx2.fillStyle = '#e8a040';
+      tCtx2.fillRect(0, 0, tinted.width, tinted.height);
+
+      // Glow pass
+      ctx.shadowColor = 'rgba(200,80,10,0.95)'; ctx.shadowBlur = 28;
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(tinted, -6, -6);
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+      // Crisp tinted pass
+      ctx.drawImage(tinted, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.needsUpdate = true;
+      const geo = new THREE.PlaneGeometry(1.68, 0.60);
+      const mat = new THREE.MeshStandardMaterial({
+        map: tex, transparent: true, alphaTest: 0.02,
+        emissive: new THREE.Color(0xc85820), emissiveIntensity: 0.25,
+        roughness: 0.3, metalness: 0.1,
+      });
+      textMesh = new THREE.Mesh(geo, mat);
+      textMesh.position.set(0, -0.92, 0.12);
+      packMesh.add(textMesh);
+      return;
+    }
 
     if (_packTheme === 'ewaste') {
       if (!_scourgeTextImg) return; // wait for image
@@ -436,6 +534,137 @@ const Pack3D = (() => {
     });
   }
 
+  // ─── Ritual circle ────────────────────────────────────────────────────────
+
+  function buildRitualCircleTexture() {
+    // Small canvas + NearestFilter = chunky pixels when scaled up
+    const S = 128;
+    const c = document.createElement('canvas');
+    c.width = S; c.height = S;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    const cx = 64, cy = 64;
+
+    // Helper: pixel-perfect circle outline via midpoint algorithm
+    function pixelCircle(r, col) {
+      ctx.fillStyle = col;
+      let x = 0, y = r, d = 1 - r;
+      while (x <= y) {
+        for (const [px, py] of [
+          [cx+x,cy+y],[cx-x,cy+y],[cx+x,cy-y],[cx-x,cy-y],
+          [cx+y,cy+x],[cx-y,cy+x],[cx+y,cy-x],[cx-y,cy-x],
+        ]) ctx.fillRect(px, py, 1, 1);
+        x++;
+        d += x * 2 + 1 <= 0 ? x * 2 + 1 : (d += x * 2 + 1 - y * 2 + 1, y--, x * 2 + 1 - y * 2 + 1);
+        if (d <= 0) d += 2 * x + 3;
+        else { d += 2 * (x - y) + 5; y--; }
+      }
+    }
+
+    // Glow blooms — draw rings with heavy shadow at low opacity first
+    ctx.shadowColor = 'rgba(220,80,10,1)';
+    ctx.shadowBlur = 14;
+
+    // Outer ring
+    ctx.strokeStyle = '#ff6010';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.stroke(); // double for glow intensity
+
+    // Inner ring
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = '#e8a040';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI * 2); ctx.stroke();
+
+    ctx.shadowBlur = 0;
+
+    // ── Demonic symbols at 5 pentagram points on outer ring ──────────────────
+    ctx.fillStyle = '#ff8030';
+    ctx.shadowColor = 'rgba(255,80,0,0.9)';
+    ctx.shadowBlur = 6;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
+      const mx = Math.round(cx + Math.cos(a) * 50);
+      const my = Math.round(cy + Math.sin(a) * 50);
+      ctx.fillRect(mx - 3, my - 2, 7, 1);
+      ctx.fillRect(mx - 2, my - 1, 5, 1);
+      ctx.fillRect(mx - 1, my,     3, 1);
+      ctx.fillRect(mx,     my + 1, 1, 1);
+    }
+
+    // ── Dagger/cross marks at 5 inter-pentagram points ────────────────────────
+    ctx.fillStyle = '#e8a040';
+    ctx.shadowBlur = 4;
+    for (let i = 0; i < 5; i++) {
+      const a = ((i + 0.5) / 5) * Math.PI * 2 - Math.PI / 2;
+      const mx = Math.round(cx + Math.cos(a) * 50);
+      const my = Math.round(cy + Math.sin(a) * 50);
+      ctx.fillRect(mx,     my - 3, 1, 6);
+      ctx.fillRect(mx - 2, my - 1, 5, 1);
+      ctx.fillRect(mx,     my + 2, 1, 2);
+    }
+
+    // ── Small eye sigils on inner ring ────────────────────────────────────────
+    ctx.fillStyle = '#ff6010';
+    ctx.shadowBlur = 5;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const mx = Math.round(cx + Math.cos(a) * 38);
+      const my = Math.round(cy + Math.sin(a) * 38);
+      ctx.fillRect(mx - 1, my,     3, 1);
+      ctx.fillRect(mx,     my + 1, 1, 1);
+    }
+
+    // ── Dot ring between the two rings ────────────────────────────────────────
+    ctx.fillStyle = '#c85820';
+    ctx.shadowBlur = 3;
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      const mx = Math.round(cx + Math.cos(a) * 44);
+      const my = Math.round(cy + Math.sin(a) * 44);
+      ctx.fillRect(mx, my, 1, 1);
+    }
+
+    ctx.shadowBlur = 0;
+    return c;
+  }
+
+  function rebuildCircleMesh() {
+    if (circleGroup) {
+      packMesh.remove(circleGroup);
+      if (circleMesh) { circleMesh.geometry.dispose(); circleMesh.material.map?.dispose(); circleMesh.material.dispose(); circleMesh = null; }
+      circleGroup = null;
+    }
+    if (_packTheme !== 'adpack') return;
+
+    const canvas = buildRitualCircleTexture();
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+
+    // RingGeometry avoids corner triangles that frustum-clip through the ring
+    const geo = new THREE.RingGeometry(0.60, 1.26, 72);
+    { // remap radial UVs → planar so the square canvas maps correctly
+      const uv = geo.attributes.uv, pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) uv.setXY(i, pos.getX(i) / 2.6 + 0.5, pos.getY(i) / 2.6 + 0.5);
+      uv.needsUpdate = true;
+    }
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, alphaTest: 0.01,
+      depthWrite: false, side: THREE.DoubleSide, opacity: 0.92,
+    });
+    circleMesh = new THREE.Mesh(geo, mat);
+    circleMesh.rotation.x = Math.PI * 0.72;
+
+    circleGroup = new THREE.Group();
+    circleGroup.position.set(0, -0.30, 0);
+    circleGroup.add(circleMesh);
+    packMesh.add(circleGroup);
+  }
+
   // ─── Scanline shard texture ────────────────────────────────────────────────
 
   function buildShardTexture(rarityColor) {
@@ -692,32 +921,32 @@ const Pack3D = (() => {
 
   function themeCol(alpha = 1) {
     if (_packTheme === 'ewaste')  return `rgba(100,200,30,${alpha})`;
-    if (_packTheme === 'adpack')  return `rgba(200,160,40,${alpha})`;
+    if (_packTheme === 'adpack')  return `rgba(190,80,10,${alpha})`;
     return `rgba(232,92,26,${alpha})`;
   }
   function themeBg() {
     if (_packTheme === 'ewaste') return '#0a140a';
-    if (_packTheme === 'adpack') return '#12100a';
+    if (_packTheme === 'adpack') return '#100804';
     return '#0f160f';
   }
   function themeGrid() {
     if (_packTheme === 'ewaste') return 'rgba(80,180,20,0.15)';
-    if (_packTheme === 'adpack') return 'rgba(200,160,40,0.18)';
+    if (_packTheme === 'adpack') return 'rgba(190,80,10,0.18)';
     return 'rgba(42,122,42,0.18)';
   }
   function themeHex() {
     if (_packTheme === 'ewaste') return '#8bc820';
-    if (_packTheme === 'adpack') return '#c8a028';
+    if (_packTheme === 'adpack') return '#c85820';
     return '#e85c1a';
   }
   function themeGlow() {
     if (_packTheme === 'ewaste') return 'rgba(100,200,20,0.6)';
-    if (_packTheme === 'adpack') return 'rgba(200,160,40,0.8)';
+    if (_packTheme === 'adpack') return 'rgba(190,80,10,0.85)';
     return 'rgba(232,92,26,0.6)';
   }
   function themeAccent() {
     if (_packTheme === 'ewaste') return 'rgba(140,220,40,0.5)';
-    if (_packTheme === 'adpack') return 'rgba(255,220,80,0.7)';
+    if (_packTheme === 'adpack') return 'rgba(200,90,20,0.7)';
     return 'rgba(58,170,58,0.6)';
   }
 
@@ -810,20 +1039,11 @@ const Pack3D = (() => {
       }
 
     } else if (_packTheme === 'adpack') {
-      // Premium black with gold tint
-      const bg = ctx.createRadialGradient(128, 160, 10, 128, 192, 220);
-      bg.addColorStop(0,   '#1c1508');
-      bg.addColorStop(0.5, '#100d04');
-      bg.addColorStop(1,   '#060401');
-      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, H);
-
-      // Full prismatic rainbow — toned down for readability
-      drawPrismatic(ctx, W, H, 0.14, 0);
-
-      // Gold diagonal stripes over the rainbow
-      ctx.strokeStyle = 'rgba(200,160,40,0.09)'; ctx.lineWidth = 2;
-      for (let x = -H; x < W+H; x += 14) {
-        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke();
+      if (_ritualPackImg) {
+        ctx.drawImage(_ritualPackImg, 0, 0, W, H);
+      } else {
+        ctx.fillStyle = '#12100a';
+        ctx.fillRect(0, 0, W, H);
       }
     }
 
@@ -835,42 +1055,9 @@ const Pack3D = (() => {
 
     // ── OUTER GLOW BORDER ─────────────────────────────────────────────────────
     if (_packTheme === 'adpack') {
-      // Thin animated rainbow frame (clean neon style).
-      const hueShift = (animT * 65) % 360;
-      const frameGrad = ctx.createLinearGradient(4, 4, W - 4, H - 4);
-      for (let i = 0; i <= 8; i++) {
-        const hue = (hueShift + i * 45) % 360;
-        frameGrad.addColorStop(i / 8, `hsla(${hue},100%,68%,0.95)`);
-      }
-      ctx.strokeStyle = frameGrad;
-      ctx.lineWidth = 3;
-      ctx.shadowColor = 'rgba(255,255,255,0.35)';
-      ctx.shadowBlur = 6;
-      ctx.strokeRect(4, 4, W - 8, H - 8);
-      ctx.shadowBlur = 0;
-
-      // Fine inner frame for the "card" look.
-      const innerGrad = ctx.createLinearGradient(10, 10, W - 10, H - 10);
-      for (let i = 0; i <= 6; i++) {
-        const hue = (hueShift + 20 + i * 60) % 360;
-        innerGrad.addColorStop(i / 6, `hsla(${hue},100%,74%,0.55)`);
-      }
-      ctx.strokeStyle = innerGrad;
-      ctx.lineWidth = 1.2;
-      ctx.strokeRect(10, 10, W - 20, H - 20);
-
-      // Subtle corner accents like reference card borders.
-      const c = 14;
-      ctx.lineWidth = 2;
-      [[10,10,1,1],[W-10,10,-1,1],[10,H-10,1,-1],[W-10,H-10,-1,-1]].forEach(([x,y,sx,sy], i) => {
-        const hue = (hueShift + i * 90) % 360;
-        ctx.strokeStyle = `hsla(${hue},100%,75%,0.9)`;
-        ctx.beginPath();
-        ctx.moveTo(x, y + sy * c);
-        ctx.lineTo(x, y);
-        ctx.lineTo(x + sx * c, y);
-        ctx.stroke();
-      });
+      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#c85820', 'rgba(190,80,10,0.8)');
+      ctx.strokeStyle = 'rgba(190,80,10,0.3)'; ctx.lineWidth = 1;
+      ctx.strokeRect(10, 10, W-20, H-20);
 
     } else if (_packTheme === 'ewaste') {
       drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8bc820', 'rgba(100,200,20,0.8)');
@@ -886,7 +1073,7 @@ const Pack3D = (() => {
 
     // ── CORNER BRACKETS ───────────────────────────────────────────────────────
     const bPad = 16, bSize = 20, bW = 3;
-    const bracketCol = _packTheme === 'adpack' ? '#ffd700' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
+    const bracketCol = _packTheme === 'adpack' ? '#c85820' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
     ctx.strokeStyle = bracketCol; ctx.lineWidth = bW;
     ctx.shadowColor = bracketCol; ctx.shadowBlur = 8;
     [[bPad,bPad,1,1],[W-bPad,bPad,-1,1],[bPad,H-bPad,1,-1],[W-bPad,H-bPad,-1,-1]].forEach(([x,y,sx,sy]) => {
@@ -895,8 +1082,8 @@ const Pack3D = (() => {
     ctx.shadowBlur = 0;
 
     // ── SPARKLES ──────────────────────────────────────────────────────────────
-    // Flesh + scourge use meshes instead of sparkles
-    if (_packTheme === 'garbage' || _packTheme === 'ewaste') { /* skipped */ }
+    // Flesh, scourge + ritual use meshes instead of canvas sparkles
+    if (_packTheme === 'garbage' || _packTheme === 'ewaste' || _packTheme === 'adpack') { /* skipped */ }
     else {
       const sparkleCount = _packTheme === 'adpack' ? 12 : 8;
     const sparklePositions = [
@@ -923,62 +1110,19 @@ const Pack3D = (() => {
     const ringY = iconY - 26;
     const icon  = _packTheme === 'ewaste' ? '⬡' : _packTheme === 'adpack' ? '★' : '◈';
 
-    if (_packTheme === 'adpack') {
-      // Radial gold glow behind icon
-      const iconGlow = ctx.createRadialGradient(128, ringY, 0, 128, ringY, 70);
-      iconGlow.addColorStop(0,   'rgba(200,160,40,0.28)');
-      iconGlow.addColorStop(0.4, 'rgba(200,160,40,0.10)');
-      iconGlow.addColorStop(1,   'rgba(0,0,0,0)');
-      ctx.fillStyle = iconGlow; ctx.fillRect(58, ringY - 70, 140, 140);
-      // Rainbow ring
-      for (let a = 0; a < Math.PI*2; a += 0.15) {
-        const hue = (a / (Math.PI*2)) * 360;
-        ctx.beginPath();
-        ctx.arc(128, ringY, 52, a, a+0.16);
-        ctx.strokeStyle = `hsla(${hue},100%,65%,0.48)`;
-        ctx.lineWidth = 2.2; ctx.stroke();
-      }
-      // Gold star with heavy shadow
-      ctx.font = 'bold 80px "VT323", monospace';
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#ffd700';
-      ctx.shadowColor = 'rgba(255,200,0,0.9)'; ctx.shadowBlur = 18;
-      ctx.fillText(icon, 128, iconY);
-      ctx.shadowColor = 'rgba(255,100,0,0.38)'; ctx.shadowBlur = 26;
-      ctx.fillText(icon, 128, iconY);
-      ctx.shadowBlur = 0;
-      // White hot centre sparkle
-      drawSparkle(ctx, 128, ringY, 28, 'rgba(255,255,255,0.95)', 0.9);
-
-    } else if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') {
+    // Ritual uses symbol mesh — skip canvas icon entirely
+    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste' && _packTheme !== 'adpack') {
       ctx.font = 'bold 72px "VT323", monospace';
       ctx.textAlign = 'center';
       ctx.fillStyle = themeHex();
       ctx.shadowColor = themeGlow(); ctx.shadowBlur = 20;
-      ctx.fillText(icon, 128, iconY);
+      ctx.fillText(_packTheme === 'ewaste' ? '⬡' : '◈', 128, 196);
       ctx.shadowBlur = 0;
     }
 
-    // ── TEXT ──────────────────────────────────────────────────────────────────
-    const packName = _packTheme === 'ewaste' ? 'SCOURGE PACK' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH PACK';
-
-    if (_packTheme === 'adpack') {
-      // Gold gradient name
-      const nameGrad = ctx.createLinearGradient(60, 0, 196, 0);
-      nameGrad.addColorStop(0,   '#c8a028');
-      nameGrad.addColorStop(0.3, '#ffd700');
-      nameGrad.addColorStop(0.6, '#ffe55a');
-      nameGrad.addColorStop(1,   '#c8a028');
-      ctx.fillStyle = nameGrad;
-      ctx.shadowColor = 'rgba(200,160,40,0.65)'; ctx.shadowBlur = 8;
-      ctx.font = '24px "VT323", monospace'; ctx.textAlign = 'center';
-      ctx.fillText(packName, 128, 236);
-      ctx.shadowBlur = 0;
-      // EXCLUSIVE badge
-      ctx.font = '9px "Share Tech Mono", monospace';
-      ctx.fillStyle = 'rgba(255,220,80,0.6)';
-      ctx.fillText('✦ EXCLUSIVE ✦', 128, 252);
-    } else if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') {
+    // Ritual: no title text for now; other non-flesh/scourge packs get text
+    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste' && _packTheme !== 'adpack') {
+      const packName = 'PACK';
       ctx.font = '22px "lo-res", sans-serif'; ctx.textAlign = 'center';
       ctx.fillStyle = '#e8e0c8';
       ctx.shadowColor = themeGlow(); ctx.shadowBlur = 6;
@@ -986,7 +1130,7 @@ const Pack3D = (() => {
       ctx.shadowBlur = 0;
     }
 
-    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste') {
+    if (_packTheme !== 'garbage' && _packTheme !== 'ewaste' && _packTheme !== 'adpack') {
       ctx.font = '11px "lo-res", sans-serif';
       ctx.fillStyle = 'rgba(232,224,200,0.35)';
       ctx.fillText('4 cards inside', 128, 264);
@@ -1013,8 +1157,7 @@ const Pack3D = (() => {
 
     // Prismatic sheen on back too
     if (_packTheme === 'adpack') {
-      drawPrismatic(ctx, W, H, 0.08, 60);
-      ctx.strokeStyle = 'rgba(200,160,40,0.1)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(190,80,10,0.1)'; ctx.lineWidth = 2;
       for (let x = -H; x < W+H; x += 16) {
         ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke();
       }
@@ -1038,11 +1181,11 @@ const Pack3D = (() => {
 
     // Border
     if (_packTheme === 'adpack') {
-      ctx.strokeStyle = '#c8a028'; ctx.lineWidth = 4;
-      ctx.shadowColor = 'rgba(200,160,40,0.55)'; ctx.shadowBlur = 8;
+      ctx.strokeStyle = '#c85820'; ctx.lineWidth = 4;
+      ctx.shadowColor = 'rgba(190,80,10,0.6)'; ctx.shadowBlur = 8;
       ctx.strokeRect(6, 6, W-12, H-12);
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(255,220,80,0.25)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(190,80,10,0.25)'; ctx.lineWidth = 1;
       ctx.strokeRect(12, 12, W-24, H-24);
     } else {
       ctx.strokeStyle = themeHex(); ctx.lineWidth = 4;
@@ -1052,7 +1195,7 @@ const Pack3D = (() => {
     }
 
     // Corner sparkles on back
-    const bkSparkleCol = _packTheme === 'adpack' ? 'rgba(255,220,80,0.8)' : _packTheme === 'ewaste' ? 'rgba(0,200,255,0.8)' : 'rgba(232,92,26,0.7)';
+    const bkSparkleCol = _packTheme === 'adpack' ? 'rgba(190,80,10,0.8)' : _packTheme === 'ewaste' ? 'rgba(0,200,255,0.8)' : 'rgba(232,92,26,0.7)';
     [[30,40],[226,40],[30,344],[226,344]].forEach(([sx,sy]) => {
       drawSparkle(ctx, sx, sy, 14, bkSparkleCol, 0.6);
     });
@@ -1061,13 +1204,11 @@ const Pack3D = (() => {
     ctx.font = '44px "VT323", monospace';
     ctx.textAlign = 'center';
     if (_packTheme === 'adpack') {
-      const ng = ctx.createLinearGradient(60, 0, 196, 0);
-      ng.addColorStop(0, 'rgba(200,160,40,0.3)'); ng.addColorStop(0.5, 'rgba(255,220,80,0.4)'); ng.addColorStop(1, 'rgba(200,160,40,0.3)');
-      ctx.fillStyle = ng;
+      ctx.fillStyle = 'rgba(190,80,10,0.3)';
     } else {
       ctx.fillStyle = themeCol(0.22);
     }
-    ctx.fillText(_packTheme === 'ewaste' ? 'SCOURGE' : _packTheme === 'adpack' ? 'AD PACK' : 'FLESH', 128, 200);
+    ctx.fillText(_packTheme === 'ewaste' ? 'SCOURGE' : _packTheme === 'adpack' ? 'RITUAL' : 'FLESH', 128, 200);
 
     const tex = new THREE.CanvasTexture(c);
     tex.needsUpdate = true;
@@ -1132,6 +1273,7 @@ const Pack3D = (() => {
     rebuildTextMesh();
     rebuildFlyMeshes();
     rebuildCloudMeshes();
+    rebuildCircleMesh();
     initPackBlood();
     attachEvents(wrap);
     isReady = true;
@@ -1217,6 +1359,13 @@ const Pack3D = (() => {
       }
     });
 
+    // Ritual circle spin
+    if (circleGroup && _packTheme === 'adpack') {
+      circleAngle += 0.004;
+      circleGroup.rotation.y = circleAngle;
+      circleGroup.position.y = -0.30 + Math.sin(idleT * 0.5) * 0.06;
+    }
+
     // Pestilence cloud animation
     cloudMeshes.forEach((m, i) => {
       const s = cloudStates[i];
@@ -1237,29 +1386,7 @@ const Pack3D = (() => {
     const baseIntensity = _packTheme === 'adpack' ? 3.1 : _packTheme === 'ewaste' ? 2.8 : 2.5;
     rimLight.intensity = baseIntensity + Math.sin(idleT * 1.2) * (baseIntensity * 0.15);
 
-    // Add subtle continuous motion on adpack textures so the face feels alive.
-    if (packMesh && _packTheme === 'adpack') {
-      if (borderAnimFrame % 4 === 0 && packMesh.material?.[4]) {
-        const prevFace = packMesh.material[4].map;
-        const nextFace = buildFaceTexture(idleT);
-        packMesh.material[4].map = nextFace;
-        packMesh.material[4].needsUpdate = true;
-        if (prevFace) prevFace.dispose();
-      }
-      const frontMap = packMesh.material?.[4]?.map;
-      const backMap  = packMesh.material?.[5]?.map;
-      if (frontMap) {
-        frontMap.center.set(0.5, 0.5);
-        frontMap.rotation = Math.sin(idleT * 0.7) * 0.012;
-        frontMap.offset.x = Math.sin(idleT * 0.35) * 0.01;
-      }
-      if (backMap) {
-        backMap.center.set(0.5, 0.5);
-        backMap.rotation = Math.sin(idleT * 0.55 + 0.8) * 0.008;
-      }
-      const pulse = 1 + Math.sin(idleT * 1.6) * 0.012;
-      packMesh.scale.set(pulse, pulse, 1);
-    } else if (packMesh) {
+    if (packMesh) {
       packMesh.scale.set(1, 1, 1);
     }
     renderer.render(scene, camera);
@@ -1340,7 +1467,7 @@ const Pack3D = (() => {
     // Update rim light colour
     if (rimLight) {
       if (_packTheme === 'adpack') {
-        rimLight.color.setStyle('#c8a028');
+        rimLight.color.setStyle('#c85820');
         rimLight.intensity = 3.1;
       } else if (_packTheme === 'ewaste') {
         rimLight.color.setStyle('#8bc820');
@@ -1354,6 +1481,7 @@ const Pack3D = (() => {
     rebuildTextMesh();
     rebuildFlyMeshes();
     rebuildCloudMeshes();
+    rebuildCircleMesh();
     rebuildPackBlood();
     clearParticles();
   }
@@ -1366,6 +1494,7 @@ const Pack3D = (() => {
     flyMeshes = []; flyStates = [];
     cloudMeshes.forEach(m => { packMesh?.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
     cloudMeshes = []; cloudStates = [];
+    if (circleGroup) { packMesh?.remove(circleGroup); if (circleMesh) { circleMesh.geometry.dispose(); circleMesh.material.map?.dispose(); circleMesh.material.dispose(); } circleGroup = null; circleMesh = null; }
     clearTimeout(pbTimer); pbTimer = null; pbDrips = [];
     if (pbMesh) { packMesh?.remove(pbMesh); pbMesh.geometry.dispose(); pbMesh.material.map?.dispose(); pbMesh.material.dispose(); pbMesh = null; }
     pbTex = null; pbCtx = null; pbCanvas = null;
