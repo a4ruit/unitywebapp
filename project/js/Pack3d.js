@@ -110,7 +110,7 @@ const Pack3D = (() => {
   // ─── Preloaded ritual art ──────────────────────────────────────────────────
   let _ritualPackImg = null;
   const _ritualPackImgLoader = new Image();
-  _ritualPackImgLoader.src = 'assets/ritual-bg.png';
+  _ritualPackImgLoader.src = 'assets/ritual-bg-purp.png';
   _ritualPackImgLoader.onload = () => {
     _ritualPackImg = _ritualPackImgLoader;
     if (packMesh && _packTheme === 'adpack') {
@@ -143,7 +143,7 @@ const Pack3D = (() => {
     let img = null, emissiveCol = 0xcc1515;
     if      (_packTheme === 'garbage' && _fleshSymbolImg)   { img = _fleshSymbolImg;   emissiveCol = 0xcc1515; }
     else if (_packTheme === 'ewaste'  && _scourgeSymbolImg) { img = _scourgeSymbolImg;  emissiveCol = 0x50c010; }
-    else if (_packTheme === 'adpack'  && _ritualSymbolImg)  { img = _ritualSymbolImg;   emissiveCol = 0xc8a028; }
+    else if (_packTheme === 'adpack'  && _ritualSymbolImg)  { img = _ritualSymbolImg;   emissiveCol = 0x8030c0; }
     if (!img) return;
 
     const c = document.createElement('canvas');
@@ -213,7 +213,7 @@ const Pack3D = (() => {
       tCtx2.imageSmoothingEnabled = false;
       tCtx2.drawImage(_ritualTextImg, ix, iy, iw, ih);
       tCtx2.globalCompositeOperation = 'source-in';
-      tCtx2.fillStyle = '#e8a040';
+      tCtx2.fillStyle = '#c080ff';
       tCtx2.fillRect(0, 0, tinted.width, tinted.height);
 
       // Glow pass
@@ -230,7 +230,7 @@ const Pack3D = (() => {
       const geo = new THREE.PlaneGeometry(1.68, 0.60);
       const mat = new THREE.MeshStandardMaterial({
         map: tex, transparent: true, alphaTest: 0.02,
-        emissive: new THREE.Color(0xc85820), emissiveIntensity: 0.25,
+        emissive: new THREE.Color(0x8030c0), emissiveIntensity: 0.25,
         roughness: 0.3, metalness: 0.1,
       });
       textMesh = new THREE.Mesh(geo, mat);
@@ -563,26 +563,29 @@ const Pack3D = (() => {
     }
 
     // Glow blooms — draw rings with heavy shadow at low opacity first
-    ctx.shadowColor = 'rgba(220,80,10,1)';
-    ctx.shadowBlur = 14;
+    ctx.shadowColor = 'rgba(120,30,200,1)';
+    ctx.shadowBlur = 22;
 
-    // Outer ring
-    ctx.strokeStyle = '#ff6010';
-    ctx.lineWidth = 1;
+    // Outer ring — draw 3× to stack glow
+    ctx.strokeStyle = '#b040f0';
+    ctx.lineWidth = 2;
     ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.stroke(); // double for glow intensity
+    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.stroke();
 
-    // Inner ring
-    ctx.shadowBlur = 8;
-    ctx.strokeStyle = '#e8a040';
-    ctx.lineWidth = 1;
+    // Inner ring — draw 3× to stack glow
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = '#d080ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, 50, 0, Math.PI * 2); ctx.stroke();
 
     ctx.shadowBlur = 0;
 
     // ── Demonic symbols at 5 pentagram points on outer ring ──────────────────
-    ctx.fillStyle = '#ff8030';
-    ctx.shadowColor = 'rgba(255,80,0,0.9)';
+    ctx.fillStyle = '#c060f0';
+    ctx.shadowColor = 'rgba(160,40,240,0.9)';
     ctx.shadowBlur = 6;
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2 - Math.PI / 2;
@@ -595,7 +598,7 @@ const Pack3D = (() => {
     }
 
     // ── Dagger/cross marks at 5 inter-pentagram points ────────────────────────
-    ctx.fillStyle = '#e8a040';
+    ctx.fillStyle = '#d080ff';
     ctx.shadowBlur = 4;
     for (let i = 0; i < 5; i++) {
       const a = ((i + 0.5) / 5) * Math.PI * 2 - Math.PI / 2;
@@ -607,7 +610,7 @@ const Pack3D = (() => {
     }
 
     // ── Small eye sigils on inner ring ────────────────────────────────────────
-    ctx.fillStyle = '#ff6010';
+    ctx.fillStyle = '#b040f0';
     ctx.shadowBlur = 5;
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
@@ -618,7 +621,7 @@ const Pack3D = (() => {
     }
 
     // ── Dot ring between the two rings ────────────────────────────────────────
-    ctx.fillStyle = '#c85820';
+    ctx.fillStyle = '#8030c0';
     ctx.shadowBlur = 3;
     for (let i = 0; i < 20; i++) {
       const a = (i / 20) * Math.PI * 2;
@@ -921,32 +924,32 @@ const Pack3D = (() => {
 
   function themeCol(alpha = 1) {
     if (_packTheme === 'ewaste')  return `rgba(100,200,30,${alpha})`;
-    if (_packTheme === 'adpack')  return `rgba(190,80,10,${alpha})`;
+    if (_packTheme === 'adpack')  return `rgba(120,30,180,${alpha})`;
     return `rgba(232,92,26,${alpha})`;
   }
   function themeBg() {
     if (_packTheme === 'ewaste') return '#0a140a';
-    if (_packTheme === 'adpack') return '#100804';
+    if (_packTheme === 'adpack') return '#08020e';
     return '#0f160f';
   }
   function themeGrid() {
     if (_packTheme === 'ewaste') return 'rgba(80,180,20,0.15)';
-    if (_packTheme === 'adpack') return 'rgba(190,80,10,0.18)';
+    if (_packTheme === 'adpack') return 'rgba(120,30,180,0.18)';
     return 'rgba(42,122,42,0.18)';
   }
   function themeHex() {
     if (_packTheme === 'ewaste') return '#8bc820';
-    if (_packTheme === 'adpack') return '#c85820';
+    if (_packTheme === 'adpack') return '#8030c0';
     return '#e85c1a';
   }
   function themeGlow() {
     if (_packTheme === 'ewaste') return 'rgba(100,200,20,0.6)';
-    if (_packTheme === 'adpack') return 'rgba(190,80,10,0.85)';
+    if (_packTheme === 'adpack') return 'rgba(120,30,180,0.85)';
     return 'rgba(232,92,26,0.6)';
   }
   function themeAccent() {
     if (_packTheme === 'ewaste') return 'rgba(140,220,40,0.5)';
-    if (_packTheme === 'adpack') return 'rgba(200,90,20,0.7)';
+    if (_packTheme === 'adpack') return 'rgba(120,30,180,0.7)';
     return 'rgba(58,170,58,0.6)';
   }
 
@@ -1055,8 +1058,8 @@ const Pack3D = (() => {
 
     // ── OUTER GLOW BORDER ─────────────────────────────────────────────────────
     if (_packTheme === 'adpack') {
-      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#c85820', 'rgba(190,80,10,0.8)');
-      ctx.strokeStyle = 'rgba(190,80,10,0.3)'; ctx.lineWidth = 1;
+      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8030c0', 'rgba(120,30,180,0.8)');
+      ctx.strokeStyle = 'rgba(120,30,180,0.3)'; ctx.lineWidth = 1;
       ctx.strokeRect(10, 10, W-20, H-20);
 
     } else if (_packTheme === 'ewaste') {
@@ -1073,7 +1076,7 @@ const Pack3D = (() => {
 
     // ── CORNER BRACKETS ───────────────────────────────────────────────────────
     const bPad = 16, bSize = 20, bW = 3;
-    const bracketCol = _packTheme === 'adpack' ? '#c85820' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
+    const bracketCol = _packTheme === 'adpack' ? '#8030c0' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
     ctx.strokeStyle = bracketCol; ctx.lineWidth = bW;
     ctx.shadowColor = bracketCol; ctx.shadowBlur = 8;
     [[bPad,bPad,1,1],[W-bPad,bPad,-1,1],[bPad,H-bPad,1,-1],[W-bPad,H-bPad,-1,-1]].forEach(([x,y,sx,sy]) => {
@@ -1152,12 +1155,12 @@ const Pack3D = (() => {
     const ctx = c.getContext('2d');
 
     // Background
-    const bgCol = _packTheme === 'ewaste' ? '#060c18' : _packTheme === 'adpack' ? '#0a0702' : '#080e08';
+    const bgCol = _packTheme === 'ewaste' ? '#060c18' : _packTheme === 'adpack' ? '#08020e' : '#080e08';
     ctx.fillStyle = bgCol; ctx.fillRect(0, 0, W, H);
 
     // Prismatic sheen on back too
     if (_packTheme === 'adpack') {
-      ctx.strokeStyle = 'rgba(190,80,10,0.1)'; ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(120,30,180,0.1)'; ctx.lineWidth = 2;
       for (let x = -H; x < W+H; x += 16) {
         ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x+H,H); ctx.stroke();
       }
@@ -1181,11 +1184,11 @@ const Pack3D = (() => {
 
     // Border
     if (_packTheme === 'adpack') {
-      ctx.strokeStyle = '#c85820'; ctx.lineWidth = 4;
-      ctx.shadowColor = 'rgba(190,80,10,0.6)'; ctx.shadowBlur = 8;
+      ctx.strokeStyle = '#8030c0'; ctx.lineWidth = 4;
+      ctx.shadowColor = 'rgba(120,30,180,0.6)'; ctx.shadowBlur = 8;
       ctx.strokeRect(6, 6, W-12, H-12);
       ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(190,80,10,0.25)'; ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(120,30,180,0.25)'; ctx.lineWidth = 1;
       ctx.strokeRect(12, 12, W-24, H-24);
     } else {
       ctx.strokeStyle = themeHex(); ctx.lineWidth = 4;
@@ -1195,7 +1198,7 @@ const Pack3D = (() => {
     }
 
     // Corner sparkles on back
-    const bkSparkleCol = _packTheme === 'adpack' ? 'rgba(190,80,10,0.8)' : _packTheme === 'ewaste' ? 'rgba(0,200,255,0.8)' : 'rgba(232,92,26,0.7)';
+    const bkSparkleCol = _packTheme === 'adpack' ? 'rgba(120,30,180,0.8)' : _packTheme === 'ewaste' ? 'rgba(0,200,255,0.8)' : 'rgba(232,92,26,0.7)';
     [[30,40],[226,40],[30,344],[226,344]].forEach(([sx,sy]) => {
       drawSparkle(ctx, sx, sy, 14, bkSparkleCol, 0.6);
     });
@@ -1204,7 +1207,7 @@ const Pack3D = (() => {
     ctx.font = '44px "VT323", monospace';
     ctx.textAlign = 'center';
     if (_packTheme === 'adpack') {
-      ctx.fillStyle = 'rgba(190,80,10,0.3)';
+      ctx.fillStyle = 'rgba(120,30,180,0.3)';
     } else {
       ctx.fillStyle = themeCol(0.22);
     }
@@ -1397,17 +1400,19 @@ const Pack3D = (() => {
   // ─── Interaction ───────────────────────────────────────────────────────────
 
   function attachEvents(el) {
-    el.addEventListener('touchstart', onTouchStart, { passive: true });
-    el.addEventListener('touchmove',  onTouchMove,  { passive: true });
-    el.addEventListener('touchend',   onTouchEnd,   { passive: true });
+    el.addEventListener('touchstart',  onTouchStart,  { passive: true });
+    el.addEventListener('touchmove',   onTouchMove,   { passive: true });
+    el.addEventListener('touchend',    onTouchEnd,    { passive: true });
+    el.addEventListener('touchcancel', onTouchCancel, { passive: true });
     el.addEventListener('mousedown',  onMouseDown);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup',   onMouseUp);
   }
 
-  function onTouchStart(e) { if (isThrowing) return; const t = e.touches[0]; startDrag(t.clientX, t.clientY); }
-  function onTouchMove(e)  { if (!isDragging) return; const t = e.touches[0]; moveDrag(t.clientX, t.clientY); }
-  function onTouchEnd(e)   { if (!isDragging) return; const t = e.changedTouches[0]; endDrag(t.clientX, t.clientY); }
+  function onTouchStart(e)  { if (isThrowing) return; const t = e.touches[0]; startDrag(t.clientX, t.clientY); }
+  function onTouchMove(e)   { if (!isDragging) return; const t = e.touches[0]; moveDrag(t.clientX, t.clientY); }
+  function onTouchEnd(e)    { if (!isDragging) return; const t = e.changedTouches[0]; endDrag(t.clientX, t.clientY); }
+  function onTouchCancel()  { isDragging = false; targetRotY = 0; targetRotX = 0.08; }
   function onMouseDown(e)  { if (isThrowing) return; startDrag(e.clientX, e.clientY); }
   function onMouseMove(e)  { if (!isDragging) return; moveDrag(e.clientX, e.clientY); }
   function onMouseUp(e)    { if (!isDragging) return; endDrag(e.clientX, e.clientY); }
@@ -1467,7 +1472,7 @@ const Pack3D = (() => {
     // Update rim light colour
     if (rimLight) {
       if (_packTheme === 'adpack') {
-        rimLight.color.setStyle('#c85820');
+        rimLight.color.setStyle('#8030c0');
         rimLight.intensity = 3.1;
       } else if (_packTheme === 'ewaste') {
         rimLight.color.setStyle('#8bc820');

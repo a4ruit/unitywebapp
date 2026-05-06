@@ -62,7 +62,7 @@ body.scourge-active .bg-grid {
 }
 
 body.ritual-active .bg-grid {
-  filter: hue-rotate(40deg) saturate(2.0) brightness(1.1);
+  filter: hue-rotate(280deg) saturate(1.6) brightness(0.9);
 }
 
 body::after {
@@ -168,9 +168,9 @@ body::after {
 @keyframes coalLedIdle { 0%,100%{opacity:1} 97%{opacity:0.85} }
 
 @keyframes coalPulse {
-  0%  { box-shadow: 0 0 8px rgba(190,80,10,0.2); }
-  50% { box-shadow: 0 0 20px rgba(190,80,10,0.8), 0 0 40px rgba(190,80,10,0.3); }
-  100%{ box-shadow: 0 0 8px rgba(190,80,10,0.2); }
+  0%  { box-shadow: 0 0 8px rgba(120,30,180,0.2); }
+  50% { box-shadow: 0 0 20px rgba(120,30,180,0.8), 0 0 40px rgba(120,30,180,0.3); }
+  100%{ box-shadow: 0 0 8px rgba(120,30,180,0.2); }
 }
 .coal-pulse { animation: coalPulse 0.4s ease-out; }
 
@@ -319,8 +319,8 @@ body::after {
     radial-gradient(circle at 78% 66%, rgba(255,160,80,0.92) 0 1.5px, transparent 2.5px),
     radial-gradient(circle at 18% 50%, rgba(200,80,20,0.65) 0 1px, transparent 2px),
     radial-gradient(circle at 84% 50%, rgba(200,80,20,0.65) 0 1px, transparent 2px),
-    radial-gradient(circle at 30% 34%, rgba(190,80,10,0.22) 0 16px, transparent 30px),
-    radial-gradient(circle at 76% 66%, rgba(190,80,10,0.2) 0 14px, transparent 26px);
+    radial-gradient(circle at 30% 34%, rgba(120,30,180,0.22) 0 16px, transparent 30px),
+    radial-gradient(circle at 76% 66%, rgba(120,30,180,0.2) 0 14px, transparent 26px);
   background-position: center center;
   background-size: 100% 100%;
   background-repeat: no-repeat;
@@ -343,8 +343,8 @@ body::after {
     radial-gradient(circle at 82% 72%, rgba(255,180,100,0.98) 0 2px, transparent 3.2px),
     radial-gradient(circle at 50% 24%, rgba(200,90,20,0.82) 0 1.6px, transparent 2.8px),
     radial-gradient(circle at 50% 76%, rgba(200,90,20,0.82) 0 1.6px, transparent 2.8px),
-    radial-gradient(circle at 22% 28%, rgba(190,80,10,0.34) 0 20px, transparent 34px),
-    radial-gradient(circle at 82% 72%, rgba(190,80,10,0.3) 0 18px, transparent 30px);
+    radial-gradient(circle at 22% 28%, rgba(120,30,180,0.34) 0 20px, transparent 34px),
+    radial-gradient(circle at 82% 72%, rgba(120,30,180,0.3) 0 18px, transparent 30px);
   background-repeat: no-repeat;
   transform: scale(0.98);
   transform-origin: 50% 50%;
@@ -383,7 +383,7 @@ body::after {
 }
 .carousel-pack[data-pack="garbage"] { border-color: rgba(200,20,20,0.42); background: rgba(20,12,8,0.42); }
 .carousel-pack[data-pack="ewaste"]  { border-color: rgba(40,140,255,0.42); background: rgba(8,12,24,0.42); }
-.carousel-pack[data-pack="adpack"]  { border-color: rgba(190,80,10,0.42); background: rgba(20,16,8,0.42); }
+.carousel-pack[data-pack="adpack"]  { border-color: rgba(120,30,180,0.42); background: rgba(12,4,20,0.42); }
 
 .carousel-pack.carousel-left {
   opacity: 0.4;
@@ -938,23 +938,7 @@ body::after {
   pointer-events: none; opacity: 0.3;
 }
 .star-shop-btn::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 1px solid transparent;
-  border-image: linear-gradient(
-    135deg,
-    hsl(0,100%,70%),
-    hsl(60,100%,70%),
-    hsl(120,100%,70%),
-    hsl(180,100%,70%),
-    hsl(240,100%,70%),
-    hsl(300,100%,70%),
-    hsl(360,100%,70%)
-  ) 1;
-  opacity: 0.95;
-  pointer-events: none;
-  animation: adpackBtnRainbow 2.4s linear infinite;
+  content: none;
 }
 .star-shop-btn:active { transform: translate(1px,1px); box-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
 .star-shop-btn:hover  { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(200,20,20,0.34); background: #1a0404; }
@@ -1273,8 +1257,8 @@ body::after {
 
 /* ── AD PACK button — gold/exclusive ─────────────── */
 .pack-type-btn--adpack {
-  border-color: rgba(190,80,10,0.35) !important;
-  background: #0c0a03 !important;
+  border-color: rgba(120,30,180,0.35) !important;
+  background: #0a0312 !important;
   position: relative;
   overflow: hidden;
 }
@@ -1285,34 +1269,34 @@ body::after {
     45deg,
     transparent,
     transparent 4px,
-    rgba(190,80,10,0.04) 4px,
-    rgba(190,80,10,0.04) 8px
+    rgba(120,30,180,0.04) 4px,
+    rgba(120,30,180,0.04) 8px
   );
   pointer-events: none;
 }
 .pack-type-btn--adpack .pack-type-icon,
 .pack-type-btn--adpack .pack-type-label {
-  color: #c85820 !important;
+  color: #8030c0 !important;
 }
 .pack-type-btn--adpack.active {
-  border-color: #c85820 !important;
-  background: #130f03 !important;
-  box-shadow: 0 0 10px rgba(190,80,10,0.24);
+  border-color: #8030c0 !important;
+  background: #0e0318 !important;
+  box-shadow: 0 0 10px rgba(120,30,180,0.24);
   animation: adpackGlow 2.8s ease-in-out infinite;
 }
 @keyframes adpackGlow {
-  0%,100% { box-shadow: 0 0 8px rgba(190,80,10,0.2); }
-  50%      { box-shadow: 0 0 14px rgba(190,80,10,0.34), 0 0 26px rgba(190,80,10,0.16); }
+  0%,100% { box-shadow: 0 0 8px rgba(120,30,180,0.2); }
+  50%      { box-shadow: 0 0 14px rgba(120,30,180,0.34), 0 0 26px rgba(120,30,180,0.16); }
 }
 
 /* ── AD PACK gate — different prompt ─────────────── */
 .gate-adpack-note {
   font-family: 'lo-res', sans-serif;
-  font-size: 8px; color: #c85820;
+  font-size: 8px; color: #8030c0;
   letter-spacing: 0.08em; line-height: 1.7;
   text-align: center; padding: 8px 12px;
-  border: 1px solid rgba(190,80,10,0.3);
-  background: rgba(190,80,10,0.05);
+  border: 1px solid rgba(120,30,180,0.3);
+  background: rgba(120,30,180,0.05);
 }
 
 /* ── PACK TYPE ROW — 4 buttons ───────────────────── */
@@ -1331,15 +1315,15 @@ body::after {
 
 /* Adpack ticker state */
 .ticker-wrap[data-state="adpack"] {
-  background: rgba(190,80,10,0.1);
-  border-color: #c85820;
+  background: rgba(120,30,180,0.1);
+  border-color: #8030c0;
   animation: adpackGlow 2s ease-in-out infinite;
 }
 .ticker-wrap[data-state="adpack"] .ticker-msg {
-  color: #c85820;
-  text-shadow: 1px 1px 0 rgba(190,80,10,0.4);
+  color: #8030c0;
+  text-shadow: 1px 1px 0 rgba(120,30,180,0.4);
 }
-.ticker-wrap[data-state="adpack"] .ticker-sep { color: #c85820; }
+.ticker-wrap[data-state="adpack"] .ticker-sep { color: #8030c0; }
 
 /* ── AD PACK PROMPT SCREEN ───────────────────────── */
 #screen-adpack-prompt {
@@ -1355,14 +1339,14 @@ body::after {
   width: 100%;
   max-width: 320px;
   padding: 24px 20px;
-  border: 2px solid #c85820;
+  border: 2px solid #8030c0;
   background: rgba(12,10,4,0.96);
   position: relative;
   overflow: hidden;
   box-shadow:
-    0 0 24px rgba(190,80,10,0.3),
-    0 0 60px rgba(190,80,10,0.1),
-    inset 0 0 32px rgba(190,80,10,0.04);
+    0 0 24px rgba(120,30,180,0.3),
+    0 0 60px rgba(120,30,180,0.1),
+    inset 0 0 32px rgba(120,30,180,0.04);
   animation: adpackPromptIn 0.3s steps(6) forwards;
 }
 
@@ -1378,7 +1362,7 @@ body::after {
   background: linear-gradient(
     105deg,
     transparent 30%,
-    rgba(190,80,10,0.08) 50%,
+    rgba(120,30,180,0.08) 50%,
     transparent 70%
   );
   animation: adpackShimmer 2.5s ease-in-out infinite;
@@ -1397,8 +1381,8 @@ body::after {
     45deg,
     transparent,
     transparent 6px,
-    rgba(190,80,10,0.03) 6px,
-    rgba(190,80,10,0.03) 12px
+    rgba(120,30,180,0.03) 6px,
+    rgba(120,30,180,0.03) 12px
   );
   pointer-events: none;
 }
@@ -1411,8 +1395,8 @@ body::after {
 
 .adpack-prompt-star {
   font-family: 'lo-res', sans-serif;
-  font-size: 22px; color: #c85820;
-  text-shadow: 0 0 10px rgba(190,80,10,0.8);
+  font-size: 22px; color: #8030c0;
+  text-shadow: 0 0 10px rgba(120,30,180,0.8);
   animation: adpackStarSpin 3s steps(4) infinite;
 }
 @keyframes adpackStarSpin {
@@ -1426,31 +1410,31 @@ body::after {
 .adpack-prompt-title {
   font-family: 'lo-res', sans-serif;
   font-size: 30px; letter-spacing: 0.2em;
-  color: #c85820;
+  color: #8030c0;
   text-shadow:
-    2px 2px 0 rgba(190,80,10,0.4),
-    0 0 20px rgba(190,80,10,0.5),
-    0 0 40px rgba(190,80,10,0.2);
+    2px 2px 0 rgba(120,30,180,0.4),
+    0 0 20px rgba(120,30,180,0.5),
+    0 0 40px rgba(120,30,180,0.2);
   animation: adpackTitlePulse 2s ease-in-out infinite;
 }
 @keyframes adpackTitlePulse {
-  0%,100% { text-shadow: 2px 2px 0 rgba(190,80,10,0.4), 0 0 20px rgba(190,80,10,0.5); }
-  50%     { text-shadow: 2px 2px 0 rgba(190,80,10,0.6), 0 0 32px rgba(190,80,10,0.8), 0 0 60px rgba(190,80,10,0.3); }
+  0%,100% { text-shadow: 2px 2px 0 rgba(120,30,180,0.4), 0 0 20px rgba(120,30,180,0.5); }
+  50%     { text-shadow: 2px 2px 0 rgba(120,30,180,0.6), 0 0 32px rgba(120,30,180,0.8), 0 0 60px rgba(120,30,180,0.3); }
 }
 
 .adpack-prompt-icon {
   font-family: 'lo-res', sans-serif;
   font-size: 64px; line-height: 1;
-  color: #c85820;
+  color: #8030c0;
   text-shadow:
-    0 0 16px rgba(190,80,10,0.9),
-    0 0 32px rgba(190,80,10,0.5),
-    0 0 64px rgba(190,80,10,0.2);
+    0 0 16px rgba(120,30,180,0.9),
+    0 0 32px rgba(120,30,180,0.5),
+    0 0 64px rgba(120,30,180,0.2);
   animation: adpackIconPulse 1.8s ease-in-out infinite;
 }
 @keyframes adpackIconPulse {
-  0%,100% { transform: scale(1);    text-shadow: 0 0 16px rgba(190,80,10,0.9), 0 0 32px rgba(190,80,10,0.5); }
-  50%     { transform: scale(1.06); text-shadow: 0 0 24px rgba(190,80,10,1),   0 0 48px rgba(190,80,10,0.7), 0 0 80px rgba(190,80,10,0.3); }
+  0%,100% { transform: scale(1);    text-shadow: 0 0 16px rgba(120,30,180,0.9), 0 0 32px rgba(120,30,180,0.5); }
+  50%     { transform: scale(1.06); text-shadow: 0 0 24px rgba(120,30,180,1),   0 0 48px rgba(120,30,180,0.7), 0 0 80px rgba(120,30,180,0.3); }
 }
 
 .adpack-prompt-body {
@@ -1494,15 +1478,15 @@ body::after {
 .adpack-prompt-btn:active { transform:translate(1px,1px); box-shadow:1px 1px 0 rgba(0,0,0,0.5); }
 
 .adpack-prompt-btn--watch {
-  border-color: #c85820;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 12px rgba(190,80,10,0.2);
+  border-color: #8030c0;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 12px rgba(120,30,180,0.2);
   animation: adpackBtnGlow 2s ease-in-out infinite;
 }
 @keyframes adpackBtnGlow {
-  0%,100% { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(190,80,10,0.15); }
-  50%     { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 20px rgba(190,80,10,0.4); }
+  0%,100% { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(120,30,180,0.15); }
+  50%     { box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 20px rgba(120,30,180,0.4); }
 }
-.adpack-prompt-btn--watch .adpack-prompt-btn-title { color: #c85820; }
+.adpack-prompt-btn--watch .adpack-prompt-btn-title { color: #8030c0; }
 
 .adpack-prompt-btn--skip  { border-color: var(--green-lt); }
 .adpack-prompt-btn--skip .adpack-prompt-btn-title  { color: var(--green-lt); }
@@ -1530,12 +1514,12 @@ body::after {
 
 /* ── AD PACK canvas glow — active state ──────────── */
 #screen-pack.adpack-active .pack-carousel-stage {
-  filter: drop-shadow(0 0 8px rgba(190,80,10,0.35)) drop-shadow(0 0 18px rgba(190,80,10,0.14));
+  filter: drop-shadow(0 0 8px rgba(120,30,180,0.35)) drop-shadow(0 0 18px rgba(120,30,180,0.14));
   animation: adpackCanvasGlow 2s ease-in-out infinite;
 }
 @keyframes adpackCanvasGlow {
-  0%,100% { filter: drop-shadow(0 0 8px rgba(190,80,10,0.32)) drop-shadow(0 0 18px rgba(190,80,10,0.12)); }
-  50%     { filter: drop-shadow(0 0 13px rgba(190,80,10,0.5)) drop-shadow(0 0 30px rgba(190,80,10,0.2)); }
+  0%,100% { filter: drop-shadow(0 0 8px rgba(120,30,180,0.32)) drop-shadow(0 0 18px rgba(120,30,180,0.12)); }
+  50%     { filter: drop-shadow(0 0 13px rgba(120,30,180,0.5)) drop-shadow(0 0 30px rgba(120,30,180,0.2)); }
 }
 
 /* ── SCOURGE: bottom row green theme ──────────────── */
@@ -1583,4 +1567,51 @@ body.scourge-active .star-shop-btn-icon {
 }
 body.scourge-active .star-shop-btn-label {
   color: rgba(100,200,20,0.9);
+}
+
+/* ── RITUAL: bottom row purple theme ──────────────── */
+body.ritual-active .pack-counter {
+  border-color: rgba(120,30,180,0.78);
+  box-shadow: 0 0 8px rgba(120,30,180,0.16);
+}
+body.ritual-active .counter-packs {
+  color: #b060e8;
+  text-shadow: 0 0 6px rgba(120,30,180,0.85), 0 0 12px rgba(120,30,180,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.ritual-active .counter-label,
+body.ritual-active .counter-tag {
+  color: rgba(120,30,180,0.95);
+}
+
+body.ritual-active .star-counter {
+  border-color: rgba(120,30,180,0.78);
+  box-shadow: 0 0 8px rgba(120,30,180,0.16);
+}
+body.ritual-active .star-counter-icon {
+  color: #b060e8;
+  text-shadow: 0 0 6px rgba(120,30,180,0.8), 0 0 12px rgba(120,30,180,0.35);
+}
+body.ritual-active .star-counter-value {
+  color: #b060e8;
+  text-shadow: 0 0 6px rgba(120,30,180,0.7);
+}
+body.ritual-active .star-counter-label {
+  color: rgba(120,30,180,0.95);
+}
+
+body.ritual-active .star-shop-btn {
+  border-color: rgba(120,30,180,0.85);
+  background: #08020e;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(120,30,180,0.18);
+}
+body.ritual-active .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(120,30,180,0.34);
+  background: #120420;
+}
+body.ritual-active .star-shop-btn-icon {
+  color: #b060e8;
+  text-shadow: 0 0 8px rgba(120,30,180,0.8);
+}
+body.ritual-active .star-shop-btn-label {
+  color: rgba(120,30,180,0.9);
 }
