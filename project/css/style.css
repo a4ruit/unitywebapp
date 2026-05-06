@@ -34,6 +34,9 @@ html, body {
   font-family:'lo-res', sans-serif;
   color:var(--cream);
   image-rendering:pixelated;
+  touch-action: none;
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
 }
 
 body::before {
@@ -1602,5 +1605,4 @@ body.scourge-active .star-shop-btn-icon {
 }
 body.scourge-active .star-shop-btn-label {
   color: rgba(100,200,20,0.9);
-}
 }
