@@ -52,9 +52,20 @@ body::before {
 
 .bg-grid {
   position:fixed; inset:0;
-  background: #0a100a url('../assets/flesh-bg.png') no-repeat center center / cover;
+  background: #0a100a url('../assets/nature-web-bg.png') no-repeat center center / cover;
   pointer-events:none; z-index:0;
   transition: filter 0.7s ease;
+}
+.bg-grid::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: url('../assets/flesh-bg.png') no-repeat center center / cover;
+  opacity: 0;
+  transition: opacity 1.4s ease;
+  pointer-events: none;
+}
+body:not(.pristine-phase) .bg-grid::before {
+  opacity: 1;
 }
 
 body.scourge-active .bg-grid {
@@ -266,8 +277,7 @@ body::after {
   position:relative;
   align-items:center;
   justify-content:center;
-  padding-top: 70px;
-  padding-bottom: 90px;
+  flex: 1;
 }
 
 /* Pack type buttons pinned to top zone */
@@ -303,6 +313,9 @@ body::after {
   flex-shrink: 0;
   overflow: visible;
   margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .pack-carousel-stage::after {
@@ -381,7 +394,7 @@ body::after {
   background: var(--scanline);
   opacity: 0.35;
 }
-.carousel-pack[data-pack="garbage"] { border-color: rgba(200,20,20,0.42); background: rgba(20,12,8,0.42); }
+.carousel-pack[data-pack="garbage"] { border-color: rgba(200,20,20,0.42);  background: rgba(20,12,8,0.42); }
 .carousel-pack[data-pack="ewaste"]  { border-color: rgba(40,140,255,0.42); background: rgba(8,12,24,0.42); }
 .carousel-pack[data-pack="adpack"]  { border-color: rgba(120,30,180,0.42); background: rgba(12,4,20,0.42); }
 
@@ -469,6 +482,32 @@ body::after {
 }
 .pack-canvas-wrap:active { cursor:grabbing; }
 .pack-canvas-wrap canvas { display:block; width:100%!important; height:100%!important; image-rendering:pixelated; }
+
+/* ── Corruption glitch transition ────────────────────────────────────────── */
+/* Pixel-nudge on the Three.js pack canvas — integer pixel shifts only       */
+body.glitch-active .pack-canvas-wrap canvas {
+  animation: packPixelNudge 0.10s steps(1) infinite;
+}
+@keyframes packPixelNudge {
+  0%   { transform: translate(0,  0);  }
+  25%  { transform: translate(-5px, 2px); }
+  50%  { transform: translate(5px,  0);  }
+  75%  { transform: translate(-3px,-3px); }
+  100% { transform: translate(0,  0);  }
+}
+/* UI rows nudge independently — reinforces that the whole screen is affected */
+body.glitch-active .pack-type-row {
+  animation: uiRowNudge 0.13s steps(1) infinite;
+}
+body.glitch-active .star-counter-row {
+  animation: uiRowNudge 0.11s steps(1) infinite reverse;
+}
+@keyframes uiRowNudge {
+  0%   { transform: translateX(calc(-50% + 0px));  }
+  33%  { transform: translateX(calc(-50% - 4px));  }
+  66%  { transform: translateX(calc(-50% + 3px));  }
+  100% { transform: translateX(calc(-50% + 0px));  }
+}
 .pack-canvas-wrap.fly-left  { animation:flyLeft  0.4s ease-in forwards; }
 .pack-canvas-wrap.fly-right { animation:flyRight 0.4s ease-in forwards; }
 @keyframes flyLeft  { to{transform:translateX(-160%) rotate(-15deg);opacity:0;} }
@@ -868,6 +907,28 @@ body::after {
   white-space: nowrap;
 }
 .pack-type-btn.active .pack-type-icon { color: var(--orange); }
+
+/* ── Fungi phase: earthy amber button override ──────────────────────────── */
+.pack-type-btn.fungi-mode.active {
+  border-color: #d4a870;
+  background: #100e08;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(212,168,112,0.25);
+}
+.pack-type-btn.fungi-mode.active .pack-type-label,
+.pack-type-btn.fungi-mode.active .pack-type-icon { color: #d4a870; }
+.pack-type-btn.fungi-mode:not(.active) .pack-type-label,
+.pack-type-btn.fungi-mode:not(.active) .pack-type-icon { color: #a07848; }
+
+/* ── Critter phase: pastel pink button override ─────────────────────────── */
+.pack-type-btn.critter-mode.active {
+  border-color: #f0b8d0;
+  background: #130b10;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(240,184,208,0.25);
+}
+.pack-type-btn.critter-mode.active .pack-type-label,
+.pack-type-btn.critter-mode.active .pack-type-icon { color: #f0b8d0; }
+.pack-type-btn.critter-mode:not(.active) .pack-type-label,
+.pack-type-btn.critter-mode:not(.active) .pack-type-icon { color: #c490a8; }
 
 /* ── STAR COUNTER — below pack canvas ───────────────── */
 .star-counter {
@@ -1614,4 +1675,67 @@ body.ritual-active .star-shop-btn-icon {
 }
 body.ritual-active .star-shop-btn-label {
   color: rgba(120,30,180,0.9);
+}
+
+/* ── PRISTINE PHASE: bottom row green (nature state of the flesh pack) ─── */
+body.pristine-phase .pack-counter {
+  border-color: rgba(129,212,250,0.78);
+  box-shadow: 0 0 8px rgba(129,212,250,0.16);
+}
+body.pristine-phase .counter-packs {
+  color: #81d4fa;
+  text-shadow: 0 0 6px rgba(129,212,250,0.85), 0 0 12px rgba(129,212,250,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.pristine-phase .counter-label,
+body.pristine-phase .counter-tag {
+  color: rgba(129,212,250,0.95);
+}
+
+body.pristine-phase .star-counter {
+  border-color: rgba(129,212,250,0.78);
+  box-shadow: 0 0 8px rgba(129,212,250,0.16);
+}
+body.pristine-phase .star-counter-icon {
+  color: #81d4fa;
+  text-shadow: 0 0 6px rgba(129,212,250,0.8), 0 0 12px rgba(129,212,250,0.35);
+}
+body.pristine-phase .star-counter-value {
+  color: #81d4fa;
+  text-shadow: 0 0 6px rgba(129,212,250,0.7);
+}
+body.pristine-phase .star-counter-label {
+  color: rgba(129,212,250,0.95);
+}
+
+body.pristine-phase .star-shop-btn {
+  border-color: rgba(129,212,250,0.85);
+  background: #010810;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(129,212,250,0.18);
+}
+body.pristine-phase .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(129,212,250,0.34);
+  background: #031020;
+}
+body.pristine-phase .star-shop-btn-icon {
+  color: #81d4fa;
+  text-shadow: 0 0 8px rgba(129,212,250,0.8);
+}
+body.pristine-phase .star-shop-btn-label {
+  color: rgba(129,212,250,0.9);
+}
+
+/* Active pack tab goes green in pristine phase */
+body.pristine-phase #packTypeGarbage.active {
+  border-color: rgba(129,212,250,0.85);
+  background: #010810;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(129,212,250,0.2);
+}
+body.pristine-phase #packTypeGarbage.active .pack-type-label,
+body.pristine-phase #packTypeGarbage.active .pack-type-icon {
+  color: #81d4fa !important;
+}
+
+/* Canvas stage glow: green in pristine, red in corrupted (default is red from adpack-active logic) */
+body.pristine-phase #screen-pack .pack-carousel-stage {
+  filter: drop-shadow(0 0 6px rgba(129,212,250,0.25)) drop-shadow(0 0 14px rgba(129,212,250,0.10));
 }

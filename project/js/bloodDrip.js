@@ -13,7 +13,7 @@ const BloodDrip = (() => {
   let drips         = [];
   let packsOpened   = 0;
   let initialized   = false; // canvases + loop exist
-  let running       = false; // full stain system active (packsOpened >= 3)
+  let running       = false; // full stain system active (packsOpened >= 9)
   let raf           = null;
   let spawnTimer    = null;
   let packDripTimer = null;
@@ -107,7 +107,7 @@ const BloodDrip = (() => {
   // ── Drip spawning ─────────────────────────────────────────────────────────
 
   function intensity() {
-    return Math.max(0, Math.floor((packsOpened - 3) / 1.5));
+    return Math.max(0, Math.floor((packsOpened - 9) / 1.5));
   }
 
   function spawnDrip() {
@@ -366,7 +366,7 @@ const BloodDrip = (() => {
   function onPackOpened() {
     packsOpened++;
 
-    if (!running && packsOpened >= 3) {
+    if (!running && packsOpened >= 9) {
       running = true;
       ensureInit();
       scheduleNextSpawn();

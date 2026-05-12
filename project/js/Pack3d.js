@@ -42,6 +42,14 @@ const Pack3D = (() => {
   let idleT = 0;
   let borderAnimFrame = 0;
 
+  // ─── Glitch transition: nature → flesh ─────────────────────────────────────
+  let glitchActive   = false;
+  let glitchStart    = 0;
+  let glitchFlipDone = false;
+  let glitchOverlay  = null;
+  let glitchOvCtx    = null;
+  const GLITCH_DUR   = 3000; // ms total
+
   const SWIPE_THRESHOLD = 45;
 
   // ─── Preloaded pack art ────────────────────────────────────────────────────
@@ -77,6 +85,36 @@ const Pack3D = (() => {
     if (packMesh && _packTheme === 'garbage') rebuildTextMesh();
   };
 
+  // ─── Preloaded critter art (ewaste phase, corruption < 6) ────────────────────
+  let _critterPackImg = null;
+  const _critterPackImgLoader = new Image();
+  _critterPackImgLoader.src = 'assets/critter-pack.png';
+  _critterPackImgLoader.onload = () => {
+    _critterPackImg = _critterPackImgLoader;
+    if (packMesh && _packTheme === 'ewaste' && isCritterPhase()) {
+      const prev = packMesh.material[4]?.map;
+      const next = buildFaceTexture();
+      if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+      if (prev) prev.dispose();
+    }
+  };
+
+  let _critterSymbolImg = null;
+  const _critterSymbolImgLoader = new Image();
+  _critterSymbolImgLoader.src = 'assets/critter-symbol.png';
+  _critterSymbolImgLoader.onload = () => {
+    _critterSymbolImg = _critterSymbolImgLoader;
+    if (packMesh && _packTheme === 'ewaste' && isCritterPhase()) { rebuildSymbolMesh(); rebuildTextMesh(); }
+  };
+
+  let _critterTextImg = null;
+  const _critterTextImgLoader = new Image();
+  _critterTextImgLoader.src = 'assets/critter-text.png';
+  _critterTextImgLoader.onload = () => {
+    _critterTextImg = _critterTextImgLoader;
+    if (packMesh && _packTheme === 'ewaste' && isCritterPhase()) rebuildTextMesh();
+  };
+
   // ─── Preloaded scourge art ─────────────────────────────────────────────────
   let _scourgePackImg = null;
   const _scourgePackImgLoader = new Image();
@@ -105,6 +143,66 @@ const Pack3D = (() => {
   _scourgeTextImgLoader.onload = () => {
     _scourgeTextImg = _scourgeTextImgLoader;
     if (packMesh && _packTheme === 'ewaste') rebuildTextMesh();
+  };
+
+  // ─── Preloaded nature art ──────────────────────────────────────────────────
+  let _naturePackImg = null;
+  const _naturePackImgLoader = new Image();
+  _naturePackImgLoader.src = 'assets/nature-bg.png';
+  _naturePackImgLoader.onload = () => {
+    _naturePackImg = _naturePackImgLoader;
+    if (packMesh && _packTheme === 'garbage' && isNaturePhase()) {
+      const prev = packMesh.material[4]?.map;
+      const next = buildFaceTexture();
+      if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+      if (prev) prev.dispose();
+    }
+  };
+
+  let _natureSymbolImg = null;
+  const _natureSymbolImgLoader = new Image();
+  _natureSymbolImgLoader.src = 'assets/nature-symbol.png';
+  _natureSymbolImgLoader.onload = () => {
+    _natureSymbolImg = _natureSymbolImgLoader;
+    if (packMesh && _packTheme === 'garbage' && isNaturePhase()) rebuildSymbolMesh();
+  };
+
+  let _natureTextImg = null;
+  const _natureTextImgLoader = new Image();
+  _natureTextImgLoader.src = 'assets/nature-text.png';
+  _natureTextImgLoader.onload = () => {
+    _natureTextImg = _natureTextImgLoader;
+    if (packMesh && _packTheme === 'garbage' && isNaturePhase()) rebuildTextMesh();
+  };
+
+  // ─── Preloaded fungi art (adpack phase, corruption < 6) ──────────────────
+  let _fungiPackImg = null;
+  const _fungiPackImgLoader = new Image();
+  _fungiPackImgLoader.src = 'assets/fungi-pack.png';
+  _fungiPackImgLoader.onload = () => {
+    _fungiPackImg = _fungiPackImgLoader;
+    if (packMesh && _packTheme === 'adpack' && isFungiPhase()) {
+      const prev = packMesh.material[4]?.map;
+      const next = buildFaceTexture();
+      if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+      if (prev) prev.dispose();
+    }
+  };
+
+  let _fungiSymbolImg = null;
+  const _fungiSymbolImgLoader = new Image();
+  _fungiSymbolImgLoader.src = 'assets/fungi-symbol.png';
+  _fungiSymbolImgLoader.onload = () => {
+    _fungiSymbolImg = _fungiSymbolImgLoader;
+    if (packMesh && _packTheme === 'adpack' && isFungiPhase()) { rebuildSymbolMesh(); rebuildTextMesh(); }
+  };
+
+  let _fungiTextImg = null;
+  const _fungiTextImgLoader = new Image();
+  _fungiTextImgLoader.src = 'assets/fungi-text.png';
+  _fungiTextImgLoader.onload = () => {
+    _fungiTextImg = _fungiTextImgLoader;
+    if (packMesh && _packTheme === 'adpack' && isFungiPhase()) rebuildTextMesh();
   };
 
   // ─── Preloaded ritual art ──────────────────────────────────────────────────
@@ -141,9 +239,18 @@ const Pack3D = (() => {
     if (symbolMesh) { packMesh.remove(symbolMesh); symbolMesh.geometry.dispose(); symbolMesh.material.map?.dispose(); symbolMesh.material.dispose(); symbolMesh = null; }
 
     let img = null, emissiveCol = 0xcc1515;
-    if      (_packTheme === 'garbage' && _fleshSymbolImg)   { img = _fleshSymbolImg;   emissiveCol = 0xcc1515; }
-    else if (_packTheme === 'ewaste'  && _scourgeSymbolImg) { img = _scourgeSymbolImg;  emissiveCol = 0x50c010; }
-    else if (_packTheme === 'adpack'  && _ritualSymbolImg)  { img = _ritualSymbolImg;   emissiveCol = 0x8030c0; }
+    if (_packTheme === 'garbage') {
+      if      (isNaturePhase() && _natureSymbolImg) { img = _natureSymbolImg; emissiveCol = 0x81d4fa; }
+      else if (_fleshSymbolImg)                      { img = _fleshSymbolImg;  emissiveCol = 0xcc1515; }
+    }
+    else if (_packTheme === 'ewaste') {
+      if (isCritterPhase() && _critterSymbolImg) { img = _critterSymbolImg; emissiveCol = 0xf0b8d0; }
+      else if (_scourgeSymbolImg)                 { img = _scourgeSymbolImg; emissiveCol = 0x50c010; }
+    }
+    else if (_packTheme === 'adpack') {
+      if (isFungiPhase() && _fungiSymbolImg)  { img = _fungiSymbolImg;  emissiveCol = 0xd4a870; }
+      else if (_ritualSymbolImg)               { img = _ritualSymbolImg; emissiveCol = 0x8030c0; }
+    }
     if (!img) return;
 
     const c = document.createElement('canvas');
@@ -155,16 +262,16 @@ const Pack3D = (() => {
 
     // Preserve natural aspect ratio so the symbol isn't squished
     const aspect = img.naturalWidth / img.naturalHeight;
-    const symH = _packTheme === 'ewaste' ? 0.88 : _packTheme === 'adpack' ? 1.00 : 0.72, symW = symH * aspect;
+    const symH = isCritterPhase() ? 0.80 : isFungiPhase() ? 0.85 : _packTheme === 'ewaste' ? 0.88 : _packTheme === 'adpack' ? 1.00 : isNaturePhase() ? 0.80 : 0.72, symW = symH * aspect;
     const geo = new THREE.PlaneGeometry(symW, symH);
     const mat = new THREE.MeshStandardMaterial({
       map: tex,
       transparent: true,
       alphaTest: 0.02,
       emissive: new THREE.Color(emissiveCol),
-      emissiveIntensity: 0.35,
-      roughness: 0.3,
-      metalness: 0.15,
+      emissiveIntensity: (isCritterPhase() || isFungiPhase()) ? 0.08 : 0.35,
+      roughness:         (isCritterPhase() || isFungiPhase()) ? 0.85 : 0.3,
+      metalness:         (isCritterPhase() || isFungiPhase()) ? 0.0  : 0.15,
     });
     symbolMesh = new THREE.Mesh(geo, mat);
     const symY = _packTheme === 'adpack' ? 0.28 : 0.12;
@@ -175,6 +282,42 @@ const Pack3D = (() => {
   function rebuildTextMesh() {
     if (textMesh) { packMesh.remove(textMesh); textMesh.geometry.dispose(); textMesh.material.map?.dispose(); textMesh.material.dispose(); textMesh = null; }
     if (_packTheme !== 'garbage' && _packTheme !== 'ewaste' && _packTheme !== 'adpack') return;
+
+    if (_packTheme === 'adpack' && isFungiPhase()) {
+      if (!_fungiTextImg) return;
+      const c = document.createElement('canvas'); c.width = 900; c.height = 320;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      const ih = 240;
+      const iw = Math.round(_fungiTextImg.naturalWidth * (ih / _fungiTextImg.naturalHeight));
+      const ix = Math.round((900 - iw) / 2), iy = Math.round((320 - ih) / 2);
+      // Fully-opaque black silhouette for thick outline
+      const tmp = document.createElement('canvas'); tmp.width = 900; tmp.height = 320;
+      const tCtx = tmp.getContext('2d'); tCtx.imageSmoothingEnabled = false;
+      tCtx.drawImage(_fungiTextImg, ix, iy, iw, ih);
+      tCtx.globalCompositeOperation = 'source-in';
+      tCtx.fillStyle = 'rgba(0,0,0,1)'; tCtx.fillRect(0, 0, 900, 320);
+      const r = 7;
+      for (let pass = 0; pass < 2; pass++)
+        for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+          if (dx*dx + dy*dy > r*r) continue; ctx.drawImage(tmp, dx, dy);
+        }
+      // Warm earthy-tinted text
+      const tinted = document.createElement('canvas'); tinted.width = 900; tinted.height = 320;
+      const tCtx2 = tinted.getContext('2d'); tCtx2.imageSmoothingEnabled = false;
+      tCtx2.drawImage(_fungiTextImg, ix, iy, iw, ih);
+      tCtx2.globalCompositeOperation = 'source-in';
+      tCtx2.fillStyle = '#d4a870'; tCtx2.fillRect(0, 0, 900, 320);
+      ctx.shadowColor = 'rgba(212,168,112,0.95)'; ctx.shadowBlur = 32; ctx.globalAlpha = 0.65;
+      ctx.drawImage(tinted, 0, 0); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      ctx.drawImage(tinted, 0, 0);
+      const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+      const geo = new THREE.PlaneGeometry(1.68, 0.60);
+      const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.02,
+        emissive: new THREE.Color(0xd4a870), emissiveIntensity: 0.25, roughness: 0.3, metalness: 0.1 });
+      textMesh = new THREE.Mesh(geo, mat);
+      textMesh.position.set(0, -0.92, 0.12); packMesh.add(textMesh);
+      return;
+    }
 
     if (_packTheme === 'adpack') {
       if (!_ritualTextImg) return;
@@ -239,6 +382,50 @@ const Pack3D = (() => {
       return;
     }
 
+    if (_packTheme === 'ewaste' && isCritterPhase()) {
+      if (!_critterTextImg) return;
+      const c = document.createElement('canvas'); c.width = 900; c.height = 320;
+      const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+      const ih = 240;
+      const iw = Math.round(_critterTextImg.naturalWidth * (ih / _critterTextImg.naturalHeight));
+      const ix = Math.round((900 - iw) / 2), iy = Math.round((320 - ih) / 2);
+
+      // Build fully-opaque black silhouette for the outline stamp
+      const tmp = document.createElement('canvas'); tmp.width = 900; tmp.height = 320;
+      const tCtx = tmp.getContext('2d'); tCtx.imageSmoothingEnabled = false;
+      tCtx.drawImage(_critterTextImg, ix, iy, iw, ih);
+      tCtx.globalCompositeOperation = 'source-in';
+      tCtx.fillStyle = 'rgba(0,0,0,1)'; tCtx.fillRect(0, 0, 900, 320);
+
+      // Thick outline: radius 7, two passes for density
+      const r = 7;
+      for (let pass = 0; pass < 2; pass++) {
+        for (let dx = -r; dx <= r; dx++) for (let dy = -r; dy <= r; dy++) {
+          if (dx*dx + dy*dy > r*r) continue; ctx.drawImage(tmp, dx, dy);
+        }
+      }
+
+      // Pastel-pink tinted text
+      const tinted = document.createElement('canvas'); tinted.width = 900; tinted.height = 320;
+      const tCtx2 = tinted.getContext('2d'); tCtx2.imageSmoothingEnabled = false;
+      tCtx2.drawImage(_critterTextImg, ix, iy, iw, ih);
+      tCtx2.globalCompositeOperation = 'source-in';
+      tCtx2.fillStyle = '#f0b8d0'; tCtx2.fillRect(0, 0, 900, 320);
+
+      // Glow pass then solid pass
+      ctx.shadowColor = 'rgba(240,184,208,0.95)'; ctx.shadowBlur = 32; ctx.globalAlpha = 0.65;
+      ctx.drawImage(tinted, 0, 0); ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+      ctx.drawImage(tinted, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+      const geo = new THREE.PlaneGeometry(1.68, 0.60);
+      const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.02,
+        emissive: new THREE.Color(0xf0b8d0), emissiveIntensity: 0.25, roughness: 0.3, metalness: 0.1 });
+      textMesh = new THREE.Mesh(geo, mat);
+      textMesh.position.set(0, -0.92, 0.12); packMesh.add(textMesh);
+      return;
+    }
+
     if (_packTheme === 'ewaste') {
       if (!_scourgeTextImg) return; // wait for image
 
@@ -298,6 +485,63 @@ const Pack3D = (() => {
       });
       textMesh = new THREE.Mesh(geo, mat);
       textMesh.position.set(0, -0.50, 0.12);
+      packMesh.add(textMesh);
+      return;
+    }
+
+    // ── GARBAGE PACK: nature phase (pristine) or flesh phase (corrupted) ──────
+    if (isNaturePhase()) {
+      if (!_natureTextImg) return;
+      const c = document.createElement('canvas');
+      c.width = 900; c.height = 320;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      const ih = 240;
+      const iw = Math.round(_natureTextImg.naturalWidth * (ih / _natureTextImg.naturalHeight));
+      const ix = Math.round((900 - iw) / 2);
+      const iy = Math.round((320 - ih) / 2);
+
+      // Dark outline — stamp silhouette in a radius loop (same technique as flesh/ewaste/ritual)
+      const tmp = document.createElement('canvas');
+      tmp.width = c.width; tmp.height = c.height;
+      const tCtx = tmp.getContext('2d');
+      tCtx.imageSmoothingEnabled = false;
+      tCtx.drawImage(_natureTextImg, ix, iy, iw, ih);
+      tCtx.globalCompositeOperation = 'source-in';
+      tCtx.fillStyle = 'rgba(0,0,0,0.88)';
+      tCtx.fillRect(0, 0, tmp.width, tmp.height);
+      const r = 4;
+      for (let dx = -r; dx <= r; dx++) {
+        for (let dy = -r; dy <= r; dy++) {
+          if (dx * dx + dy * dy > r * r) continue;
+          ctx.drawImage(tmp, dx, dy);
+        }
+      }
+
+      // Sky-blue tinted pass
+      const tinted = document.createElement('canvas');
+      tinted.width = c.width; tinted.height = c.height;
+      const tCtx2 = tinted.getContext('2d');
+      tCtx2.imageSmoothingEnabled = false;
+      tCtx2.drawImage(_natureTextImg, ix, iy, iw, ih);
+      tCtx2.globalCompositeOperation = 'source-in';
+      tCtx2.fillStyle = '#81d4fa';
+      tCtx2.fillRect(0, 0, tinted.width, tinted.height);
+
+      // Glow pass
+      ctx.shadowColor = 'rgba(129,212,250,0.95)'; ctx.shadowBlur = 28;
+      ctx.globalAlpha = 0.6;
+      ctx.drawImage(tinted, -6, -6);
+      ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+
+      // Crisp tinted pass
+      ctx.drawImage(tinted, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c); tex.needsUpdate = true;
+      const geo = new THREE.PlaneGeometry(1.68, 0.60);
+      const mat = new THREE.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.02, emissive: new THREE.Color(0x81d4fa), emissiveIntensity: 0.25, roughness: 0.3, metalness: 0.1 });
+      textMesh = new THREE.Mesh(geo, mat);
+      textMesh.position.set(0, -0.92, 0.12);
       packMesh.add(textMesh);
       return;
     }
@@ -372,6 +616,30 @@ const Pack3D = (() => {
     packMesh.add(textMesh);
   }
 
+  function buildLeafTexture() {
+    // Flower petal — teardrop shape in #ee8375 salmon-pink
+    const c = document.createElement('canvas');
+    c.width = 7; c.height = 6;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+    const p = (x, y, col) => { ctx.fillStyle = col; ctx.fillRect(x, y, 1, 1); };
+    // Tip
+    p(3, 0, '#ee8375');
+    // Upper body
+    p(2, 1, '#ee8375'); p(3, 1, '#f5a498'); p(4, 1, '#ee8375');
+    // Widest point
+    p(1, 2, '#d46555'); p(2, 2, '#ee8375'); p(3, 2, '#f9bbb0'); p(4, 2, '#ee8375'); p(5, 2, '#d46555');
+    p(1, 3, '#d46555'); p(2, 3, '#ee8375'); p(3, 3, '#f5a498'); p(4, 3, '#ee8375'); p(5, 3, '#d46555');
+    // Lower body, tapering
+    p(2, 4, '#ee8375'); p(3, 4, '#f5a498'); p(4, 4, '#ee8375');
+    p(2, 5, '#d46555'); p(3, 5, '#ee8375'); p(4, 5, '#d46555');
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
   function buildFlyTexture(wingFlap) {
     // Draw on a tiny canvas — NearestFilter keeps it blocky
     const c = document.createElement('canvas');
@@ -417,17 +685,30 @@ const Pack3D = (() => {
     flyMeshes = []; flyStates = [];
     if (_packTheme !== 'garbage') return;
 
-    const count = 6;
+    const leaf = isNaturePhase();
+    const count = leaf ? 18 : 6;
     for (let i = 0; i < count; i++) {
-      const geo = new THREE.PlaneGeometry(0.11, 0.11);
+      const size = leaf ? (0.10 + Math.random() * 0.08) : 0.11;
+      const geo = new THREE.PlaneGeometry(size, size);
       const mat = new THREE.MeshStandardMaterial({
-        map: buildFlyTexture(true),
+        map: leaf ? buildLeafTexture() : buildFlyTexture(true),
         transparent: true, alphaTest: 0.05,
-        emissive: new THREE.Color(0x331100), emissiveIntensity: 0.3,
+        emissive: new THREE.Color(leaf ? 0x662010 : 0x331100), emissiveIntensity: 0.3,
       });
       const mesh = new THREE.Mesh(geo, mat);
-      const bx = (Math.random() - 0.5) * 1.1;
-      const by = (Math.random() - 0.5) * 1.8;
+      // For petals: bias spawn positions toward the card edges
+      let bx, by;
+      if (leaf) {
+        // Spread across full card face with extra weight at left/right edges
+        const edgeBias = Math.random() < 0.55;
+        bx = edgeBias
+          ? (Math.random() < 0.5 ? -1 : 1) * (0.55 + Math.random() * 0.35)  // edge column
+          : (Math.random() - 0.5) * 1.6;                                       // scattered centre
+        by = (Math.random() - 0.5) * 2.4;
+      } else {
+        bx = (Math.random() - 0.5) * 1.1;
+        by = (Math.random() - 0.5) * 1.8;
+      }
       const bz = 0.10 + Math.random() * 0.08;
       mesh.position.set(bx, by, bz);
       packMesh.add(mesh);
@@ -435,12 +716,62 @@ const Pack3D = (() => {
       flyStates.push({
         bx, by, bz,
         angle:  Math.random() * Math.PI * 2,
-        speed:  0.6 + Math.random() * 1.0,
-        radius: 0.04 + Math.random() * 0.10,
+        speed:  leaf ? (0.12 + Math.random() * 0.22) : (0.6 + Math.random() * 1.0),
+        radius: leaf ? (0.12 + Math.random() * 0.22) : (0.04 + Math.random() * 0.10),
         phase:  Math.random() * Math.PI * 2,
         flapT:  Math.random() * Math.PI * 2,
+        isLeaf: leaf,
       });
     }
+  }
+
+  // ─── Fluffy cloud meshes (critter pack) ──────────────────────────────────
+
+  function buildFluffyCloudTexture(seed) {
+    const W = 32, H = 18;
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
+
+    let r = seed * 9301 + 49297;
+    const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+
+    // Three overlapping blobs: main body + two bumps on top
+    const blobs = [
+      { cx: 16, cy: 12, rx: 11, ry: 5.5 }, // main wide body
+      { cx: 10, cy:  8, rx:  6, ry: 5.0 }, // left bump
+      { cx: 19, cy:  7, rx:  6, ry: 5.0 }, // right bump
+      { cx: 14, cy:  5, rx:  4, ry: 3.5 }, // centre top knob
+    ];
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let minDist = Infinity;
+        for (const b of blobs) {
+          const dx = (x - b.cx) / b.rx, dy = (y - b.cy) / b.ry;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          if (d < minDist) minDist = d;
+        }
+        if (minDist > 1.0) continue;
+        // White core, soft wispy edges with faint pink tint
+        const base = minDist < 0.35 ? 0.82 + rnd() * 0.15
+                   : minDist < 0.65 ? 0.52 + rnd() * 0.25
+                   :                   0.12 + rnd() * 0.18;
+        const v  = 230 + Math.floor(rnd() * 25);
+        const rv = Math.min(255, v + 10);           // slight warm-pink push
+        const gv = Math.max(180, v - 15);
+        const bv = Math.min(255, v + 5);
+        ctx.fillStyle = `rgba(${rv},${gv},${bv},${base.toFixed(2)})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
   }
 
   // ─── Pestilence cloud meshes (scourge pack) ───────────────────────────────
@@ -492,9 +823,131 @@ const Pack3D = (() => {
     return tex;
   }
 
+  // ─── Spore puff texture (fungi pack) — tiny, misty, pixelly ──────────────
+  function buildSporeTexture(seed) {
+    const S = 5; // very small canvas → chunky pixels when scaled up
+    const c = document.createElement('canvas'); c.width = S; c.height = S;
+    const ctx = c.getContext('2d'); ctx.imageSmoothingEnabled = false;
+    let r = seed * 9301 + 49297;
+    const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+    const cx = (S - 1) / 2, cy = (S - 1) / 2;
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const dx = (x - cx) / (S * 0.45), dy = (y - cy) / (S * 0.45);
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 1.0) continue;
+        // Misty falloff — visible but soft at edges
+        const base = dist < 0.25 ? 0.78 + rnd() * 0.18
+                   : dist < 0.60 ? 0.42 + rnd() * 0.28
+                   :                0.08 + rnd() * 0.16;
+        // Pale warm spore colour — near-white with faint amber tint
+        const rv = Math.floor(220 + rnd() * 35);
+        const gv = Math.floor(195 + rnd() * 30);
+        const bv = Math.floor(150 + rnd() * 30);
+        ctx.fillStyle = `rgba(${rv},${gv},${bv},${base.toFixed(2)})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.magFilter = THREE.NearestFilter;
+    tex.minFilter = THREE.NearestFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
   function rebuildCloudMeshes() {
     cloudMeshes.forEach(m => { packMesh.remove(m); m.geometry.dispose(); m.material.map?.dispose(); m.material.dispose(); });
     cloudMeshes = []; cloudStates = [];
+
+    // ── Critter phase: fluffy clouds in front of + behind the pack ──────────
+    if (isCritterPhase()) {
+      const cfgs = [
+        // [bx,    by,    bz,    w,    baseOpacity]
+        // ── front clump A (top-right) ────────────────────────────────────────
+        [ 0.60,  1.10,  0.44,  1.60, 0.54 ],  // large anchor
+        [ 0.30,  0.95,  0.40,  0.90, 0.48 ],  // small neighbour
+        [ 0.85,  0.85,  0.42,  1.10, 0.45 ],  // offset right
+        // ── front clump B (left) ─────────────────────────────────────────────
+        [-0.65,  0.65,  0.46,  1.45, 0.52 ],  // large anchor
+        [-0.40,  0.50,  0.50,  0.70, 0.44 ],  // tucked close
+        [-0.80,  0.40,  0.43,  1.00, 0.46 ],  // spread left
+        // ── front stray (lower centre) ───────────────────────────────────────
+        [ 0.10,  0.05,  0.48,  1.80, 0.50 ],  // large, low
+        // ── back clump (top-left) ─────────────────────────────────────────────
+        [-0.45,  1.25, -0.24,  1.50, 0.38 ],  // large anchor
+        [-0.20,  1.10, -0.20,  0.85, 0.32 ],  // close neighbour
+        [ 0.55,  0.20, -0.28,  1.20, 0.34 ],  // back right stray
+        [-0.10,  0.30, -0.26,  1.70, 0.36 ],  // back wide
+      ];
+      cfgs.forEach(([bx, by, bz, w, baseOpacity], i) => {
+        const geo = new THREE.PlaneGeometry(w, w * (18 / 32));
+        const mat = new THREE.MeshBasicMaterial({
+          map: buildFluffyCloudTexture(i + 1),
+          transparent: true,
+          depthWrite: false,
+          opacity: baseOpacity,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(bx, by, bz);
+        packMesh.add(mesh);
+        cloudMeshes.push(mesh);
+        cloudStates.push({
+          bx, by, bz,
+          pulsePhase: Math.random() * Math.PI * 2,
+          pulseSpeed: 0.004 + Math.random() * 0.004,  // slower, lazier drift
+          driftX:     (Math.random() - 0.5) * 0.0012,
+          driftY:     (Math.random() - 0.5) * 0.0006,
+          offsetX: 0, offsetY: 0,
+          baseOpacity,
+        });
+      });
+      return;
+    }
+
+    // ── Fungi phase: tiny misty spores clustered around the pack ─────────────
+    if (isFungiPhase()) {
+      // Define cluster centres [cx, cy, cz, count, spread, baseZ spread]
+      const clusters = [
+        [ 0.55,  0.85,  0.30, 14, 0.20 ],  // front top-right
+        [-0.55,  0.60,  0.34, 12, 0.18 ],  // front top-left
+        [ 0.65, -0.20,  0.32, 12, 0.16 ],  // front right-mid
+        [-0.60, -0.30,  0.36, 10, 0.18 ],  // front left-mid
+        [ 0.10,  0.20,  0.38, 10, 0.14 ],  // front centre
+        [-0.40,  1.00, -0.18, 10, 0.16 ],  // back top-left
+        [ 0.50, -0.60, -0.22,  8, 0.14 ],  // back bottom-right
+      ];
+      let seed = 1;
+      clusters.forEach(([ccx, ccy, ccz, count, spread]) => {
+        for (let i = 0; i < count; i++) {
+          const bx = ccx + (Math.random() - 0.5) * spread * 2;
+          const by = ccy + (Math.random() - 0.5) * spread * 2;
+          const bz = ccz + (Math.random() - 0.5) * 0.08;
+          const w  = 0.07 + Math.random() * 0.10;  // tiny: 0.07–0.17
+          const baseOpacity = 0.55 + Math.random() * 0.30;
+          const geo = new THREE.PlaneGeometry(w, w);
+          const mat = new THREE.MeshStandardMaterial({
+            map: buildSporeTexture(seed++),
+            transparent: true, depthWrite: false, opacity: baseOpacity,
+            emissive: new THREE.Color(0xd4a870), emissiveIntensity: 0.6,
+            roughness: 1.0, metalness: 0.0,
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(bx, by, bz);
+          packMesh.add(mesh);
+          cloudMeshes.push(mesh);
+          cloudStates.push({
+            bx, by, bz,
+            pulsePhase: Math.random() * Math.PI * 2,
+            pulseSpeed: 0.003 + Math.random() * 0.004,
+            driftX: (Math.random() - 0.5) * 0.0008,
+            driftY: (Math.random() - 0.5) * 0.0010,
+            offsetX: 0, offsetY: 0, baseOpacity,
+          });
+        }
+      });
+      return;
+    }
+
     if (_packTheme !== 'ewaste') return;
 
     const configs = [
@@ -641,6 +1094,7 @@ const Pack3D = (() => {
       circleGroup = null;
     }
     if (_packTheme !== 'adpack') return;
+    if (isFungiPhase()) return;  // spores only during pre-horror; circle appears on corruption flip
 
     const canvas = buildRitualCircleTexture();
     const tex = new THREE.CanvasTexture(canvas);
@@ -873,7 +1327,7 @@ const Pack3D = (() => {
     if (pbTex) pbTex.needsUpdate = true;
     clearTimeout(pbTimer);
     pbTimer = null;
-    if (_packTheme !== 'garbage') return;
+    if (_packTheme !== 'garbage' || isNaturePhase()) return;
     function schedNext() {
       pbTimer = setTimeout(() => { spawnPackBloodDrip(); schedNext(); }, 5000 + Math.random() * 8000);
     }
@@ -918,38 +1372,51 @@ const Pack3D = (() => {
 
   // ─── Canvas textures ───────────────────────────────────────────────────────
 
-  // Theme: 'garbage' = flesh/red, 'ewaste' = scourge/green, 'adpack' = gold
+  // Theme: 'garbage' = flesh (starts pristine at low corruption, corrupts into flesh), 'ewaste' = scourge/green, 'adpack' = ritual/purple
   let _packTheme = 'garbage';
   function setPackTheme(theme) { _packTheme = theme; }
 
+  // Corruption helpers — garbage pack IS the nature pack at low corruption
+  //                     ewaste pack IS the critter pack at low corruption
+  function getCorruptionLevel() { return parseInt(document.body.dataset.corruption) || 0; }
+  function isNaturePhase()      { return _packTheme === 'garbage' && getCorruptionLevel() < 6; }
+  function isCritterPhase()     { return _packTheme === 'ewaste'  && getCorruptionLevel() < 6; }
+  function isFungiPhase()       { return _packTheme === 'adpack'  && getCorruptionLevel() < 6; }
+
   function themeCol(alpha = 1) {
+    if (_packTheme === 'garbage') return isNaturePhase() ? `rgba(129,212,250,${alpha})` : `rgba(232,92,26,${alpha})`;
     if (_packTheme === 'ewaste')  return `rgba(100,200,30,${alpha})`;
     if (_packTheme === 'adpack')  return `rgba(120,30,180,${alpha})`;
     return `rgba(232,92,26,${alpha})`;
   }
   function themeBg() {
-    if (_packTheme === 'ewaste') return '#0a140a';
-    if (_packTheme === 'adpack') return '#08020e';
+    if (_packTheme === 'garbage') return isNaturePhase() ? '#040c14' : '#0f160f';
+    if (_packTheme === 'ewaste')  return '#0a140a';
+    if (_packTheme === 'adpack')  return '#08020e';
     return '#0f160f';
   }
   function themeGrid() {
-    if (_packTheme === 'ewaste') return 'rgba(80,180,20,0.15)';
-    if (_packTheme === 'adpack') return 'rgba(120,30,180,0.18)';
+    if (_packTheme === 'garbage') return isNaturePhase() ? 'rgba(129,212,250,0.10)' : 'rgba(42,122,42,0.18)';
+    if (_packTheme === 'ewaste')  return 'rgba(80,180,20,0.15)';
+    if (_packTheme === 'adpack')  return 'rgba(120,30,180,0.18)';
     return 'rgba(42,122,42,0.18)';
   }
   function themeHex() {
-    if (_packTheme === 'ewaste') return '#8bc820';
-    if (_packTheme === 'adpack') return '#8030c0';
+    if (_packTheme === 'garbage') return isNaturePhase() ? '#81d4fa' : '#e85c1a';
+    if (_packTheme === 'ewaste')  return '#8bc820';
+    if (_packTheme === 'adpack')  return '#8030c0';
     return '#e85c1a';
   }
   function themeGlow() {
-    if (_packTheme === 'ewaste') return 'rgba(100,200,20,0.6)';
-    if (_packTheme === 'adpack') return 'rgba(120,30,180,0.85)';
+    if (_packTheme === 'garbage') return isNaturePhase() ? 'rgba(129,212,250,0.65)' : 'rgba(232,92,26,0.6)';
+    if (_packTheme === 'ewaste')  return 'rgba(100,200,20,0.6)';
+    if (_packTheme === 'adpack')  return 'rgba(120,30,180,0.85)';
     return 'rgba(232,92,26,0.6)';
   }
   function themeAccent() {
-    if (_packTheme === 'ewaste') return 'rgba(140,220,40,0.5)';
-    if (_packTheme === 'adpack') return 'rgba(120,30,180,0.7)';
+    if (_packTheme === 'garbage') return isNaturePhase() ? 'rgba(129,212,250,0.45)' : 'rgba(58,170,58,0.6)';
+    if (_packTheme === 'ewaste')  return 'rgba(140,220,40,0.5)';
+    if (_packTheme === 'adpack')  return 'rgba(120,30,180,0.7)';
     return 'rgba(58,170,58,0.6)';
   }
 
@@ -1022,31 +1489,41 @@ const Pack3D = (() => {
     // ── BASE BACKGROUND ───────────────────────────────────────────────────────
 
     if (_packTheme === 'garbage') {
-      // Flesh pack art base
-      if (_fleshPackImg) {
-        ctx.drawImage(_fleshPackImg, 0, 0, W, H);
+      if (isNaturePhase()) {
+        // Pristine nature art
+        if (_naturePackImg) { ctx.drawImage(_naturePackImg, 0, 0, W, H); }
+        else { ctx.fillStyle = '#040c14'; ctx.fillRect(0, 0, W, H); }
       } else {
-        ctx.fillStyle = '#0d0505';
-        ctx.fillRect(0, 0, W, H);
+        // Corrupted flesh art
+        if (_fleshPackImg) { ctx.drawImage(_fleshPackImg, 0, 0, W, H); }
+        else { ctx.fillStyle = '#0d0505'; ctx.fillRect(0, 0, W, H); }
+        // Blood-red prismatic sheen over the art
+        drawPrismatic(ctx, W, H, 0.06, 0);
       }
-      // Blood-red prismatic sheen over the art
-      drawPrismatic(ctx, W, H, 0.06, 0);
 
     } else if (_packTheme === 'ewaste') {
-      // Scourge bg art
-      if (_scourgePackImg) {
-        ctx.drawImage(_scourgePackImg, 0, 0, W, H);
+      if (isCritterPhase()) {
+        if (_critterPackImg) {
+          ctx.drawImage(_critterPackImg, 0, 0, W, H);
+          // Tamp down neon brightness from the PNG so scene lights don't oversaturate it
+          ctx.fillStyle = 'rgba(0,0,0,0.28)';
+          ctx.fillRect(0, 0, W, H);
+        }
+        else { ctx.fillStyle = '#120a10'; ctx.fillRect(0, 0, W, H); }
       } else {
-        ctx.fillStyle = '#0a140a';
-        ctx.fillRect(0, 0, W, H);
+        if (_scourgePackImg) { ctx.drawImage(_scourgePackImg, 0, 0, W, H); }
+        else { ctx.fillStyle = '#0a140a'; ctx.fillRect(0, 0, W, H); }
       }
 
     } else if (_packTheme === 'adpack') {
-      if (_ritualPackImg) {
-        ctx.drawImage(_ritualPackImg, 0, 0, W, H);
+      if (isFungiPhase()) {
+        if (_fungiPackImg) {
+          ctx.drawImage(_fungiPackImg, 0, 0, W, H);
+          ctx.fillStyle = 'rgba(0,0,0,0.18)'; ctx.fillRect(0, 0, W, H);
+        } else { ctx.fillStyle = '#0e0d08'; ctx.fillRect(0, 0, W, H); }
       } else {
-        ctx.fillStyle = '#12100a';
-        ctx.fillRect(0, 0, W, H);
+        if (_ritualPackImg) { ctx.drawImage(_ritualPackImg, 0, 0, W, H); }
+        else { ctx.fillStyle = '#12100a'; ctx.fillRect(0, 0, W, H); }
       }
     }
 
@@ -1058,15 +1535,28 @@ const Pack3D = (() => {
 
     // ── OUTER GLOW BORDER ─────────────────────────────────────────────────────
     if (_packTheme === 'adpack') {
-      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8030c0', 'rgba(120,30,180,0.8)');
-      ctx.strokeStyle = 'rgba(120,30,180,0.3)'; ctx.lineWidth = 1;
-      ctx.strokeRect(10, 10, W-20, H-20);
+      if (isFungiPhase()) {
+        // fungi-pack.png has its own border baked in — skip extra glow border
+      } else {
+        drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8030c0', 'rgba(120,30,180,0.8)');
+        ctx.strokeStyle = 'rgba(120,30,180,0.3)'; ctx.lineWidth = 1;
+        ctx.strokeRect(10, 10, W-20, H-20);
+      }
 
     } else if (_packTheme === 'ewaste') {
-      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8bc820', 'rgba(100,200,20,0.8)');
-      ctx.strokeStyle = 'rgba(140,220,40,0.3)'; ctx.lineWidth = 1;
+      if (isCritterPhase()) {
+        // critter-pack.png has its own border baked in — skip extra glow border
+      } else {
+        drawGlowBorder(ctx, 4, 4, W-8, H-8, '#8bc820', 'rgba(100,200,20,0.8)');
+        ctx.strokeStyle = 'rgba(140,220,40,0.3)'; ctx.lineWidth = 1;
+        ctx.strokeRect(10, 10, W-20, H-20);
+        drawPrismatic(ctx, W, H, 0.05, 100);
+      }
+
+    } else if (isNaturePhase()) {
+      drawGlowBorder(ctx, 4, 4, W-8, H-8, '#81d4fa', 'rgba(129,212,250,0.8)');
+      ctx.strokeStyle = 'rgba(129,212,250,0.25)'; ctx.lineWidth = 1;
       ctx.strokeRect(10, 10, W-20, H-20);
-      drawPrismatic(ctx, W, H, 0.05, 100);
 
     } else {
       drawGlowBorder(ctx, 4, 4, W-8, H-8, '#cc1515', 'rgba(200,20,20,0.7)');
@@ -1076,7 +1566,7 @@ const Pack3D = (() => {
 
     // ── CORNER BRACKETS ───────────────────────────────────────────────────────
     const bPad = 16, bSize = 20, bW = 3;
-    const bracketCol = _packTheme === 'adpack' ? '#8030c0' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
+    const bracketCol = isNaturePhase() ? '#81d4fa' : isCritterPhase() ? '#f0b8d0' : isFungiPhase() ? '#d4a870' : _packTheme === 'adpack' ? '#8030c0' : _packTheme === 'ewaste' ? '#8bc820' : '#cc1515';
     ctx.strokeStyle = bracketCol; ctx.lineWidth = bW;
     ctx.shadowColor = bracketCol; ctx.shadowBlur = 8;
     [[bPad,bPad,1,1],[W-bPad,bPad,-1,1],[bPad,H-bPad,1,-1],[W-bPad,H-bPad,-1,-1]].forEach(([x,y,sx,sy]) => {
@@ -1237,12 +1727,18 @@ const Pack3D = (() => {
     camera = new THREE.PerspectiveCamera(35, W / H, 0.1, 100);
     camera.position.set(0, 0, 5.5);
 
-    const ambient = new THREE.AmbientLight(0x1a2a1a, 0.8);
+    const ambient = new THREE.AmbientLight(isNaturePhase() ? 0x1a2a3a : 0x1a2a1a, 0.8);
     scene.add(ambient);
 
     rimLight = new THREE.PointLight(0xe85c1a, 2.5, 10);
     rimLight.position.set(0, -2.5, 1.5);
     scene.add(rimLight);
+    // Set correct rim colour immediately based on current theme/phase
+    if (isNaturePhase())       { rimLight.color.setStyle('#81d4fa'); rimLight.intensity = 2.2; }
+    else if (isCritterPhase()) { rimLight.color.setStyle('#f0b8d0'); rimLight.intensity = 0.4; }
+    else if (isFungiPhase())   { rimLight.color.setStyle('#d4a870'); rimLight.intensity = 1.8; }
+    else if (_packTheme === 'adpack') { rimLight.color.setStyle('#8030c0'); rimLight.intensity = 3.1; }
+    else if (_packTheme === 'ewaste') { rimLight.color.setStyle('#8bc820'); rimLight.intensity = 3.0; }
     // Second fill light for premium sheen
     const fillLight = new THREE.PointLight(0xffffff, 0.8, 8);
     fillLight.position.set(0, 3, 2);
@@ -1344,21 +1840,26 @@ const Pack3D = (() => {
       textMesh.position.z = 0.12 + Math.sin(idleT * 0.9 + 0.3) * 0.012;
     }
 
-    // Fly swarm animation
+    // Fly / leaf swarm animation
     flyMeshes.forEach((m, i) => {
       const s = flyStates[i];
       s.angle += s.speed * 0.02;
-      s.flapT += 0.18;
+      s.flapT += s.isLeaf ? 0.03 : 0.18;
       m.position.x = s.bx + Math.cos(s.angle) * s.radius;
       m.position.y = s.by + Math.sin(s.angle * 1.3 + s.phase) * s.radius * 0.7;
       m.position.z = s.bz + Math.sin(s.angle * 0.6 + s.phase) * 0.02;
-      // Wing flap — rebuild texture at low frequency to avoid GPU thrash
-      if (Math.floor(s.flapT) % 4 === 0 && Math.floor(s.flapT) !== m._lastFlap) {
-        m._lastFlap = Math.floor(s.flapT);
-        const prev = m.material.map;
-        m.material.map = buildFlyTexture(Math.floor(s.flapT / 2) % 2 === 0);
-        m.material.needsUpdate = true;
-        if (prev) prev.dispose();
+      if (s.isLeaf) {
+        // Leaves gently rock back and forth
+        m.rotation.z = Math.sin(s.flapT + s.phase) * 0.45;
+      } else {
+        // Wing flap — rebuild texture at low frequency to avoid GPU thrash
+        if (Math.floor(s.flapT) % 4 === 0 && Math.floor(s.flapT) !== m._lastFlap) {
+          m._lastFlap = Math.floor(s.flapT);
+          const prev = m.material.map;
+          m.material.map = buildFlyTexture(Math.floor(s.flapT / 2) % 2 === 0);
+          m.material.needsUpdate = true;
+          if (prev) prev.dispose();
+        }
       }
     });
 
@@ -1386,8 +1887,12 @@ const Pack3D = (() => {
     updateParticles();
     updatePackBlood();
 
-    const baseIntensity = _packTheme === 'adpack' ? 3.1 : _packTheme === 'ewaste' ? 2.8 : 2.5;
-    rimLight.intensity = baseIntensity + Math.sin(idleT * 1.2) * (baseIntensity * 0.15);
+    if (glitchActive) {
+      tickGlitch(); // overrides rim light during transition
+    } else {
+      const baseIntensity = _packTheme === 'adpack' ? 3.1 : _packTheme === 'ewaste' ? 2.8 : 2.5;
+      rimLight.intensity = baseIntensity + Math.sin(idleT * 1.2) * (baseIntensity * 0.15);
+    }
 
     if (packMesh) {
       packMesh.scale.set(1, 1, 1);
@@ -1471,9 +1976,18 @@ const Pack3D = (() => {
     });
     // Update rim light colour
     if (rimLight) {
-      if (_packTheme === 'adpack') {
+      if (_packTheme === 'garbage' && isNaturePhase()) {
+        rimLight.color.setStyle('#81d4fa');
+        rimLight.intensity = 2.2;
+      } else if (_packTheme === 'adpack' && isFungiPhase()) {
+        rimLight.color.setStyle('#d4a870');
+        rimLight.intensity = 1.8;
+      } else if (_packTheme === 'adpack') {
         rimLight.color.setStyle('#8030c0');
         rimLight.intensity = 3.1;
+      } else if (_packTheme === 'ewaste' && isCritterPhase()) {
+        rimLight.color.setStyle('#f0b8d0');
+        rimLight.intensity = 1.4;
       } else if (_packTheme === 'ewaste') {
         rimLight.color.setStyle('#8bc820');
         rimLight.intensity = 3.0;
@@ -1507,5 +2021,195 @@ const Pack3D = (() => {
     renderer?.dispose();
   }
 
-  return { init, throwPack, resetPack, destroy, setPackTheme, get isReady() { return isReady; } };
+  // ─── Glitch transition helpers ─────────────────────────────────────────────
+  // Full-screen pixel-grid canvas — same pixelated rendering technique as bloodDrip.js
+  const GLITCH_PIXEL = 5; // each grid unit = 5×5 screen pixels
+
+  function createGlitchOverlay() {
+    if (glitchOverlay) glitchOverlay.remove();
+    const GW = Math.ceil(window.innerWidth  / GLITCH_PIXEL);
+    const GH = Math.ceil(window.innerHeight / GLITCH_PIXEL);
+    glitchOverlay = document.createElement('canvas');
+    glitchOverlay.width  = GW;
+    glitchOverlay.height = GH;
+    Object.assign(glitchOverlay.style, {
+      position: 'fixed', top: '0', left: '0',
+      width: '100%', height: '100%',
+      pointerEvents: 'none',
+      imageRendering: 'pixelated',
+      zIndex: '300', // above everything including blood drip (z:150)
+    });
+    document.body.appendChild(glitchOverlay);
+    glitchOvCtx = glitchOverlay.getContext('2d');
+    glitchOvCtx.imageSmoothingEnabled = false;
+  }
+
+  function drawGlitchFrame(progress, intensity) {
+    if (!glitchOvCtx || !glitchOverlay) return;
+    const GW  = glitchOverlay.width;
+    const GH  = glitchOverlay.height;
+    const ctx = glitchOvCtx;
+    ctx.clearRect(0, 0, GW, GH);
+    const rng = Math.random;
+
+    // Pixel-art palette — reds only
+    const PALETTE = [
+      [60,  0,   0  ], // deep red
+      [110, 5,   5  ], // dark red
+      [160, 10,  10 ], // mid red
+      [210, 18,  18 ], // red
+      [240, 30,  30 ], // bright red
+      [210, 18,  18 ], // red (weighted heavier)
+      [160, 10,  10 ], // mid red (weighted heavier)
+    ];
+
+    function pickCol() {
+      return PALETTE[Math.floor(rng() * PALETTE.length)];
+    }
+    function fill(col, a) {
+      ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${a ?? 1})`;
+    }
+
+    // 1. Full-width horizontal scan strips — the core pixel-glitch look
+    //    These cross the entire viewport, corrupting the whole UI
+    const scanCount = Math.floor(1 + intensity * 10);
+    for (let i = 0; i < scanCount; i++) {
+      const gy = Math.floor(rng() * GH);
+      const gh = 1 + Math.floor(rng() * 3); // 1–3 grid rows
+      fill(pickCol(), 0.55 + rng() * 0.45);
+      ctx.fillRect(0, gy, GW, gh);
+    }
+
+    // 2. Displaced strip segments — same row, but offset horizontally,
+    //    simulating screen-tear without needing to read back pixels
+    const dispCount = Math.floor(intensity * 7);
+    for (let i = 0; i < dispCount; i++) {
+      const gy   = Math.floor(rng() * GH);
+      const gh   = 1 + Math.floor(rng() * 2);
+      const gOff = Math.round((rng() - 0.5) * intensity * GW * 0.28);
+      fill(pickCol(), 0.7 + rng() * 0.3);
+      // Fill the "gap" left by the displaced region
+      if (gOff > 0) ctx.fillRect(0, gy, gOff, gh);
+      else           ctx.fillRect(GW + gOff, gy, -gOff, gh);
+    }
+
+    // 3. Scatter blocks — solid pixel rectangles, larger = more blocky/readable
+    const blockCount = Math.floor(intensity * 18);
+    for (let i = 0; i < blockCount; i++) {
+      fill(pickCol(), 0.65 + rng() * 0.35);
+      ctx.fillRect(
+        Math.floor(rng() * GW),
+        Math.floor(rng() * GH),
+        2 + Math.floor(rng() * 14),
+        1 + Math.floor(rng() * 3)
+      );
+    }
+
+    // 4. Pixel static — single-pixel noise scattered across the whole screen
+    const staticCount = Math.floor(intensity * 55);
+    for (let i = 0; i < staticCount; i++) {
+      fill(pickCol(), 0.85 + rng() * 0.15);
+      ctx.fillRect(Math.floor(rng() * GW), Math.floor(rng() * GH), 1, 1);
+    }
+
+    // 5. Dither corruption patch — checkerboard of two palette colours
+    //    Appears when intensity is high; very "8-bit error" feeling
+    if (intensity > 0.42 && rng() < intensity * 0.40) {
+      const dx = Math.floor(rng() * (GW - 28));
+      const dy = Math.floor(rng() * (GH - 12));
+      const dw = 10 + Math.floor(rng() * 22);
+      const dh =  3 + Math.floor(rng() * 6);
+      const colA = pickCol();
+      const colB = pickCol();
+      for (let y = dy; y < dy + dh; y++) {
+        for (let x = dx; x < dx + dw; x++) {
+          fill((x + y) % 2 === 0 ? colA : colB, 1);
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+
+    // 6. Large flash block — occasional big opaque rectangle (screen blowout)
+    if (rng() < intensity * 0.10) {
+      const fw = Math.floor(GW * (0.25 + rng() * 0.55));
+      const fh = Math.floor(GH * (0.04 + rng() * 0.14));
+      fill(rng() < 0.45 ? [0,0,0] : [255,255,255], 0.22 + rng() * 0.32);
+      ctx.fillRect(Math.floor(rng() * (GW - fw)), Math.floor(rng() * (GH - fh)), fw, fh);
+    }
+  }
+
+  function tickGlitch() {
+    if (!glitchActive || !packMesh) return;
+    const elapsed  = Date.now() - glitchStart;
+    const progress = Math.min(elapsed / GLITCH_DUR, 1.0);
+
+    // Intensity envelope: ramp up → plateau → fade out
+    const envelope =
+      progress < 0.35 ? progress / 0.35 :
+      progress < 0.70 ? 1.0 :
+      1.0 - (progress - 0.70) / 0.30;
+    const intensity = Math.max(0, envelope * (0.75 + Math.sin(elapsed * 0.025) * 0.25));
+
+    // 3D pack shake — integer-ish pixel nudge matching the grid aesthetic
+    if (!isThrowing) {
+      packMesh.position.x += (Math.random() - 0.5) * intensity * 0.11;
+      packMesh.position.y += (Math.random() - 0.5) * intensity * 0.06;
+    }
+
+    // Rim light flickers blue→red as corruption takes hold
+    if (rimLight) {
+      const snapRed = Math.random() < progress * 0.78;
+      rimLight.color.setStyle(snapRed ? '#e85c1a' : '#81d4fa');
+      rimLight.intensity = 1.8 + Math.random() * intensity * 3.2;
+    }
+
+    // Draw full-screen pixel glitch overlay
+    drawGlitchFrame(progress, intensity);
+
+    // At ~45%: snap face/symbol/text to flesh, swap petals→flies
+    if (!glitchFlipDone && progress >= 0.45) {
+      glitchFlipDone = true;
+      onCorruptionUpdate();  // isNaturePhase() is false → builds flesh
+      rebuildFlyMeshes();    // petals → flies
+    }
+
+    // End of transition — clean up everything
+    if (progress >= 1.0) {
+      glitchActive = false;
+      if (glitchOverlay) { glitchOverlay.remove(); glitchOverlay = null; glitchOvCtx = null; }
+      if (rimLight) { rimLight.color.setStyle('#e85c1a'); rimLight.intensity = 2.5; }
+      document.body.classList.remove('glitch-active');
+    }
+  }
+
+  function startGlitchTransition() {
+    if (glitchActive) return;
+    glitchActive   = true;
+    glitchStart    = Date.now();
+    glitchFlipDone = false;
+    createGlitchOverlay();
+    document.body.classList.add('glitch-active');
+  }
+
+  // Called by main.js whenever packsOpened changes — redraws active pack with new corruption level
+  function onCorruptionUpdate() {
+    if (!packMesh) return;
+    if (_packTheme !== 'garbage' && _packTheme !== 'adpack') return;
+    const prev = packMesh.material[4]?.map;
+    const next = buildFaceTexture();
+    if (packMesh.material[4]) { packMesh.material[4].map = next; packMesh.material[4].needsUpdate = true; }
+    if (prev) prev.dispose();
+    rebuildSymbolMesh();
+    rebuildTextMesh();
+    rebuildCloudMeshes();
+    rebuildCircleMesh();
+    if (rimLight) {
+      if (isNaturePhase())       { rimLight.color.setStyle('#81d4fa'); rimLight.intensity = 2.2; }
+      else if (isFungiPhase())   { rimLight.color.setStyle('#d4a870'); rimLight.intensity = 1.8; }
+      else if (_packTheme === 'adpack') { rimLight.color.setStyle('#8030c0'); rimLight.intensity = 3.1; }
+      else                       { rimLight.color.setStyle('#e85c1a'); rimLight.intensity = 2.5; }
+    }
+  }
+
+  return { init, throwPack, resetPack, destroy, setPackTheme, onCorruptionUpdate, startGlitchTransition, get isReady() { return isReady; } };
 })();

@@ -1,9 +1,20 @@
 const WS_URL = 'wss://unitywebapp.onrender.com';
 
-// ─── Card pool ────────────────────────────────────────────────────────────────
+// ─── Card pools ───────────────────────────────────────────────────────────────
 
-// ─── FLESH pack ───────────────────────────────────────────────────────────────
-const GARBAGE_CARDS = [
+// ─── NATURE (garbage / pristine) ──────────────────────────────────────────────
+const NATURE_CARDS = [
+  { id:'small_cube', name:'Fallen Leaf',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Still green. Give it time.' },
+  { id:'large_cube', name:'Wildflowers',     rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Nobody planted them. That\'s the point.' },
+  { id:'sphere',     name:'Flower Bush',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'In bloom. Spreading beyond the path.' },
+  { id:'triangle',   name:'Ancient Yew',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It watched the forest grow. It will watch it fall.' },
+  { id:'octagon',    name:'The Old Grove',   rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Before the map. Before the name.' },
+  { id:'triad',      name:'Pollen Drift',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Carried by nothing. Reaching everything.' },
+  { id:'star',       name:'Treant',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Ancient. Ambulatory. Aware.' },
+];
+
+// ─── FLESH (garbage / horror) ─────────────────────────────────────────────────
+const FLESH_CARDS = [
   { id:'small_cube', name:'Unidentified Tissue', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
   { id:'large_cube', name:'Pale Growth',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Found attached to nothing. Still warm.' },
   { id:'sphere',     name:'Wet Membrane',        rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Permeable. Spreading.' },
@@ -13,32 +24,125 @@ const GARBAGE_CARDS = [
   { id:'star',       name:'The Flesh',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was here before you. It will be here after.' },
 ];
 
-// ─── E-WASTE pack ──────────────────────────────────────────────────────────────
-const EWASTE_CARDS = [
-  { id:'small_cube', name:'Tangled Cable',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'USB-A. Obsolete. Non-recyclable.' },
-  { id:'large_cube', name:'Dead Battery',    rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Lithium. Do not puncture. Do not discard.' },
-  { id:'sphere',     name:'Cracked Screen',  rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Glass and indium. Separation cost: infinite.' },
-  { id:'triangle',   name:'Old iPod',        rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'1000 songs. 0 second-lives. Still here.' },
-  { id:'octagon',    name:'Laptop Shell',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Magnesium alloy. The guts are somewhere else.' },
-  { id:'triad',      name:'Circuit Board',   rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Lead solder. Gold traces. Worth nothing now.' },
-  { id:'star',       name:'RAM Stick',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'32GB DDR5. Rare earth metals. Permanent.' },
+// ─── CRITTER (ewaste / pristine) ──────────────────────────────────────────────
+const CRITTER_CARDS = [
+  { id:'small_cube', name:'Sheep',            rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
+  { id:'large_cube', name:'Duck',             rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
+  { id:'sphere',     name:'Flock of Birds',   rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Moving together. No leader. No mistake.' },
+  { id:'triangle',   name:'Red Fox',          rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
+  { id:'octagon',    name:'Great Stag',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The forest holds its breath.' },
+  { id:'triad',      name:'The Migration',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Thousands. No map. Right on time.' },
+  { id:'star',       name:'The Herd',         rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Before the fence. Before the road.' },
 ];
 
-// ─── AD PACK cards ────────────────────────────────────────────────────────────
-const ADPACK_CARDS = [
-  { id:'small_cube', name:'Flyer',              rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Already on the ground before you noticed.' },
-  { id:'large_cube', name:'Pop-Up Ad',          rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Appeared without warning. Cannot be closed.' },
-  { id:'sphere',     name:'Digital Billboard',  rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Never turns off. Never looks away.' },
-  { id:'triangle',   name:'Loyalty Card',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'You signed up for this.' },
-  { id:'octagon',    name:'Sponsored Content',  rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'You cannot tell the difference anymore.' },
-  { id:'triad',      name:'Terms & Conditions', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'94 pages. Updated weekly. You agreed.' },
-  { id:'star',       name:'Data Centre',        rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'The water remembers.' },
+// ─── SCOURGE (ewaste / horror) ────────────────────────────────────────────────
+const SCOURGE_CARDS = [
+  { id:'small_cube', name:'Ticks',               rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Eight legs. No conscience. Already feeding.' },
+  { id:'large_cube', name:'Infested Mice',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'The fleas are the point. The mice are just transport.' },
+  { id:'sphere',     name:'Necrotic Mass',       rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Growing. Always growing.' },
+  { id:'triangle',   name:'The Black Plague',    rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Arrived by ship. Left by reputation.' },
+  { id:'octagon',    name:'Host Event',          rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The distinction between parasite and host is administrative.' },
+  { id:'triad',      name:'Propagation Cluster', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three vectors. Simultaneous. Uncontained.' },
+  { id:'star',       name:'The Bloom',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It does not spread. It reveals.' },
+];
+
+// ─── FUNGI (adpack / pristine) ────────────────────────────────────────────────
+const FUNGI_CARDS = [
+  { id:'small_cube', name:'White Mushroom',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Overnight. Unannounced.' },
+  { id:'large_cube', name:'Fairy Cap',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Do not eat. Do not touch.' },
+  { id:'sphere',     name:'Chanterelle',      rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'The forest floor gives selectively.' },
+  { id:'triangle',   name:'Giant Puffball',   rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Ten trillion spores. Patient.' },
+  { id:'octagon',    name:'Death Cap',        rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Beautiful. Absolute.' },
+  { id:'triad',      name:'Spore Release',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Already airborne. Already everywhere.' },
+  { id:'star',       name:'The Network',      rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It remembered this forest before the trees did.' },
+];
+
+// ─── RITUAL (adpack / horror) ─────────────────────────────────────────────────
+const RITUAL_CARDS = [
+  { id:'small_cube', name:'Sheep Sacrifice',  rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Offered willingly. Or so they believed.' },
+  { id:'large_cube', name:'The Goat',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'The old compact. Blood for favour.' },
+  { id:'sphere',     name:'The Pyre',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'What the circle demands.' },
+  { id:'triangle',   name:'The Offering',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Named. Then unnamed.' },
+  { id:'octagon',    name:'The Summoning',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Something answered.' },
+  { id:'triad',      name:'Mass Rite',        rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'They came at midnight. None returned alone.' },
+  { id:'star',       name:'The Entity',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was the ritual all along.' },
 ];
 
 // ─── Active pack type ──────────────────────────────────────────────────────────
 let activePackType = 'garbage';
-let CARDS = GARBAGE_CARDS;
 const PACK_TYPE_ORDER = ['garbage', 'ewaste', 'adpack'];
+
+// Returns the correct card pool for the current pack type + corruption phase
+function getActiveCardPool() {
+  const isHorror = parseInt(document.body.dataset.corruption || '0') >= 6;
+  if (activePackType === 'garbage') return isHorror ? FLESH_CARDS   : NATURE_CARDS;
+  if (activePackType === 'ewaste')  return isHorror ? SCOURGE_CARDS : CRITTER_CARDS;
+  if (activePackType === 'adpack')  return isHorror ? RITUAL_CARDS  : FUNGI_CARDS;
+  return NATURE_CARDS;
+}
+
+// ─── Corruption / progression ──────────────────────────────────────────────────
+let packsOpened = 0;
+const CORRUPTION_MAX = 9;
+
+function updateCorruption() {
+  const prevLevel = parseInt(document.body.dataset.corruption || '0');
+  const level     = Math.min(packsOpened, CORRUPTION_MAX);
+  document.body.dataset.corruption = level;
+  const isPristine = level < 6;
+  // Toggle pristine-phase class (drives green bottom-row CSS)
+  document.body.classList.toggle('pristine-phase', isPristine);
+  // Update pack tab labels/icons to reflect current phase
+  updateFirstPackTab(isPristine);
+  updateSecondPackTab(isPristine);
+  updateThirdPackTab(isPristine);
+  // On the nature→flesh crossing, run glitch transition (handles onCorruptionUpdate internally)
+  if (typeof Pack3D !== 'undefined') {
+    if (prevLevel < 6 && level >= 6) {
+      Pack3D.startGlitchTransition();
+    } else {
+      Pack3D.onCorruptionUpdate();
+    }
+  }
+  // Notify Unity of the new pack type (phase crossing may change nature↔flesh etc.)
+  sendPackType();
+}
+
+function updateFirstPackTab(isPristine) {
+  const btn = document.getElementById('packTypeGarbage');
+  if (!btn) return;
+  const icon = btn.querySelector('img');
+  const label = btn.querySelector('.pack-type-label');
+  if (icon) icon.src = isPristine ? 'assets/nature-symbol.png' : 'assets/flesh-symbol.png';
+  if (label) label.textContent = isPristine ? 'NATURE' : 'FLESH';
+}
+
+function updateThirdPackTab(isFungi) {
+  const btn = document.getElementById('packTypeAdpack');
+  if (!btn) return;
+  const icon = btn.querySelector('img');
+  const label = btn.querySelector('.pack-type-label');
+  if (icon) icon.src = isFungi ? 'assets/fungi-symbol.png' : 'assets/ritual-symbol.png';
+  if (label) label.textContent = isFungi ? 'FUNGI' : 'RITUAL';
+  btn.classList.toggle('fungi-mode', isFungi);
+  // Keep ritual-active + adpack-active in sync if adpack is currently selected
+  if (btn.classList.contains('active')) {
+    document.body.classList.toggle('ritual-active', !isFungi);
+    const sp = document.getElementById('screen-pack');
+    if (sp) sp.classList.toggle('adpack-active', !isFungi);
+  }
+}
+
+function updateSecondPackTab(isCritter) {
+  const btn = document.getElementById('packTypeEwaste');
+  if (!btn) return;
+  const icon = btn.querySelector('img');
+  const label = btn.querySelector('.pack-type-label');
+  if (icon) icon.src = isCritter ? 'assets/critter-symbol.png' : 'assets/scourge-symbol.png';
+  if (label) label.textContent = isCritter ? 'CRITTER' : 'SCOURGE';
+  btn.classList.toggle('critter-mode', isCritter);
+}
+
 let isPackTypeSwitching = false;
 
 function updatePackCarousel(type) {
@@ -103,23 +207,17 @@ function setPackType(type) {
   const prevType = activePackType;
   activePackType = type;
   window.activePackType = type;
-  if (type === 'adpack') {
-    CARDS = ADPACK_CARDS;
-  } else if (type === 'ewaste') {
-    CARDS = EWASTE_CARDS;
-  } else {
-    CARDS = GARBAGE_CARDS;
-  }
   document.getElementById('packTypeGarbage')?.classList.toggle('active', type === 'garbage');
   document.getElementById('packTypeEwaste')?.classList.toggle('active',  type === 'ewaste');
   document.getElementById('packTypeAdpack')?.classList.toggle('active',  type === 'adpack');
+  const corruption = parseInt(document.body.dataset.corruption) || 0;
   document.body.classList.toggle('scourge-active', type === 'ewaste');
-  document.body.classList.toggle('ritual-active',  type === 'adpack');
+  document.body.classList.toggle('ritual-active',  type === 'adpack' && corruption >= 6);
   updatePackCarousel(type);
   animatePackTypeSwitch(prevType, type);
   // Toggle adpack glow on screen-pack
   const sp = document.getElementById('screen-pack');
-  if (sp) sp.classList.toggle('adpack-active', type === 'adpack');
+  if (sp) sp.classList.toggle('adpack-active', type === 'adpack' && (parseInt(document.body.dataset.corruption) || 0) >= 6);
   const stage = document.getElementById('packCarouselStage');
   if (stage) {
     stage.classList.remove('adpack-shimmer-burst');
@@ -128,11 +226,14 @@ function setPackType(type) {
       stage.classList.add('adpack-shimmer-burst');
     }
   }
+  sendPackType();
   showScreen('screen-pack');
   setTickerState('idle');
 }
 
-function pick(tier) { return { ...CARDS.find(c => c.rarity === tier) }; }
+function pick(tier) {
+  return { ...getActiveCardPool().find(c => c.rarity === tier) };
+}
 
 let isGodPack = false;
 
@@ -188,7 +289,7 @@ function setStatus(connected) {
 function connect() {
   try {
     ws = new WebSocket(WS_URL);
-    ws.onopen  = () => { setStatus(true); ws.send('web_client'); clearTimeout(reconnectTimer); };
+    ws.onopen  = () => { setStatus(true); ws.send('web_client'); clearTimeout(reconnectTimer); sendPackType(); };
     ws.onclose = () => { setStatus(false); reconnectTimer = setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
     ws.onmessage = (e) => console.log('[WS]', e.data);
@@ -201,6 +302,22 @@ function send(msg) {
   } else {
     console.warn('[WS] Not connected:', msg);
   }
+}
+
+// ─── Unity pack type sync ─────────────────────────────────────────────────────
+
+// Maps web-app internal type + corruption phase → Unity pack_type_* message name
+function getUnityPackType() {
+  const corruption = parseInt(document.body.dataset.corruption || '0');
+  const isHorror   = corruption >= 6;
+  if (activePackType === 'garbage') return isHorror ? 'flesh'   : 'nature';
+  if (activePackType === 'ewaste')  return isHorror ? 'scourge' : 'critter';
+  if (activePackType === 'adpack')  return isHorror ? 'ritual'  : 'fungi';
+  return 'nature';
+}
+
+function sendPackType() {
+  send('pack_type_' + getUnityPackType());
 }
 
 // ─── Ticker ───────────────────────────────────────────────────────────────────
@@ -306,11 +423,6 @@ function initPack() {
 let _pendingPackDir = 'right';
 
 function triggerPackOpen(dir) {
-  if (activePackType === 'adpack') {
-    _pendingPackDir = dir;
-    showAdpackPrompt();
-    return;
-  }
   if (!consumePack()) return;
   doPackOpen(dir);
 }
@@ -350,6 +462,8 @@ function adpackCancel() {
 }
 
 function doPackOpen(dir) {
+  packsOpened++;
+  updateCorruption();   // also calls sendPackType() internally
   send('pack_opened');
   BloodDrip.onPackOpened();
 
@@ -364,6 +478,8 @@ function doPackOpen(dir) {
   const topCard = packCards[packCards.length - 1];
   const isHighRarity = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(topCard?.rarity);
   if (isHighRarity) triggerFlash();
+
+  if (isGodPack) send('spawn_godpack');
 
   Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
     if (isGodPack) triggerGodPackFlash();
@@ -490,6 +606,9 @@ function resetToPackScreen() {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 window.activePackType = 'garbage'; // default for cardTextures.js
+document.body.dataset.corruption = 0; // start fully pristine
+document.body.classList.add('pristine-phase');
+updateFirstPackTab(true); // set tab to NATURE at startup
 connect();
 initPack();
 updatePackCarousel(activePackType);

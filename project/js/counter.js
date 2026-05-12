@@ -1,7 +1,7 @@
 // ─── STARS CURRENCY + PACK COUNTER ────────────────────────────────────────────
 
 let stars           = 0;
-let packsLeft      = 3;   // 3 free packs on load
+let packsLeft      = 6;   // 6 free packs on load
 
 const PACKS_PER_BATCH = 3;
 const STARS_PER_AD     = 10;  // earned by watching full ad
