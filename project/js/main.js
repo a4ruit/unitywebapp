@@ -440,15 +440,7 @@ function showAdpackPrompt() {
 }
 
 function adpackConfirmWatch() {
-  showAd({
-    onComplete: () => {
-      addStars(STARS_PER_AD);
-      doPackOpen(_pendingPackDir);
-    },
-    onSkip: () => {
-      doPackOpen(_pendingPackDir);
-    }
-  });
+  doPackOpen(_pendingPackDir);
 }
 
 function adpackConfirmSkip() {
