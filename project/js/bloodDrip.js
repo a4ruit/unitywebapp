@@ -13,7 +13,7 @@ const BloodDrip = (() => {
   let drips         = [];
   let packsOpened   = 0;
   let initialized   = false; // canvases + loop exist
-  let running       = false; // full stain system active (packsOpened >= 9)
+  let running       = false; // full stain system active (packsOpened >= 15)
   let raf           = null;
   let spawnTimer    = null;
   let packDripTimer = null;
@@ -107,7 +107,7 @@ const BloodDrip = (() => {
   // ── Drip spawning ─────────────────────────────────────────────────────────
 
   function intensity() {
-    return Math.max(0, Math.floor((packsOpened - 9) / 1.5));
+    return Math.max(0, Math.floor((packsOpened - 15) / 1.5));
   }
 
   function spawnDrip() {
@@ -366,7 +366,7 @@ const BloodDrip = (() => {
   function onPackOpened() {
     packsOpened++;
 
-    if (!running && packsOpened >= 9) {
+    if (!running && packsOpened >= 15) {
       running = true;
       ensureInit();
       scheduleNextSpawn();
@@ -379,8 +379,8 @@ const BloodDrip = (() => {
     for (let i = 0; i < burst; i++) {
       setTimeout(() => spawnDrip(), i * 130);
     }
-    if (packsOpened >= 7)  setTimeout(() => { spawnDrip(); spawnDrip(); }, 500);
-    if (packsOpened >= 12) setTimeout(() => { for (let i = 0; i < 3; i++) spawnDrip(); }, 900);
+    if (packsOpened >= 17) setTimeout(() => { spawnDrip(); spawnDrip(); }, 500);
+    if (packsOpened >= 20) setTimeout(() => { for (let i = 0; i < 3; i++) spawnDrip(); }, 900);
   }
 
   function startPackDrips() {
