@@ -1379,9 +1379,9 @@ const Pack3D = (() => {
   // Corruption helpers — garbage pack IS the nature pack at low corruption
   //                     ewaste pack IS the critter pack at low corruption
   function getCorruptionLevel() { return parseInt(document.body.dataset.corruption) || 0; }
-  function isNaturePhase()      { return _packTheme === 'garbage' && getCorruptionLevel() < 6; }
-  function isCritterPhase()     { return _packTheme === 'ewaste'  && getCorruptionLevel() < 6; }
-  function isFungiPhase()       { return _packTheme === 'adpack'  && getCorruptionLevel() < 6; }
+  function isNaturePhase()      { return _packTheme === 'garbage' && getCorruptionLevel() < (window.HORROR_THRESHOLD ?? 15); }
+  function isCritterPhase()     { return _packTheme === 'ewaste'  && getCorruptionLevel() < (window.HORROR_THRESHOLD ?? 15); }
+  function isFungiPhase()       { return _packTheme === 'adpack'  && getCorruptionLevel() < (window.HORROR_THRESHOLD ?? 15); }
 
   function themeCol(alpha = 1) {
     if (_packTheme === 'garbage') return isNaturePhase() ? `rgba(129,212,250,${alpha})` : `rgba(232,92,26,${alpha})`;
