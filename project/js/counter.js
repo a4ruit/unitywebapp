@@ -1,6 +1,6 @@
 // ─── STARS CURRENCY + PACK COUNTER ────────────────────────────────────────────
 
-let stars           = 0;
+let stars           = 100;
 let packsLeft      = 6;   // 6 free packs on load
 
 const PACKS_PER_BATCH = 3;
