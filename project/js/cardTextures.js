@@ -36,14 +36,14 @@ const CardTextures = (() => {
   function cardIsNaturePhase() {
     if (typeof window === 'undefined') return false;
     if (window.activePackType !== 'garbage') return false;
-    return parseInt(document.body?.dataset?.corruption || '0') < 6;
+    return parseInt(document.body?.dataset?.corruption || '0') < (window.HORROR_THRESHOLD ?? 15);
   }
 
   // â”€â”€â”€ Shape drawers â€” reskinned as waste items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function drawShape(ctx, rarity, t) {
     const packType = typeof window !== 'undefined' ? window.activePackType : 'garbage';
-    const isHorror = parseInt(document.body?.dataset?.corruption || '0') >= 6;
+    const isHorror = parseInt(document.body?.dataset?.corruption || '0') >= (window.HORROR_THRESHOLD ?? 15);
     if (packType === 'ewaste' && !isHorror) { drawShapeCritter(ctx, rarity, t); return; }
     if (packType === 'ewaste')              { drawShapeScourge(ctx, rarity, t); return; }
     if (packType === 'adpack' && !isHorror) { drawShapeFungi(ctx, rarity, t);  return; }

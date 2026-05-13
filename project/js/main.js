@@ -74,7 +74,7 @@ const PACK_TYPE_ORDER = ['garbage', 'ewaste', 'adpack'];
 
 // Returns the correct card pool for the current pack type + corruption phase
 function getActiveCardPool() {
-  const isHorror = parseInt(document.body.dataset.corruption || '0') >= 6;
+  const isHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
   if (activePackType === 'garbage') return isHorror ? FLESH_CARDS   : NATURE_CARDS;
   if (activePackType === 'ewaste')  return isHorror ? SCOURGE_CARDS : CRITTER_CARDS;
   if (activePackType === 'adpack')  return isHorror ? RITUAL_CARDS  : FUNGI_CARDS;
@@ -83,13 +83,14 @@ function getActiveCardPool() {
 
 // ─── Corruption / progression ──────────────────────────────────────────────────
 let packsOpened = 0;
-const CORRUPTION_MAX = 9;
+const HORROR_THRESHOLD = 15;  // packs opened before horror phase begins
+const CORRUPTION_MAX   = 18;  // max corruption level (HORROR_THRESHOLD + a few horror ticks)
 
 function updateCorruption() {
   const prevLevel = parseInt(document.body.dataset.corruption || '0');
   const level     = Math.min(packsOpened, CORRUPTION_MAX);
   document.body.dataset.corruption = level;
-  const isPristine = level < 6;
+  const isPristine = level < HORROR_THRESHOLD;
   // Toggle pristine-phase class (drives green bottom-row CSS)
   document.body.classList.toggle('pristine-phase', isPristine);
   // Update pack tab labels/icons to reflect current phase
@@ -98,7 +99,7 @@ function updateCorruption() {
   updateThirdPackTab(isPristine);
   // On the nature→flesh crossing, run glitch transition (handles onCorruptionUpdate internally)
   if (typeof Pack3D !== 'undefined') {
-    if (prevLevel < 6 && level >= 6) {
+    if (prevLevel < HORROR_THRESHOLD && level >= HORROR_THRESHOLD) {
       Pack3D.startGlitchTransition();
     } else {
       Pack3D.onCorruptionUpdate();
@@ -212,12 +213,12 @@ function setPackType(type) {
   document.getElementById('packTypeAdpack')?.classList.toggle('active',  type === 'adpack');
   const corruption = parseInt(document.body.dataset.corruption) || 0;
   document.body.classList.toggle('scourge-active', type === 'ewaste');
-  document.body.classList.toggle('ritual-active',  type === 'adpack' && corruption >= 6);
+  document.body.classList.toggle('ritual-active',  type === 'adpack' && corruption >= HORROR_THRESHOLD);
   updatePackCarousel(type);
   animatePackTypeSwitch(prevType, type);
   // Toggle adpack glow on screen-pack
   const sp = document.getElementById('screen-pack');
-  if (sp) sp.classList.toggle('adpack-active', type === 'adpack' && (parseInt(document.body.dataset.corruption) || 0) >= 6);
+  if (sp) sp.classList.toggle('adpack-active', type === 'adpack' && (parseInt(document.body.dataset.corruption) || 0) >= HORROR_THRESHOLD);
   const stage = document.getElementById('packCarouselStage');
   if (stage) {
     stage.classList.remove('adpack-shimmer-burst');
@@ -309,7 +310,7 @@ function send(msg) {
 // Maps web-app internal type + corruption phase → Unity pack_type_* message name
 function getUnityPackType() {
   const corruption = parseInt(document.body.dataset.corruption || '0');
-  const isHorror   = corruption >= 6;
+  const isHorror   = corruption >= HORROR_THRESHOLD;
   if (activePackType === 'garbage') return isHorror ? 'flesh'   : 'nature';
   if (activePackType === 'ewaste')  return isHorror ? 'scourge' : 'critter';
   if (activePackType === 'adpack')  return isHorror ? 'ritual'  : 'fungi';
@@ -471,7 +472,11 @@ function doPackOpen(dir) {
   const isHighRarity = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(topCard?.rarity);
   if (isHighRarity) triggerFlash();
 
-  if (isGodPack) send('spawn_godpack');
+  // Only send spawn_godpack in horror phase — Unity's SpawnGodPack always spawns
+  // flesh/horror objects, so in pristine phase we let individual card commands route
+  // through the active pack type instead.
+  const _gpHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
+  if (isGodPack && _gpHorror) send('spawn_godpack');
 
   Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
     if (isGodPack) triggerGodPackFlash();

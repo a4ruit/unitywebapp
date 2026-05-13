@@ -11,6 +11,10 @@ let _glitchTimer = 0;
 // ─── Show ─────────────────────────────────────────────────────────────────────
 
 function showAd({ onComplete, onSkip }) {
+  // ── ADS DISABLED — skip straight to completion ──
+  if (onComplete) onComplete();
+  return;
+
   _adCallbacks = { onComplete, onSkip };
   _adElapsed   = 0;
   _glitchTimer = 0;
