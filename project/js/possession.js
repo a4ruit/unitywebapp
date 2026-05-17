@@ -166,7 +166,7 @@ function _buildUI() {
     /* ── Countdown bar ── */
     #poss-timer {
       position: absolute;
-      top: 18px;
+      top: 22px;
       left: 50%;
       transform: translateX(-50%);
       color: rgba(255,255,255,0.85);
@@ -176,25 +176,66 @@ function _buildUI() {
       text-shadow: 0 0 10px #00c8b4;
       display: none;
       white-space: nowrap;
+      z-index: 2;
     }
 
-    /* ── Video / sheep-cam ── */
+    /* ── Sheep-cam framed as a trading card ──
+       Wrap is 5:7 portrait (matches three.js card aspect).
+       Video fills the entire card space. Frame overlays on top so its
+       pixel-art border decoration sits ON the video edges. */
     #poss-video-wrap {
       position: absolute;
-      top: 52px;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
-      width: min(90vw, 340px);
-      aspect-ratio: 16/9;
-      background: #000;
-      border: 1px solid rgba(0,200,180,0.35);
+      transform: translate(-50%, -54%);   /* vertical center, slight upward bias for the joystick below */
+      width: min(55vw, 220px);
+      aspect-ratio: 5 / 7;
       display: none;
+    }
+    /* Art window fills the ENTIRE wrap — video covers the whole card area. */
+    #poss-art-window {
+      position: absolute;
+      inset: 0;
       overflow: hidden;
+      background: #000;
     }
     #poss-video {
       width: 100%;
       height: 100%;
+      /* cover = scales video to fill, cropping sides — gives the
+         "vertical slice" look without squishing the source. */
       object-fit: cover;
+      display: block;
+      background: #000;
+    }
+    /* Frame is the LAST child so it renders ON TOP of the video.
+       drop-shadow follows the actual pixel edges (the PNG is transparent
+       outside the frame), giving the card a teal bloom like the three.js
+       cards. The bloom gently pulses to feel alive without distracting. */
+    #poss-card-frame {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      image-rendering: pixelated;
+      user-select: none;
+      -webkit-user-drag: none;
+      filter:
+        drop-shadow(0 0 6px rgba(0,200,180,0.7))
+        drop-shadow(0 0 16px rgba(0,200,180,0.4))
+        drop-shadow(0 0 32px rgba(0,200,180,0.2));
+      animation: poss-card-bloom 3.2s ease-in-out infinite;
+    }
+    @keyframes poss-card-bloom {
+      0%, 100% { filter:
+        drop-shadow(0 0 6px  rgba(0,200,180,0.7))
+        drop-shadow(0 0 16px rgba(0,200,180,0.4))
+        drop-shadow(0 0 32px rgba(0,200,180,0.2)); }
+      50%      { filter:
+        drop-shadow(0 0 8px  rgba(0,200,180,0.9))
+        drop-shadow(0 0 22px rgba(0,200,180,0.55))
+        drop-shadow(0 0 44px rgba(0,200,180,0.30)); }
     }
     #poss-video-label {
       position: absolute;
@@ -307,11 +348,14 @@ function _buildUI() {
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
     <div id="poss-video-wrap">
-      <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
-      <div id="poss-video-label">
-        <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
-        <div id="poss-loading-bar"></div>
+      <div id="poss-art-window">
+        <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
+        <div id="poss-video-label">
+          <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+          <div id="poss-loading-bar"></div>
+        </div>
       </div>
+      <img id="poss-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
     </div>
     <div id="poss-joy-zone">
       <div id="poss-joy-bg"></div>
