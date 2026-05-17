@@ -207,15 +207,18 @@ function _buildUI() {
       padding: 1px;
       box-sizing: border-box;
     }
-    /* The fill: jumps in 10 discrete chunks across the bar */
+    /* The fill: 20 discrete chunks over 10 seconds, holds at 100%.
+       Animation only runs while the `.is-loading` class is present. */
     #poss-loading-bar::after {
       content: '';
       display: block;
       height: 100%;
       width: 0%;
       background: #00c8b4;
-      animation: poss-pixel-fill 1.8s steps(10) infinite;
       box-shadow: 0 0 6px rgba(0,200,180,0.5);
+    }
+    #poss-loading-bar.is-loading::after {
+      animation: poss-pixel-fill 10s steps(20) forwards;
     }
     @keyframes poss-pixel-fill {
       from { width: 0%;   }
@@ -295,15 +298,16 @@ function _buildUI() {
   document.body.appendChild(root);
 
   _ui = {
-    btn:      root.querySelector('#poss-btn'),
-    timer:    root.querySelector('#poss-timer'),
-    secs:     root.querySelector('#poss-secs'),
-    vidWrap:  root.querySelector('#poss-video-wrap'),
-    video:    root.querySelector('#poss-video'),
-    vidLabel: root.querySelector('#poss-video-label'),
-    joyZone:  root.querySelector('#poss-joy-zone'),
-    joyKnob:  root.querySelector('#poss-joy-knob'),
-    release:  root.querySelector('#poss-release'),
+    btn:        root.querySelector('#poss-btn'),
+    timer:      root.querySelector('#poss-timer'),
+    secs:       root.querySelector('#poss-secs'),
+    vidWrap:    root.querySelector('#poss-video-wrap'),
+    video:      root.querySelector('#poss-video'),
+    vidLabel:   root.querySelector('#poss-video-label'),
+    loadingBar: root.querySelector('#poss-loading-bar'),
+    joyZone:    root.querySelector('#poss-joy-zone'),
+    joyKnob:    root.querySelector('#poss-joy-knob'),
+    release:    root.querySelector('#poss-release'),
   };
 
   _ui.btn.addEventListener('click',     _requestPossession);
@@ -391,6 +395,11 @@ function _onGranted(duration) {
   _ui.release.style.display  = 'block';
   _ui.secs.textContent       = duration;
 
+  // Restart the 10s loading-bar animation by toggling the class with a reflow
+  _ui.loadingBar.classList.remove('is-loading');
+  void _ui.loadingBar.offsetWidth;        // force reflow to reset animation
+  _ui.loadingBar.classList.add('is-loading');
+
   // Send joystick at 20 fps — always send so sheep stops when stick is centred
   _inputInterval = setInterval(() => {
     send(`sheep_input|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
@@ -422,6 +431,7 @@ function _onEnded() {
   }
   _ui.video.srcObject        = null;
   _ui.vidLabel.style.display = 'flex';   // restore "CONNECTING…" loader for next session
+  _ui.loadingBar.classList.remove('is-loading');  // reset bar to empty
 
   _ui.btn.textContent   = 'Inhabit a sheep';
   _ui.btn.style.opacity = '1';
