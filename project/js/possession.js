@@ -36,6 +36,7 @@ let _joystickActive = false;
 let _joyX           = 0;
 let _joyY           = 0;
 let _ui             = null;   // DOM refs, built once on load
+let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
 
 // ── Globals called by main.js ──────────────────────────────────────────────
 
@@ -77,6 +78,21 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('possess_tick|')) {
     const parts = msg.split('|');            // [1]=clientId [2]=secsLeft
     if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+
+  // Unity sends the WebRTC offer once the possession camera is ready.
+  // SDP may contain '|', so we rejoin everything after the clientId field.
+  if (msg.startsWith('webrtc_offer|')) {
+    const firstPipe  = msg.indexOf('|');
+    const secondPipe = msg.indexOf('|', firstPipe + 1);
+    if (secondPipe >= 0) {
+      const clientId = msg.slice(firstPipe + 1, secondPipe);
+      if (clientId === CLIENT_ID) {
+        const sdp = msg.slice(secondPipe + 1);
+        _handleOffer(sdp);   // async — returns a promise we intentionally don't await
+        return true;
+      }
+    }
   }
 
   return false;
@@ -320,10 +336,8 @@ function _onGranted(duration) {
     send(`sheep_input|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
   }, 50);
 
-  // ── WebRTC video slot ────────────────────────────────────────────────────
-  // Uncomment when Unity WebRTC package is wired up:
-  //   _startWebRTCReceive();
-  // ────────────────────────────────────────────────────────────────────────
+  // WebRTC video: Unity will send a 'webrtc_offer|' message shortly after
+  // granting possession. The offer is handled in handlePossessionMessage above.
 }
 
 function _onDenied() {
@@ -341,6 +355,14 @@ function _onEnded() {
   _joystickActive = false;
   _joyX = 0; _joyY = 0;
 
+  // Tear down the WebRTC peer connection and clear the video element
+  if (_peerConnection) {
+    _peerConnection.close();
+    _peerConnection = null;
+  }
+  _ui.video.srcObject        = null;
+  _ui.vidLabel.style.display = '';   // restore "SHEEP CAM" placeholder text
+
   _ui.btn.textContent   = 'Inhabit a sheep';
   _ui.btn.style.opacity = '1';
   _ui.btn.classList.remove('poss-hidden');
@@ -351,31 +373,56 @@ function _onEnded() {
   _ui.joyKnob.style.transform = 'translate(-50%,-50%)';
 }
 
-// ── WebRTC scaffold (future — requires com.unity.webrtc on Unity side) ─────
+// ── WebRTC receive ─────────────────────────────────────────────────────────
 //
-// async function _startWebRTCReceive() {
-//   const pc = new RTCPeerConnection({
-//     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-//   });
-//   pc.ontrack = (e) => {
-//     _ui.video.srcObject        = e.streams[0];
-//     _ui.vidLabel.style.display = 'none';
-//   };
-//   pc.onicecandidate = (e) => {
-//     if (e.candidate)
-//       send(`webrtc_ice|${CLIENT_ID}|${JSON.stringify(e.candidate)}`);
-//   };
-//   // Add to handlePossessionMessage:
-//   // if (msg.startsWith('webrtc_offer|')) {
-//   //   const [,cid,...rest] = msg.split('|'); const sdp = rest.join('|');
-//   //   if (cid === CLIENT_ID) {
-//   //     await pc.setRemoteDescription({ type:'offer', sdp });
-//   //     const ans = await pc.createAnswer();
-//   //     await pc.setLocalDescription(ans);
-//   //     send(`webrtc_answer|${CLIENT_ID}|${ans.sdp}`);
-//   //   }
-//   // }
-// }
+// Called when Unity sends 'webrtc_offer|clientId|<sdp>'.
+// Uses vanilla ICE: we wait for ICE gathering to complete before sending the
+// answer, so no separate ICE candidate messages are needed over the broadcast
+// server (which would echo them back to Unity and cause confusion).
+
+async function _handleOffer(sdp) {
+  try {
+    // Ensure SDP ends with CRLF — the outer message .trim() may have stripped it
+    if (!sdp.endsWith('\r\n')) sdp += '\r\n';
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+    });
+
+    // When the video track arrives, push it into the sheep-cam <video> element
+    pc.ontrack = e => {
+      _ui.video.srcObject        = e.streams[0];
+      _ui.vidLabel.style.display = 'none';
+      console.log('[WebRTC] Sheep-cam video stream connected');
+    };
+
+    _peerConnection = pc;
+
+    await pc.setRemoteDescription({ type: 'offer', sdp });
+
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+
+    // Vanilla ICE: wait until all candidates are gathered before sending the answer
+    if (pc.iceGatheringState !== 'complete') {
+      await new Promise(resolve => {
+        pc.addEventListener('icegatheringstatechange', function handler() {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', handler);
+            resolve();
+          }
+        });
+      });
+    }
+
+    // Send the full answer SDP (ICE bundled) back to Unity via the server
+    send(`webrtc_answer|${CLIENT_ID}|${pc.localDescription.sdp}`);
+    console.log('[WebRTC] Answer sent to Unity');
+
+  } catch (err) {
+    console.error('[WebRTC] _handleOffer error:', err);
+  }
+}
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 if (document.readyState === 'loading') {
