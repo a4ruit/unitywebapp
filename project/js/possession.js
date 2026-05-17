@@ -43,6 +43,7 @@ let _joyX           = 0;
 let _joyY           = 0;
 let _ui             = null;   // DOM refs, built once on load
 let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
+let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
 
 // ── Globals called by main.js ──────────────────────────────────────────────
 
@@ -98,6 +99,29 @@ function handlePossessionMessage(data) {
         _handleOffer(sdp);   // async — returns a promise we intentionally don't await
         return true;
       }
+    }
+  }
+
+  // Trickle ICE candidate from Unity (offerer side).
+  // Format: webrtc_offer_ice|clientId|candidate|sdpMid|sdpMLineIndex
+  if (msg.startsWith('webrtc_offer_ice|')) {
+    const p = msg.split('|');
+    if (p.length >= 5 && p[1] === CLIENT_ID) {
+      const ice = {
+        candidate:     p[2],
+        sdpMid:        p[3],
+        sdpMLineIndex: parseInt(p[4], 10),
+      };
+      if (!ice.candidate) return true;   // end-of-candidates sentinel
+
+      // If remote description isn't set yet, queue. Otherwise add immediately.
+      if (_peerConnection && _peerConnection.remoteDescription) {
+        _peerConnection.addIceCandidate(new RTCIceCandidate(ice))
+          .catch(err => console.warn('[WebRTC] addIceCandidate failed:', err));
+      } else {
+        _pendingIce.push(ice);
+      }
+      return true;
     }
   }
 
@@ -429,6 +453,7 @@ function _onEnded() {
     _peerConnection.close();
     _peerConnection = null;
   }
+  _pendingIce = [];   // drop any candidates still in the queue
   _ui.video.srcObject        = null;
   _ui.vidLabel.style.display = 'flex';   // restore "CONNECTING…" loader for next session
   _ui.loadingBar.classList.remove('is-loading');  // reset bar to empty
@@ -481,6 +506,13 @@ async function _handleOffer(sdp) {
       console.log('[WebRTC] Connection state:', pc.connectionState);
     pc.onsignalingstatechange     = () =>
       console.log('[WebRTC] Signaling state:', pc.signalingState);
+
+    // ── Trickle ICE: send each browser-side candidate to Unity ────────────
+    pc.onicecandidate = e => {
+      if (!e.candidate) return;   // null = end-of-candidates
+      const c = e.candidate;
+      send(`webrtc_answer_ice|${CLIENT_ID}|${c.candidate}|${c.sdpMid}|${c.sdpMLineIndex}`);
+    };
 
     // When the video track arrives, push it into the sheep-cam <video> element.
     // Unity WebRTC does NOT always populate e.streams[], so fall back to
@@ -557,24 +589,23 @@ async function _handleOffer(sdp) {
 
     await pc.setRemoteDescription({ type: 'offer', sdp });
 
+    // Flush any ICE candidates that arrived before we'd set remote description
+    if (_pendingIce.length > 0) {
+      console.log(`[WebRTC] Flushing ${_pendingIce.length} queued ICE candidates`);
+      for (const ice of _pendingIce) {
+        try { await pc.addIceCandidate(new RTCIceCandidate(ice)); }
+        catch (err) { console.warn('[WebRTC] queued addIceCandidate failed:', err); }
+      }
+      _pendingIce = [];
+    }
+
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
 
-    // Vanilla ICE: wait until all candidates are gathered before sending the answer
-    if (pc.iceGatheringState !== 'complete') {
-      await new Promise(resolve => {
-        pc.addEventListener('icegatheringstatechange', function handler() {
-          if (pc.iceGatheringState === 'complete') {
-            pc.removeEventListener('icegatheringstatechange', handler);
-            resolve();
-          }
-        });
-      });
-    }
-
-    // Send the full answer SDP (ICE bundled) back to Unity via the server
+    // Trickle ICE: send the answer IMMEDIATELY (no candidates yet).
+    // Browser candidates trickle out via pc.onicecandidate above.
     send(`webrtc_answer|${CLIENT_ID}|${pc.localDescription.sdp}`);
-    console.log('[WebRTC] Answer sent to Unity');
+    console.log('[WebRTC] Answer sent to Unity — candidates trickling…');
 
   } catch (err) {
     console.error('[WebRTC] _handleOffer error:', err);
