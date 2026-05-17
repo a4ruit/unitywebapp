@@ -5,7 +5,7 @@ const Pack3D = (() => {
 
   // ─── State ─────────────────────────────────────────────────────────────────
 
-  let renderer, scene, camera, packMesh, rimLight, symbolMesh, textMesh;
+  let renderer, scene, camera, packMesh, rimLight, symbolMesh, textMesh, backdropMesh;
   let flyMeshes    = [];
   let flyStates    = [];
   let cloudMeshes  = [];
@@ -1401,6 +1401,14 @@ const Pack3D = (() => {
     if (_packTheme === 'adpack')  return 'rgba(120,30,180,0.18)';
     return 'rgba(42,122,42,0.18)';
   }
+  function updateBackdropLight() {
+    if (!backdropMesh) return;
+    if (isNaturePhase())  { backdropMesh.color.setStyle('#4a9a60'); backdropMesh.intensity = 0.6; return; }
+    if (isCritterPhase()) { backdropMesh.color.setStyle('#6aaa30'); backdropMesh.intensity = 0.5; return; }
+    if (isFungiPhase())   { backdropMesh.color.setStyle('#a07830'); backdropMesh.intensity = 0.4; return; }
+    // Horror phases — light off
+    backdropMesh.intensity = 0;
+  }
   function themeHex() {
     if (_packTheme === 'garbage') return isNaturePhase() ? '#81d4fa' : '#e85c1a';
     if (_packTheme === 'ewaste')  return '#8bc820';
@@ -1767,6 +1775,12 @@ const Pack3D = (() => {
 
     packMesh = new THREE.Mesh(geo, [edgeMat, edgeMat, edgeMat, edgeMat, frontMat, backMat]);
     scene.add(packMesh);
+
+    // ── Subtle backdrop point light — pristine phases only ────────────────────
+    backdropMesh = new THREE.PointLight(0x000000, 0, 6);
+    backdropMesh.position.set(0, 0, -1.2);
+    scene.add(backdropMesh);
+    updateBackdropLight();
 
     rebuildSymbolMesh();
     rebuildTextMesh();
@@ -2209,6 +2223,7 @@ const Pack3D = (() => {
       else if (_packTheme === 'adpack') { rimLight.color.setStyle('#8030c0'); rimLight.intensity = 3.1; }
       else                       { rimLight.color.setStyle('#e85c1a'); rimLight.intensity = 2.5; }
     }
+    updateBackdropLight();
   }
 
   return { init, throwPack, resetPack, destroy, setPackTheme, onCorruptionUpdate, startGlitchTransition, get isReady() { return isReady; } };

@@ -31,7 +31,19 @@ const CardTextures = (() => {
     return `hsl(${h},100%,60%)`;
   }
 
-  // â”€â”€â”€ Phase helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ─── Preloaded card skin images ──────────────────────────────────────────────
+
+  const _cardSkins = {};
+  function _loadSkin(key, src) {
+    const img = new Image();
+    img.src = src;
+    _cardSkins[key] = img; // available once img.complete or onload fires
+  }
+  _loadSkin('nature-common',   'assets/common-card.png');
+  _loadSkin('nature-uncommon', 'assets/uncommon-card.png');
+  _loadSkin('nature-rare',     'assets/epic-card.png');
+
+  // ─── Phase helper ────────────────────────────────────────────────────────────
 
   function cardIsNaturePhase() {
     if (typeof window === 'undefined') return false;
@@ -497,96 +509,111 @@ const CardTextures = (() => {
       }
 
     } else if (rarity === 'legendary-alpha') {
-      // Treant — upright tree-creature, humanoid silhouette, rainbow shimmer
-      const pulse = 1 + Math.sin(t * 2) * 0.05;
-      const sway  = Math.sin(t * 0.8) * 0.04;
+      // Tree of Life — cosmic tree, spreading roots, vast canopy, life-glow at heart
+      const pulse  = 1 + Math.sin(t * 1.4) * 0.04;
+      const sway   = Math.sin(t * 0.6) * 0.025;
       ctx.scale(pulse, pulse);
       ctx.rotate(sway);
 
-      const grad = ctx.createLinearGradient(-38, 52, 38, -52);
+      const grad = ctx.createLinearGradient(-50, 58, 50, -62);
       for (let i = 0; i <= 6; i++) grad.addColorStop(i/6, rainbow(t, i*60));
 
-      ctx.lineCap = 'round';
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-      // Root feet — two splayed root-clusters at base
-      const roots = [
-        [-10,36,-24,50],[-10,36,-14,52],[-10,36,-4,50],
-        [ 10,36,  4,50],[ 10,36, 14,52],[ 10,36, 24,50],
+      // ── Roots spreading outward from base ────────────────────────────────
+      const rootPaths = [
+        [0,34, -18,48, -32,54],
+        [0,34, -10,50, -16,58],
+        [0,34,   0,52,   0,60],
+        [0,34,  10,50,  16,58],
+        [0,34,  18,48,  32,54],
+        [0,34,  -6,44, -38,50],
+        [0,34,   6,44,  38,50],
       ];
-      roots.forEach(([x1,y1,x2,y2]) => {
-        ctx.strokeStyle = grad; ctx.lineWidth = 2;
+      rootPaths.forEach(([x1,y1,cx,cy,x2,y2]) => {
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.moveTo(x1,y1);
-        ctx.quadraticCurveTo((x1+x2)/2 + (Math.random()-0.5)*4, (y1+y2)/2+4, x2,y2);
+        ctx.quadraticCurveTo(cx,cy,x2,y2);
         ctx.stroke();
       });
 
-      // Legs — two thick root-columns
-      ctx.strokeStyle = grad; ctx.lineWidth = 6;
-      ctx.beginPath(); ctx.moveTo(-10,36); ctx.lineTo(-8,14); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo( 10,36); ctx.lineTo( 8,14); ctx.stroke();
-
-      // Torso — broad bark-covered trunk body
+      // ── Main trunk ───────────────────────────────────────────────────────
       ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.moveTo(-14,16);
-      ctx.bezierCurveTo(-16,4,-14,-8,-10,-16);
-      ctx.lineTo(-6,-22); ctx.lineTo(6,-22); ctx.lineTo(10,-16);
-      ctx.bezierCurveTo(14,-8,16,4,14,16);
+      ctx.moveTo(-9, 36);
+      ctx.bezierCurveTo(-10, 18, -8, 0, -6, -18);
+      ctx.lineTo(-3, -24); ctx.lineTo(3, -24);
+      ctx.bezierCurveTo(8, 0, 10, 18, 9, 36);
       ctx.closePath(); ctx.fill();
-      // Bark texture lines on torso
-      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
-      [[-8,0,-6,-14],[ 2,4, 4,-12],[-4,8,-2,-10]].forEach(([x1,y1,x2,y2]) => {
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo((x1+x2)/2+3,(y1+y2)/2,x2,y2); ctx.stroke();
+      // Bark striations
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 0.8;
+      [[-4,30,-3,-18],[0,28,1,-20],[4,30,3,-18]].forEach(([x1,y1,x2,y2]) => {
+        ctx.beginPath(); ctx.moveTo(x1,y1);
+        ctx.quadraticCurveTo(x1+2,(y1+y2)/2,x2,y2); ctx.stroke();
       });
 
-      // Arms — large gnarled branches spreading wide
-      // Left arm
-      ctx.strokeStyle = grad; ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(-12,-4); ctx.bezierCurveTo(-22,-8,-32,-6,-38,-12); ctx.stroke();
+      // ── Major branches spreading wide ────────────────────────────────────
+      ctx.strokeStyle = grad;
+      // Far left
+      ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(-6,-10); ctx.bezierCurveTo(-18,-14,-30,-12,-40,-18); ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-40,-18); ctx.bezierCurveTo(-46,-22,-50,-30,-46,-36); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-40,-18); ctx.bezierCurveTo(-44,-12,-48,-10,-52,-14); ctx.stroke();
+      // Far right
+      ctx.lineWidth = 3.5;
+      ctx.beginPath(); ctx.moveTo(6,-10); ctx.bezierCurveTo(18,-14,30,-12,40,-18); ctx.stroke();
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(40,-18); ctx.bezierCurveTo(46,-22,50,-30,46,-36); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(40,-18); ctx.bezierCurveTo(44,-12,48,-10,52,-14); ctx.stroke();
+      // Upper mid-left
       ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(-38,-12); ctx.bezierCurveTo(-42,-16,-44,-22,-40,-26); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-38,-12); ctx.lineTo(-42,-8); ctx.stroke();
-      // Right arm
-      ctx.lineWidth = 4;
-      ctx.beginPath(); ctx.moveTo(12,-4); ctx.bezierCurveTo(22,-8,32,-6,38,-12); ctx.stroke();
-      ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.moveTo(38,-12); ctx.bezierCurveTo(42,-16,44,-22,40,-26); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(38,-12); ctx.lineTo(42,-8); ctx.stroke();
-      // Finger-branches at arm tips
-      [[- 40,-26,-46,-32],[-40,-26,-36,-34],[40,-26,46,-32],[40,-26,36,-34]].forEach(([x1,y1,x2,y2]) => {
-        ctx.lineWidth = 1.2;
-        ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
-      });
+      ctx.beginPath(); ctx.moveTo(-5,-20); ctx.bezierCurveTo(-16,-26,-24,-22,-30,-30); ctx.stroke();
+      // Upper mid-right
+      ctx.beginPath(); ctx.moveTo(5,-20); ctx.bezierCurveTo(16,-26,24,-22,30,-30); ctx.stroke();
+      // Crown branches
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(-3,-24); ctx.bezierCurveTo(-12,-32,-14,-40,-10,-46); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo( 3,-24); ctx.bezierCurveTo(12,-32,14,-40,10,-46); ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(0,-28); ctx.lineTo(0,-50); ctx.stroke();
 
-      // Head — knobby rounded crown
-      const headBlobs = [[0,-30,12],[-8,-38,8],[8,-38,8],[0,-44,9]];
-      headBlobs.forEach(([cx,cy,r],i) => {
-        const h = ((t*60+i*72)%360+360)%360;
+      // ── Canopy leaf clusters ──────────────────────────────────────────────
+      const leaves = [
+        [0,-54,10],[-10,-50,8],[10,-50,8],[-4,-60,7],[4,-60,7],
+        [-30,-32,7],[30,-32,7],[-46,-38,7],[46,-38,7],
+        [-50,-16,6],[50,-16,6],[-28,-14,5],[28,-14,5],
+      ];
+      leaves.forEach(([cx,cy,r],i) => {
+        const h = ((t*50+i*48)%360+360)%360;
         ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-        ctx.fillStyle = `hsla(${h},72%,38%,${0.42+Math.sin(t*2+i)*0.12})`; ctx.fill();
-        ctx.strokeStyle = grad; ctx.lineWidth = 0.8; ctx.stroke();
+        ctx.fillStyle = `hsla(${h},75%,36%,${0.5+Math.sin(t*2+i*0.9)*0.15})`; ctx.fill();
+        ctx.strokeStyle = grad; ctx.lineWidth = 0.6; ctx.stroke();
       });
 
-      // Eyes — two glowing amber eyes in the bark face
-      const eyeGlow = 0.7 + Math.sin(t*3)*0.25;
-      ctx.fillStyle = `rgba(255,220,80,${eyeGlow})`;
-      ctx.beginPath(); ctx.ellipse(-4,-30,3,2.5,0.1,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.ellipse( 4,-30,3,2.5,-0.1,0,Math.PI*2); ctx.fill();
-      ctx.fillStyle = `rgba(255,255,180,${eyeGlow*0.6})`;
-      ctx.beginPath(); ctx.arc(-4,-31,1.2,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc( 4,-31,1.2,0,Math.PI*2); ctx.fill();
+      // ── Life-glow — radiant heartwood pulse ───────────────────────────────
+      const glowR  = 6 + Math.sin(t*3)*2;
+      const glowA  = 0.55 + Math.sin(t*4)*0.3;
+      const glow   = ctx.createRadialGradient(0,4,0,0,4,glowR*2.5);
+      glow.addColorStop(0, `rgba(255,255,200,${glowA})`);
+      glow.addColorStop(0.4, `rgba(255,220,80,${glowA*0.5})`);
+      glow.addColorStop(1, 'rgba(255,180,0,0)');
+      ctx.beginPath(); ctx.arc(0,4,glowR*2.5,0,Math.PI*2);
+      ctx.fillStyle = glow; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,4,glowR,0,Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,220,${glowA})`; ctx.fill();
 
-      // Canopy foliage clusters sprouting from head/shoulders
-      [[0,-50,8],[-10,-46,7],[10,-46,7],[-4,-56,6],[4,-56,6]].forEach(([cx,cy,r],i) => {
-        const h = ((t*60+i*55)%360+360)%360;
-        ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-        ctx.fillStyle = `hsla(${h},70%,35%,${0.38+Math.sin(t*2.5+i)*0.14})`; ctx.fill();
-        ctx.strokeStyle = grad; ctx.lineWidth = 0.7; ctx.stroke();
-      });
-
-      // Heartwood pulse — glowing chest core
-      ctx.beginPath(); ctx.arc(0,-2, 4+Math.sin(t*4)*1.5, 0, Math.PI*2);
-      ctx.fillStyle = `rgba(255,255,255,${0.5+Math.sin(t*5)*0.35})`; ctx.fill();
+      // ── Floating light motes drifting upward ─────────────────────────────
+      for (let i = 0; i < 6; i++) {
+        const mt = (t * 0.5 + i * 0.28) % 1;
+        const mx = Math.sin(i * 2.1 + t) * 28;
+        const my = 30 - mt * 90;
+        const ma = Math.sin(mt * Math.PI) * 0.8;
+        const h  = ((t*60+i*55)%360+360)%360;
+        ctx.beginPath(); ctx.arc(mx,my,1.8,0,Math.PI*2);
+        ctx.fillStyle = `hsla(${h},100%,75%,${ma})`; ctx.fill();
+      }
     }
 
     ctx.restore();
@@ -1808,9 +1835,25 @@ const CardTextures = (() => {
     }
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,256,384);
-    drawBackground(ctx, card.rarity, t);
-    drawBorder(ctx, card.rarity, t);
-    drawCorners(ctx, card.rarity, t);
+
+    // ── Card skin override: use PNG base when available ──────────────────────
+    const isNature = cardIsNaturePhase();
+    const skinKey  = isNature && card.rarity === 'common'   ? 'nature-common'
+                   : isNature && card.rarity === 'uncommon' ? 'nature-uncommon'
+                   : isNature && card.rarity === 'rare'     ? 'nature-rare'
+                   : null;
+    const skinImg  = skinKey ? _cardSkins[skinKey] : null;
+
+    if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
+      // PNG replaces the procedural background + border + corners
+      ctx.drawImage(skinImg, 0, 0, 256, 384);
+    } else {
+      // Fallback: procedural frame
+      drawBackground(ctx, card.rarity, t);
+      drawBorder(ctx, card.rarity, t);
+      drawCorners(ctx, card.rarity, t);
+    }
+
     drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t);
     return canvas;

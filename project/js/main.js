@@ -10,7 +10,7 @@ const NATURE_CARDS = [
   { id:'triangle',   name:'Ancient Yew',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It watched the forest grow. It will watch it fall.' },
   { id:'octagon',    name:'The Old Grove',   rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Before the map. Before the name.' },
   { id:'triad',      name:'Pollen Drift',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Carried by nothing. Reaching everything.' },
-  { id:'star',       name:'Treant',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Ancient. Ambulatory. Aware.' },
+  { id:'star',       name:'Tree of Life',     rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It remembers the first rain. It will outlast the last.' },
 ];
 
 // ─── FLESH (garbage / horror) ─────────────────────────────────────────────────
@@ -290,10 +290,10 @@ function setStatus(connected) {
 function connect() {
   try {
     ws = new WebSocket(WS_URL);
-    ws.onopen  = () => { setStatus(true); ws.send('web_client'); clearTimeout(reconnectTimer); sendPackType(); };
+    ws.onopen  = () => { setStatus(true); ws.send('web_client'); clearTimeout(reconnectTimer); sendPackType(); updatePossessionWS(); };
     ws.onclose = () => { setStatus(false); reconnectTimer = setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
-    ws.onmessage = (e) => console.log('[WS]', e.data);
+    ws.onmessage = (e) => { console.log('[WS]', e.data); handlePossessionMessage(e.data); };
   } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
 }
 
