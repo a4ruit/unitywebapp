@@ -208,10 +208,7 @@ function _buildUI() {
       display: block;
       background: #000;
     }
-    /* Frame is the LAST child so it renders ON TOP of the video.
-       drop-shadow follows the actual pixel edges (the PNG is transparent
-       outside the frame), giving the card a teal bloom like the three.js
-       cards. The bloom gently pulses to feel alive without distracting. */
+    /* Frame is the LAST child so it renders ON TOP of the video. */
     #poss-card-frame {
       position: absolute;
       inset: 0;
@@ -221,21 +218,6 @@ function _buildUI() {
       image-rendering: pixelated;
       user-select: none;
       -webkit-user-drag: none;
-      filter:
-        drop-shadow(0 0 6px rgba(0,200,180,0.7))
-        drop-shadow(0 0 16px rgba(0,200,180,0.4))
-        drop-shadow(0 0 32px rgba(0,200,180,0.2));
-      animation: poss-card-bloom 3.2s ease-in-out infinite;
-    }
-    @keyframes poss-card-bloom {
-      0%, 100% { filter:
-        drop-shadow(0 0 6px  rgba(0,200,180,0.7))
-        drop-shadow(0 0 16px rgba(0,200,180,0.4))
-        drop-shadow(0 0 32px rgba(0,200,180,0.2)); }
-      50%      { filter:
-        drop-shadow(0 0 8px  rgba(0,200,180,0.9))
-        drop-shadow(0 0 22px rgba(0,200,180,0.55))
-        drop-shadow(0 0 44px rgba(0,200,180,0.30)); }
     }
     #poss-video-label {
       position: absolute;
