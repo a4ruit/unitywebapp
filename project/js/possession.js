@@ -26,6 +26,12 @@
  *    possess_tick|<clientId>|<secsLeft>
  */
 
+// ── Version stamp ──────────────────────────────────────────────────────────
+// If you don't see this in the console on page load, your browser is serving
+// cached possession.js — hard refresh (Ctrl+Shift+R) or disable cache in DevTools.
+console.log('%c[possession.js] v2025-05-17 — WebRTC stats poller + MediaStream fallback',
+  'color:#00c8b4; font-weight:bold');
+
 // ── Unique ID per page load — survives reconnects, lost on refresh ─────────
 const CLIENT_ID = 'web_' + Math.random().toString(36).slice(2, 11);
 
@@ -170,11 +176,44 @@ function _buildUI() {
       position: absolute;
       inset: 0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: rgba(255,255,255,0.25);
+      gap: 10px;
+      color: rgba(0,200,180,0.85);
       font-size: 11px;
-      letter-spacing: 2px;
+      letter-spacing: 3px;
+      text-shadow: 0 0 8px rgba(0,200,180,0.4);
+    }
+    #poss-video-label .dots span {
+      display: inline-block;
+      opacity: 0.2;
+      animation: poss-dot-fade 1.4s infinite;
+    }
+    #poss-video-label .dots span:nth-child(2) { animation-delay: 0.2s; }
+    #poss-video-label .dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes poss-dot-fade {
+      0%, 100% { opacity: 0.2; }
+      40%      { opacity: 1; }
+    }
+    #poss-loading-bar {
+      position: relative;
+      width: 60%;
+      height: 2px;
+      background: rgba(0,200,180,0.15);
+      overflow: hidden;
+    }
+    #poss-loading-bar::after {
+      content: '';
+      position: absolute;
+      top: 0; bottom: 0;
+      width: 40%;
+      background: linear-gradient(90deg, transparent, #00c8b4, transparent);
+      animation: poss-loading-slide 1.4s ease-in-out infinite;
+    }
+    @keyframes poss-loading-slide {
+      0%   { left: -40%; }
+      100% { left: 100%; }
     }
 
     /* ── Virtual joystick ── */
@@ -236,7 +275,10 @@ function _buildUI() {
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
     <div id="poss-video-wrap">
       <video id="poss-video" autoplay playsinline muted></video>
-      <div id="poss-video-label">SHEEP CAM</div>
+      <div id="poss-video-label">
+        <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+        <div id="poss-loading-bar"></div>
+      </div>
     </div>
     <div id="poss-joy-zone">
       <div id="poss-joy-bg"></div>
@@ -325,11 +367,12 @@ function _onGranted(duration) {
   _possessed = true;
 
   _ui.btn.classList.add('poss-hidden');
-  _ui.timer.style.display   = 'block';
-  _ui.vidWrap.style.display = 'block';
-  _ui.joyZone.style.display = 'flex';
-  _ui.release.style.display = 'block';
-  _ui.secs.textContent      = duration;
+  _ui.timer.style.display    = 'block';
+  _ui.vidWrap.style.display  = 'block';
+  _ui.vidLabel.style.display = 'flex';   // show "CONNECTING…" until first frame
+  _ui.joyZone.style.display  = 'flex';
+  _ui.release.style.display  = 'block';
+  _ui.secs.textContent       = duration;
 
   // Send joystick at 20 fps — always send so sheep stops when stick is centred
   _inputInterval = setInterval(() => {
@@ -361,7 +404,7 @@ function _onEnded() {
     _peerConnection = null;
   }
   _ui.video.srcObject        = null;
-  _ui.vidLabel.style.display = '';   // restore "SHEEP CAM" placeholder text
+  _ui.vidLabel.style.display = 'flex';   // restore "CONNECTING…" loader for next session
 
   _ui.btn.textContent   = 'Inhabit a sheep';
   _ui.btn.style.opacity = '1';
@@ -389,11 +432,68 @@ async function _handleOffer(sdp) {
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
     });
 
-    // When the video track arrives, push it into the sheep-cam <video> element
+    // ── Diagnostic logging ────────────────────────────────────────────────
+    pc.oniceconnectionstatechange = () =>
+      console.log('[WebRTC] ICE state:', pc.iceConnectionState);
+    pc.onconnectionstatechange    = () =>
+      console.log('[WebRTC] Connection state:', pc.connectionState);
+    pc.onsignalingstatechange     = () =>
+      console.log('[WebRTC] Signaling state:', pc.signalingState);
+
+    // When the video track arrives, push it into the sheep-cam <video> element.
+    // Unity WebRTC does NOT always populate e.streams[], so fall back to
+    // wrapping the bare track in a new MediaStream.
     pc.ontrack = e => {
-      _ui.video.srcObject        = e.streams[0];
-      _ui.vidLabel.style.display = 'none';
-      console.log('[WebRTC] Sheep-cam video stream connected');
+      console.log('[WebRTC] ontrack fired — kind:', e.track.kind,
+                  '| streams:', e.streams.length);
+
+      const stream = (e.streams && e.streams[0])
+        ? e.streams[0]
+        : new MediaStream([e.track]);
+
+      _ui.video.srcObject = stream;
+      // DON'T hide the loading label yet — wait for the first real frame.
+      // The 'loadeddata' event fires when the browser has decoded a frame.
+      _ui.video.addEventListener('loadeddata', () => {
+        _ui.vidLabel.style.display = 'none';
+        console.log('[WebRTC] First video frame decoded — hiding loader');
+      }, { once: true });
+
+      // Some browsers (mobile Safari) don't autoplay even with `autoplay muted`
+      _ui.video.play().catch(err =>
+        console.warn('[WebRTC] video.play() rejected:', err));
+
+      console.log('[WebRTC] Sheep-cam stream attached to video element');
+
+      // ── Diagnostic: poll inbound video stats every 1s ───────────────────
+      // Tells us EXACTLY whether bytes are arriving, frames are decoding, etc.
+      const pollStats = async () => {
+        if (!_peerConnection || _peerConnection.connectionState === 'closed') {
+          clearInterval(statsTimer);
+          return;
+        }
+        const stats = await _peerConnection.getStats();
+        let found = false;
+        stats.forEach(r => {
+          if (r.type === 'inbound-rtp' && r.kind === 'video') {
+            found = true;
+            console.log('%c[WebRTC] inbound-rtp:',
+              'color:#00c8b4;font-weight:bold',
+              'bytes=' + r.bytesReceived,
+              'packets=' + r.packetsReceived,
+              'framesDecoded=' + r.framesDecoded,
+              'framesDropped=' + r.framesDropped,
+              'fps=' + (r.framesPerSecond || 0),
+              '| <video>:', _ui.video.videoWidth + 'x' + _ui.video.videoHeight,
+              'paused=' + _ui.video.paused,
+              'readyState=' + _ui.video.readyState);
+          }
+        });
+        if (!found) console.log('[WebRTC] (no inbound-rtp report yet)');
+      };
+      // Fire once after 500ms, then every 1s
+      setTimeout(pollStats, 500);
+      const statsTimer = setInterval(pollStats, 1000);
     };
 
     _peerConnection = pc;
