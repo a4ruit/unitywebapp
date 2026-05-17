@@ -198,22 +198,28 @@ function _buildUI() {
     }
     #poss-loading-bar {
       position: relative;
-      width: 60%;
-      height: 2px;
-      background: rgba(0,200,180,0.15);
+      width: 65%;
+      height: 10px;
+      background: rgba(0,200,180,0.10);
+      border: 1px solid rgba(0,200,180,0.6);
       overflow: hidden;
+      image-rendering: pixelated;
+      padding: 1px;
+      box-sizing: border-box;
     }
+    /* The fill: jumps in 10 discrete chunks across the bar */
     #poss-loading-bar::after {
       content: '';
-      position: absolute;
-      top: 0; bottom: 0;
-      width: 40%;
-      background: linear-gradient(90deg, transparent, #00c8b4, transparent);
-      animation: poss-loading-slide 1.4s ease-in-out infinite;
+      display: block;
+      height: 100%;
+      width: 0%;
+      background: #00c8b4;
+      animation: poss-pixel-fill 1.8s steps(10) infinite;
+      box-shadow: 0 0 6px rgba(0,200,180,0.5);
     }
-    @keyframes poss-loading-slide {
-      0%   { left: -40%; }
-      100% { left: 100%; }
+    @keyframes poss-pixel-fill {
+      from { width: 0%;   }
+      to   { width: 100%; }
     }
 
     /* ── Virtual joystick ── */
@@ -274,7 +280,7 @@ function _buildUI() {
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
     <div id="poss-video-wrap">
-      <video id="poss-video" autoplay playsinline muted></video>
+      <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
       <div id="poss-video-label">
         <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
         <div id="poss-loading-bar"></div>
@@ -354,6 +360,17 @@ function _setupJoystick() {
 function _requestPossession() {
   _ui.btn.textContent   = 'Requesting…';
   _ui.btn.style.opacity = '0.5';
+
+  // ── iOS Safari autoplay priming ─────────────────────────────────────────
+  // iOS only allows autoplay on a <video> if .play() was invoked at least
+  // once inside a user-gesture handler. Our actual .play() happens later in
+  // pc.ontrack — by then the gesture has expired. Calling .play() here
+  // (synchronously, while the click event is still on the stack) gives the
+  // element a "user-approved" token so it can autoplay when the stream
+  // arrives asynchronously. Source-less play() throws — we swallow it.
+  _ui.video.muted = true;            // double-insurance for autoplay rules
+  _ui.video.play().catch(() => {});  // silent — expected to reject (no src)
+
   // Uses main.js global send() — already handles ws.readyState check
   send(`possess_request|${CLIENT_ID}`);
 }
@@ -452,16 +469,31 @@ async function _handleOffer(sdp) {
         : new MediaStream([e.track]);
 
       _ui.video.srcObject = stream;
+
       // DON'T hide the loading label yet — wait for the first real frame.
-      // The 'loadeddata' event fires when the browser has decoded a frame.
       _ui.video.addEventListener('loadeddata', () => {
         _ui.vidLabel.style.display = 'none';
         console.log('[WebRTC] First video frame decoded — hiding loader');
       }, { once: true });
 
-      // Some browsers (mobile Safari) don't autoplay even with `autoplay muted`
-      _ui.video.play().catch(err =>
-        console.warn('[WebRTC] video.play() rejected:', err));
+      // Aggressive play attempt — also try on 'playing' and 'canplay' events
+      const tryPlay = () => _ui.video.play().catch(err => {
+        console.warn('[WebRTC] video.play() rejected:', err.name);
+        // If autoplay was blocked, swap the loader for a "TAP TO PLAY" prompt
+        if (err.name === 'NotAllowedError') {
+          _ui.vidLabel.innerHTML =
+            '<div style="cursor:pointer;padding:14px 22px;border:1px solid #00c8b4;' +
+            'background:rgba(0,200,180,0.15);">▶  TAP TO START</div>';
+          _ui.vidLabel.onclick = () => {
+            _ui.video.play().then(() => {
+              _ui.vidLabel.style.display = 'none';
+              _ui.vidLabel.onclick = null;
+            });
+          };
+        }
+      });
+      tryPlay();
+      _ui.video.addEventListener('canplay', tryPlay, { once: true });
 
       console.log('[WebRTC] Sheep-cam stream attached to video element');
 
