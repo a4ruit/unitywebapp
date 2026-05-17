@@ -208,7 +208,7 @@ function _buildUI() {
       box-sizing: border-box;
     }
     /* The fill: 20 discrete chunks over 10 seconds, holds at 100%.
-       Animation only runs while the `.is-loading` class is present. */
+       Animation only runs while the .is-loading class is present. */
     #poss-loading-bar::after {
       content: '';
       display: block;
@@ -456,7 +456,22 @@ async function _handleOffer(sdp) {
     if (!sdp.endsWith('\r\n')) sdp += '\r\n';
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      // STUN + TURN: STUN handles open NAT, TURN relays through a public
+      // server for networks that block peer-to-peer (uni WiFi, guest WiFi,
+      // mobile carriers with symmetric NAT). Open Relay Project — free
+      // public TURN for testing. Swap for your own coturn in production.
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        {
+          urls: [
+            'turn:openrelay.metered.ca:80',
+            'turn:openrelay.metered.ca:443',
+            'turn:openrelay.metered.ca:443?transport=tcp',
+          ],
+          username:   'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ]
     });
 
     // ── Diagnostic logging ────────────────────────────────────────────────
