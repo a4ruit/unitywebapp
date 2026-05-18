@@ -6,7 +6,7 @@ const WS_URL = 'wss://unitywebapp.onrender.com';
 const NATURE_CARDS = [
   { id:'small_cube', name:'Fallen Leaf',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Still green. Give it time.' },
   { id:'large_cube', name:'Wildflowers',     rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
-  { id:'sphere',     name:'Flower Bush',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'In bloom. Spreading beyond the path.' },
+  { id:'sphere',     name:'Flower Bush',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'In bloom. Spreading beyond the path.' },
   { id:'triangle',   name:'Ancient Yew',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It watched the forest grow. It will watch it fall.' },
   { id:'octagon',    name:'The Old Grove',   rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Before the map. Before the name.' },
   { id:'triad',      name:'Pollen Drift',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Carried by nothing. Reaching everything.' },
@@ -577,10 +577,11 @@ function showGodPackComplete() {
 
 function dropCard(card) {
   // If this card supports user-driven placement, request placement instead
-  // of an immediate spawn. The placement modal (possession.js) drives the
-  // preview from the joystick, then sends the final spawn at confirm.
+  // of an immediate spawn. Pass the rarity so Unity can register it in the
+  // Card HUD (regular spawns do this inside SpawnByType, but placement
+  // bypasses that path).
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
-    send(`placement_request|${CLIENT_ID}|${card.placement}`);
+    send(`placement_request|${CLIENT_ID}|${card.placement}|${card.rarity}|${card.name}`);
   } else {
     send(card.command);
   }

@@ -103,8 +103,8 @@ function handlePossessionMessage(data) {
 
   // ── Placement lifecycle ──────────────────────────────────────────────────
   if (msg.startsWith('placement_granted|')) {
-    const parts = msg.split('|');     // [1]=clientId [2]=duration
-    if (parts[1] === CLIENT_ID) { _onPlacementGranted(); return true; }
+    const parts = msg.split('|');     // [1]=clientId [2]=duration [3]=cardName
+    if (parts[1] === CLIENT_ID) { _onPlacementGranted(parts[3]); return true; }
   }
   if (msg.startsWith('placement_denied|')) {
     const parts = msg.split('|');
@@ -743,8 +743,14 @@ function _onSheepAte(total) {
 
 // ── Placement (user-driven card spawning) ──────────────────────────────────
 
-function _onPlacementGranted() {
+function _onPlacementGranted(cardName) {
   _placing = true;
+
+  // Update the card header dynamically — e.g. "WILDFLOWER PLACEMENT" vs "FLOWER BUSH PLACEMENT"
+  if (_ui.placeCardHeader) {
+    const label = (cardName || 'WILDFLOWER').toString().toUpperCase();
+    _ui.placeCardHeader.innerHTML = label + '<br>PLACEMENT';
+  }
 
   // Move joystick + PLACE button INTO the placement card so they live
   // inside the framed modal. They retain their event listeners.
