@@ -44,6 +44,8 @@ let _joyY           = 0;
 let _ui             = null;   // DOM refs, built once on load
 let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
 let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
+let _placing        = false;  // true while user is moving a placement preview
+let _placementInputInterval = null;
 // Session-only: button only unlocks after the user clicks a sheep card in the
 // CURRENT page-life. Reload = locked again. No persistence on purpose.
 let _sheepAvailable = false;
@@ -97,6 +99,20 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('sheep_ate|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onSheepAte(Number(parts[2])); return true; }
+  }
+
+  // ── Placement lifecycle ──────────────────────────────────────────────────
+  if (msg.startsWith('placement_granted|')) {
+    const parts = msg.split('|');     // [1]=clientId [2]=duration
+    if (parts[1] === CLIENT_ID) { _onPlacementGranted(); return true; }
+  }
+  if (msg.startsWith('placement_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onPlacementDenied(); return true; }
+  }
+  if (msg.startsWith('placement_done|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onPlacementDone(); return true; }
   }
 
   // Unity announces this every time a critter-pack common card spawns a sheep.
@@ -342,6 +358,124 @@ function _buildUI() {
       transform: translate(-50%,-50%);
     }
 
+    /* ── Placement modal — fullscreen overlay + card housing the joystick ── */
+    #poss-place-overlay {
+      pointer-events: all;             /* catches ALL events, blocks background */
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 8, 12, 0.75);
+      z-index: 100;                    /* above all other poss-root children */
+      display: none;
+      align-items: center;
+      justify-content: center;
+      animation: poss-overlay-fade 0.22s ease-out;
+    }
+    #poss-place-overlay.active { display: flex; }
+    @keyframes poss-overlay-fade {
+      from { background: rgba(5, 8, 12, 0); }
+      to   { background: rgba(5, 8, 12, 0.75); }
+    }
+
+    #poss-place-card {
+      position: relative;
+      width: min(82vw, 320px);
+      /* Height auto-derived from the PNG's natural aspect ratio. */
+    }
+    /* Opaque backdrop INSIDE the frame's art window — kills page bleed-through
+       while leaving the frame's transparent corners untouched. Adjust the
+       inset to match your frame's actual visible-edge if needed. */
+    #poss-place-card-backdrop {
+      position: absolute;
+      top: 6%;
+      bottom: 6%;
+      left: 6%;
+      right: 6%;
+      background: rgba(8, 12, 18, 0.95);
+      z-index: 0;
+    }
+    #poss-place-card-frame {
+      display: block;
+      width: 100%;
+      height: auto;                    /* preserve PNG's native aspect ratio */
+      pointer-events: none;
+      image-rendering: pixelated;
+      user-select: none;
+      -webkit-user-drag: none;
+      position: relative;
+      z-index: 2;                      /* on top of backdrop AND content */
+    }
+    #poss-place-card-content {
+      position: absolute;
+      top: 13%;
+      bottom: 11%;
+      left: 14%;
+      right: 14%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 1;                      /* above backdrop, below frame border */
+    }
+    #poss-place-card-header {
+      color: #ffb030;
+      font-family: monospace;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(255,176,48,0.7);
+      text-align: center;
+      line-height: 1.5;
+      padding-top: 4%;
+    }
+
+    /* When joystick + PLACE button are children of the card, override their
+       fixed bottom/right positioning so they flow inside the card content. */
+    #poss-place-card-content #poss-joy-zone {
+      position: relative !important;
+      top: auto !important; bottom: auto !important;
+      left: auto !important; right: auto !important;
+      transform: none !important;
+    }
+    #poss-place-card-content #poss-place {
+      position: relative !important;
+      top: auto !important; bottom: auto !important;
+      left: auto !important; right: auto !important;
+    }
+
+    /* ── PLACE button (right thumb, replaces EAT during placement) ── */
+    #poss-place {
+      pointer-events: all;
+      position: absolute;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(80,220,140,0.18);
+      border: 2px solid rgba(80,220,140,0.85);
+      color: #50dc8c;
+      font-family: monospace;
+      font-size: 16px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;        /* centers PLACE text vertically inside the circle */
+      justify-content: center;    /* centers it horizontally */
+      text-align: center;
+      padding: 0;                 /* button user-agent style adds asymmetric padding */
+      text-shadow: 0 0 8px rgba(80,220,140,0.7);
+      box-shadow: 0 0 12px rgba(80,220,140,0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-place:active {
+      background: rgba(80,220,140,0.45);
+      transform: scale(0.92);
+    }
+
     /* ── Eat button (right thumb, mirrors joystick) ── */
     #poss-eat {
       pointer-events: all;
@@ -360,6 +494,10 @@ function _buildUI() {
       text-transform: uppercase;
       cursor: pointer;
       display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
       text-shadow: 0 0 8px rgba(255,176,48,0.7);
       box-shadow: 0 0 12px rgba(255,176,48,0.4);
       transition: transform 0.08s ease-out, background 0.1s;
@@ -414,31 +552,51 @@ function _buildUI() {
       <div id="poss-joy-knob"></div>
     </div>
     <button id="poss-eat">EAT</button>
+    <button id="poss-place">PLACE</button>
     <button id="poss-release">release</button>
+
+    <!-- Placement modal: blocks background, houses joystick + PLACE button -->
+    <div id="poss-place-overlay">
+      <div id="poss-place-card">
+        <div id="poss-place-card-backdrop"></div>
+        <div id="poss-place-card-content">
+          <div id="poss-place-card-header">WILDFLOWER<br>PLACEMENT</div>
+          <!-- joystick and PLACE button are moved here when placement starts -->
+        </div>
+        <img id="poss-place-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
+      </div>
+    </div>
   `;
   document.body.appendChild(root);
 
   _ui = {
-    btn:        root.querySelector('#poss-btn'),
-    timer:      root.querySelector('#poss-timer'),
-    secs:       root.querySelector('#poss-secs'),
-    eaten:      root.querySelector('#poss-eaten'),
-    eatenCount: root.querySelector('#poss-eaten-count'),
-    vidWrap:    root.querySelector('#poss-video-wrap'),
-    video:      root.querySelector('#poss-video'),
-    vidLabel:   root.querySelector('#poss-video-label'),
-    loadingBar: root.querySelector('#poss-loading-bar'),
-    joyZone:    root.querySelector('#poss-joy-zone'),
-    joyKnob:    root.querySelector('#poss-joy-knob'),
-    release:    root.querySelector('#poss-release'),
-    eat:        root.querySelector('#poss-eat'),
+    root:             root,
+    btn:              root.querySelector('#poss-btn'),
+    timer:            root.querySelector('#poss-timer'),
+    secs:             root.querySelector('#poss-secs'),
+    eaten:            root.querySelector('#poss-eaten'),
+    eatenCount:       root.querySelector('#poss-eaten-count'),
+    vidWrap:          root.querySelector('#poss-video-wrap'),
+    video:            root.querySelector('#poss-video'),
+    vidLabel:         root.querySelector('#poss-video-label'),
+    loadingBar:       root.querySelector('#poss-loading-bar'),
+    joyZone:          root.querySelector('#poss-joy-zone'),
+    joyKnob:          root.querySelector('#poss-joy-knob'),
+    release:          root.querySelector('#poss-release'),
+    eat:              root.querySelector('#poss-eat'),
+    place:            root.querySelector('#poss-place'),
+    placeOverlay:     root.querySelector('#poss-place-overlay'),
+    placeCardContent: root.querySelector('#poss-place-card-content'),
+    placeCardHeader:  root.querySelector('#poss-place-card-header'),
   };
 
   _ui.btn.addEventListener('click',     _requestPossession);
   _ui.release.addEventListener('click', _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
-  _ui.eat.addEventListener('touchstart', e => { e.preventDefault(); _eat(); }, { passive: false });
-  _ui.eat.addEventListener('click',      _eat);
+  _ui.eat.addEventListener('touchstart',   e => { e.preventDefault(); _eat();          }, { passive: false });
+  _ui.eat.addEventListener('click',        _eat);
+  _ui.place.addEventListener('touchstart', e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
+  _ui.place.addEventListener('click',      _confirmPlace);
   _setupJoystick();
 
   // Hide the Inhabit button until at least one sheep has been pulled.
@@ -583,6 +741,68 @@ function _onSheepAte(total) {
   setTimeout(() => _ui.eaten && _ui.eaten.classList.remove('bump'), 150);
 }
 
+// ── Placement (user-driven card spawning) ──────────────────────────────────
+
+function _onPlacementGranted() {
+  _placing = true;
+
+  // Move joystick + PLACE button INTO the placement card so they live
+  // inside the framed modal. They retain their event listeners.
+  _ui.placeCardContent.appendChild(_ui.joyZone);
+  _ui.placeCardContent.appendChild(_ui.place);
+  _ui.joyZone.style.display = 'flex';
+  _ui.place.style.display   = 'flex';
+
+  // Show the overlay — pointer-events:all means the entire background
+  // (pack carousel, shop, stars, everything) is now uninteractable
+  // until placement completes.
+  _ui.placeOverlay.classList.add('active');
+
+  // Hide the inhabit button while placing
+  _ui.btn.classList.add('poss-hidden');
+
+  // Stream joystick magnitude/direction to Unity at 20fps as placement_move
+  _placementInputInterval = setInterval(() => {
+    send(`placement_move|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+  }, 50);
+
+  console.log('[possession.js] Placement started — UI modal active, background blocked');
+}
+
+function _onPlacementDenied() {
+  console.log('[possession.js] Placement denied (someone else is placing)');
+  if (_sheepAvailable && _ui) _ui.btn.classList.remove('poss-hidden');
+}
+
+function _onPlacementDone() {
+  _placing = false;
+  clearInterval(_placementInputInterval);
+  _placementInputInterval = null;
+  _joyX = 0; _joyY = 0;
+
+  // Move joystick + PLACE button back to the root so their default
+  // CSS positioning takes over again for the next possession session.
+  _ui.root.appendChild(_ui.joyZone);
+  _ui.root.appendChild(_ui.place);
+
+  _ui.joyZone.style.display   = 'none';
+  _ui.place.style.display     = 'none';
+  _ui.joyKnob.style.transform = 'translate(-50%,-50%)';
+
+  // Hide overlay (unblocks the pack screen)
+  _ui.placeOverlay.classList.remove('active');
+
+  // Restore the inhabit button if a sheep is still available
+  if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
+
+  console.log('[possession.js] Placement done — modal closed, background unblocked');
+}
+
+function _confirmPlace() {
+  if (!_placing) return;
+  send(`placement_confirm|${CLIENT_ID}`);
+}
+
 function _onEnded() {
   _possessed = false;
   clearInterval(_inputInterval);
@@ -599,10 +819,15 @@ function _onEnded() {
   _ui.vidLabel.style.display = 'flex';   // restore "CONNECTING…" loader for next session
   _ui.loadingBar.classList.remove('is-loading');  // reset bar to empty
 
+  // ── Consume the sheep-card credit ───────────────────────────────────────
+  // Each card pull grants ONE possession. Now that this one is done, lock
+  // the button until a NEW sheep_spawned message arrives.
+  _sheepAvailable = false;
+
   _ui.btn.textContent   = 'Inhabit a sheep';
   _ui.btn.style.opacity = '1';
-  // Only re-show the button if there's a sheep to inhabit — otherwise stay
-  // locked until the next sheep_spawned broadcast arrives.
+  // Button stays hidden — _sheepAvailable is false now, so this is a no-op
+  // unless the user pulls another sheep card later.
   if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
   _ui.timer.style.display   = 'none';
   _ui.eaten.style.display   = 'none';
