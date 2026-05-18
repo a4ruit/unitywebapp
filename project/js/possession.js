@@ -32,6 +32,16 @@
 console.log('%c[possession.js] v2025-05-17 — WebRTC stats poller + MediaStream fallback',
   'color:#00c8b4; font-weight:bold');
 
+// ── TURN server configuration ──────────────────────────────────────────────
+// Fill these in with your self-hosted coturn VPS details. Leave host empty
+// to fall through to the openrelay public TURN only.
+// (When you deploy to production, sync these with the Inspector values on
+// SheepPossessionManager so Unity & browser hit the SAME TURN server.)
+const TURN_HOST     = '209.38.22.49';
+const TURN_PORT     = 3478;
+const TURN_USERNAME = 'swipe2pull';
+const TURN_PASSWORD = 'Tan440tive4!!';
+
 // ── Unique ID per page load — survives reconnects, lost on refresh ─────────
 const CLIENT_ID = 'web_' + Math.random().toString(36).slice(2, 11);
 
@@ -857,22 +867,31 @@ async function _handleOffer(sdp) {
     if (!sdp.endsWith('\r\n')) sdp += '\r\n';
 
     const pc = new RTCPeerConnection({
-      // STUN + TURN: STUN handles open NAT, TURN relays through a public
-      // server for networks that block peer-to-peer (uni WiFi, guest WiFi,
-      // mobile carriers with symmetric NAT). Open Relay Project — free
-      // public TURN for testing. Swap for your own coturn in production.
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        {
+      // STUN + TURN. Production = self-hosted coturn; Open Relay as fallback.
+      iceServers: (() => {
+        const list = [{ urls: 'stun:stun.l.google.com:19302' }];
+        if (TURN_HOST && TURN_USERNAME) {
+          list.push({
+            urls: [
+              `turn:${TURN_HOST}:${TURN_PORT}`,
+              `turn:${TURN_HOST}:${TURN_PORT}?transport=tcp`,
+            ],
+            username:   TURN_USERNAME,
+            credential: TURN_PASSWORD,
+          });
+          console.log(`[WebRTC] Using self-hosted TURN: turn:${TURN_HOST}:${TURN_PORT}`);
+        }
+        list.push({
           urls: [
             'turn:openrelay.metered.ca:80',
             'turn:openrelay.metered.ca:443',
             'turn:openrelay.metered.ca:443?transport=tcp',
           ],
           username:   'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ]
+          credential: 'openrelayproject',
+        });
+        return list;
+      })()
     });
 
     // ── Diagnostic logging ────────────────────────────────────────────────
