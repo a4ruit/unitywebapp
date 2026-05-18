@@ -44,6 +44,11 @@ let _joyY           = 0;
 let _ui             = null;   // DOM refs, built once on load
 let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
 let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
+// Session-only: button only unlocks after the user clicks a sheep card in the
+// CURRENT page-life. Reload = locked again. No persistence on purpose.
+let _sheepAvailable = false;
+// Clean up any leftover flag from prior versions that persisted across reloads.
+try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 
 // ── Globals called by main.js ──────────────────────────────────────────────
 
@@ -85,6 +90,21 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('possess_tick|')) {
     const parts = msg.split('|');            // [1]=clientId [2]=secsLeft
     if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+
+  // Unity broadcasts this every time the possessed sheep eats a Resource.
+  // Format: sheep_ate|clientId|totalEaten
+  if (msg.startsWith('sheep_ate|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onSheepAte(Number(parts[2])); return true; }
+  }
+
+  // Unity announces this every time a critter-pack common card spawns a sheep.
+  // Unlocks the "Inhabit a sheep" button (and remembers across page reloads).
+  // Match defensively: trims, accepts pipe-suffixed variants too.
+  if (msg === 'sheep_spawned' || msg.startsWith('sheep_spawned|') || msg.startsWith('sheep_spawned ')) {
+    _onSheepSpawned();
+    return true;
   }
 
   // Unity sends the WebRTC offer once the possession camera is ready.
@@ -177,6 +197,25 @@ function _buildUI() {
       display: none;
       white-space: nowrap;
       z-index: 2;
+    }
+    /* ── Eaten counter ── */
+    #poss-eaten {
+      position: absolute;
+      top: 46px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: #ffb030;
+      font-size: 11px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      text-shadow: 0 0 8px rgba(255,176,48,0.7);
+      display: none;
+      white-space: nowrap;
+      z-index: 2;
+      transition: transform 0.15s ease-out;
+    }
+    #poss-eaten.bump {
+      transform: translateX(-50%) scale(1.25);
     }
 
     /* ── Sheep-cam framed as a trading card ──
@@ -303,6 +342,36 @@ function _buildUI() {
       transform: translate(-50%,-50%);
     }
 
+    /* ── Eat button (right thumb, mirrors joystick) ── */
+    #poss-eat {
+      pointer-events: all;
+      position: absolute;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(255,176,48,0.18);
+      border: 2px solid rgba(255,176,48,0.85);
+      color: #ffb030;
+      font-family: monospace;
+      font-size: 16px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      text-shadow: 0 0 8px rgba(255,176,48,0.7);
+      box-shadow: 0 0 12px rgba(255,176,48,0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-eat:active {
+      background: rgba(255,176,48,0.45);
+      transform: scale(0.92);
+    }
+
     /* ── Release button (appears during possession) ── */
     #poss-release {
       pointer-events: all;
@@ -329,6 +398,7 @@ function _buildUI() {
   root.innerHTML = `
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
+    <div id="poss-eaten">EATEN — <span id="poss-eaten-count">0</span></div>
     <div id="poss-video-wrap">
       <div id="poss-art-window">
         <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
@@ -343,6 +413,7 @@ function _buildUI() {
       <div id="poss-joy-bg"></div>
       <div id="poss-joy-knob"></div>
     </div>
+    <button id="poss-eat">EAT</button>
     <button id="poss-release">release</button>
   `;
   document.body.appendChild(root);
@@ -351,6 +422,8 @@ function _buildUI() {
     btn:        root.querySelector('#poss-btn'),
     timer:      root.querySelector('#poss-timer'),
     secs:       root.querySelector('#poss-secs'),
+    eaten:      root.querySelector('#poss-eaten'),
+    eatenCount: root.querySelector('#poss-eaten-count'),
     vidWrap:    root.querySelector('#poss-video-wrap'),
     video:      root.querySelector('#poss-video'),
     vidLabel:   root.querySelector('#poss-video-label'),
@@ -358,11 +431,22 @@ function _buildUI() {
     joyZone:    root.querySelector('#poss-joy-zone'),
     joyKnob:    root.querySelector('#poss-joy-knob'),
     release:    root.querySelector('#poss-release'),
+    eat:        root.querySelector('#poss-eat'),
   };
 
   _ui.btn.addEventListener('click',     _requestPossession);
   _ui.release.addEventListener('click', _releasePossession);
+  // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
+  _ui.eat.addEventListener('touchstart', e => { e.preventDefault(); _eat(); }, { passive: false });
+  _ui.eat.addEventListener('click',      _eat);
   _setupJoystick();
+
+  // Hide the Inhabit button until at least one sheep has been pulled.
+  // _sheepAvailable starts as true if localStorage remembers a prior pull.
+  if (!_sheepAvailable) {
+    _ui.btn.classList.add('poss-hidden');
+    console.log('[possession.js] Inhabit button locked — waiting for first sheep_spawned');
+  }
 }
 
 // ── Joystick ───────────────────────────────────────────────────────────────
@@ -434,15 +518,23 @@ function _releasePossession() {
   _onEnded();   // optimistic — server will confirm with possess_ended
 }
 
+function _eat() {
+  if (!_possessed) return;
+  send(`sheep_eat|${CLIENT_ID}`);
+}
+
 function _onGranted(duration) {
   _possessed = true;
 
   _ui.btn.classList.add('poss-hidden');
   _ui.timer.style.display    = 'block';
+  _ui.eaten.style.display    = 'block';
+  _ui.eatenCount.textContent = '0';
   _ui.vidWrap.style.display  = 'block';
   _ui.vidLabel.style.display = 'flex';   // show "CONNECTING…" until first frame
   _ui.joyZone.style.display  = 'flex';
   _ui.release.style.display  = 'block';
+  _ui.eat.style.display      = 'flex';
   _ui.secs.textContent       = duration;
 
   // Restart the 10s loading-bar animation by toggling the class with a reflow
@@ -464,8 +556,31 @@ function _onDenied() {
   _ui.btn.style.opacity = '1';
 }
 
+/**
+ * Called when Unity broadcasts that a sheep has joined the colony
+ * (i.e. the user pulled the common card in a critter pack).
+ * Unlocks the Inhabit button and persists across reloads.
+ */
+function _onSheepSpawned() {
+  _sheepAvailable = true;
+  if (_ui && !_possessed) {
+    _ui.btn.classList.remove('poss-hidden');
+    console.log('[possession.js] Sheep card pulled — Inhabit button unlocked');
+  }
+}
+
 function _onTick(secsLeft) {
   _ui.secs.textContent = secsLeft;
+}
+
+/**
+ * Called when Unity tells us the sheep just ate something.
+ * Updates the eaten counter with a brief scale-bump for feedback.
+ */
+function _onSheepAte(total) {
+  _ui.eatenCount.textContent = total;
+  _ui.eaten.classList.add('bump');
+  setTimeout(() => _ui.eaten && _ui.eaten.classList.remove('bump'), 150);
 }
 
 function _onEnded() {
@@ -486,11 +601,15 @@ function _onEnded() {
 
   _ui.btn.textContent   = 'Inhabit a sheep';
   _ui.btn.style.opacity = '1';
-  _ui.btn.classList.remove('poss-hidden');
+  // Only re-show the button if there's a sheep to inhabit — otherwise stay
+  // locked until the next sheep_spawned broadcast arrives.
+  if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
   _ui.timer.style.display   = 'none';
+  _ui.eaten.style.display   = 'none';
   _ui.vidWrap.style.display = 'none';
   _ui.joyZone.style.display = 'none';
   _ui.release.style.display = 'none';
+  _ui.eat.style.display     = 'none';
   _ui.joyKnob.style.transform = 'translate(-50%,-50%)';
 }
 
