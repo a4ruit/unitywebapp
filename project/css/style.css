@@ -1739,3 +1739,86 @@ body.pristine-phase #packTypeGarbage.active .pack-type-icon {
 body.pristine-phase #screen-pack .pack-carousel-stage {
   filter: drop-shadow(0 0 6px rgba(129,212,250,0.25)) drop-shadow(0 0 14px rgba(129,212,250,0.10));
 }
+
+/* ── DEBUG: phase toggle button (temporary) ──────────────────────────────── */
+
+.debug-phase-btn {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 9999;
+  background: rgba(10, 10, 10, 0.5);
+  border: 1px solid rgba(200, 200, 200, 0.25);
+  color: rgba(220, 220, 220, 0.6);
+  font-family: inherit;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  cursor: pointer;
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+.debug-phase-btn:active { opacity: 1; }
+.debug-phase-btn[data-phase="horror"] {
+  border-color: rgba(204, 17, 17, 0.5);
+  color: rgba(220, 80, 80, 0.85);
+}
+
+/* ── HORROR ROULETTE (Three.js) ──────────────────────────────────────────── */
+/* NOTE: never put `display: flex` directly on the ID — `.screen.hidden { display:none }`
+   would lose the specificity war and the screen would render on top of every other one. */
+
+#screen-horror-spin:not(.hidden) {
+  /* Fully transparent — the bg-grid pixel art behind shows through unobstructed.
+     No backdrop blur, no tint, no overlay. */
+  background: transparent;
+  gap: 24px;
+}
+
+/* Suppress the body vignette + grid overlay while the horror spin is active
+   so the bg-grid (horror background image) reads cleanly without darkening. */
+body:has(#screen-horror-spin:not(.hidden))::after,
+body:has(#screen-horror-spin:not(.hidden))::before {
+  opacity: 0;
+}
+
+/* Pointer — chunky pixel arrow over the top of the orbit */
+.roulette-pointer {
+  width: 0; height: 0;
+  border-left:  9px solid transparent;
+  border-right: 9px solid transparent;
+  border-top:  14px solid var(--cream);
+  margin-bottom: -6px;
+  z-index: 3;
+  filter: drop-shadow(0 0 4px rgba(232,224,200,0.6));
+}
+
+/* 3D canvas container — Three.js renderer is appended here */
+.roulette-3d-wrap {
+  position: relative;
+  width: 280px;
+  height: 280px;
+}
+.roulette-3d-wrap canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  image-rendering: pixelated;
+}
+
+/* Spin / confirm button — minimal outline */
+.roulette-btn {
+  background: none;
+  border: 2px solid var(--cream);
+  color: var(--cream);
+  font-family: inherit;
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  padding: 11px 38px;
+  cursor: pointer;
+  transition: opacity 0.2s, background 0.15s;
+}
+.roulette-btn:disabled { opacity: 0.35; cursor: default; }
+.roulette-btn:not(:disabled):active {
+  background: rgba(232,224,200,0.12);
+}

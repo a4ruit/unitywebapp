@@ -576,15 +576,21 @@ function showGodPackComplete() {
 // ─── Normal drop ──────────────────────────────────────────────────────────────
 
 function dropCard(card) {
-  // If this card supports user-driven placement, request placement instead
-  // of an immediate spawn. Pass the rarity so Unity can register it in the
-  // Card HUD (regular spawns do this inside SpawnByType, but placement
-  // bypasses that path).
+  // Placement cards get their own modal regardless of phase
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
     send(`placement_request|${CLIENT_ID}|${card.placement}|${card.rarity}|${card.name}`);
-  } else {
-    send(card.command);
+    resetToPackScreen();
+    return;
   }
+
+  // Horror phase (non-godpack) gets an extra variant spin before spawning
+  const isHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
+  if (isHorror && !isGodPack) {
+    showHorrorSpin(card);   // resetToPackScreen() fires inside the spin confirm
+    return;
+  }
+
+  send(card.command);
   resetToPackScreen();
 }
 
@@ -618,3 +624,544 @@ initPack();
 updatePackCarousel(activePackType);
 setTickerState('idle');
 initCounter();
+
+// ── DEBUG: phase toggle (temporary) ───────────────────────────────────────
+// Single button in top-left flips packsOpened between 0 (pristine) and 15
+// (horror threshold). Calls the regular updateCorruption() so the existing
+// transition logic — tab swaps, glitch effect, pack type sync — fires exactly
+// as it would after a real 15-pack grind. Remove this block + the HTML button
+// + the CSS rule before production.
+
+function debugTogglePhase() {
+  const btn = document.getElementById('debugPhaseBtn');
+  const inHorror = packsOpened >= HORROR_THRESHOLD;
+  packsOpened = inHorror ? 0 : HORROR_THRESHOLD;
+  updateCorruption();
+  if (inHorror) {
+    btn.textContent = '▸ horror';
+    btn.dataset.phase = 'pristine';
+  } else {
+    btn.textContent = '◂ pristine';
+    btn.dataset.phase = 'horror';
+  }
+}
+
+// ── Horror Phase Roulette (Three.js) ──────────────────────────────────────
+// Five 3D items orbit around the Z axis. They spin individually on their own
+// axes too. On tap, the orbit accelerates and decelerates via cubic ease-out
+// over SPIN_DURATION_MS, landing the winner under the top pointer.
+// HOLO uses a custom rainbow shader for iridescence. Result is cosmetic —
+// Unity always receives the standard spawn command.
+
+const HORROR_VARIANTS = [
+  { id:'flesh',  label:'FLESH',  prob:35, color:'#8B2020' },
+  { id:'pallor', label:'PALLOR', prob:30, color:'#C8B89A' },
+  { id:'bile',   label:'BILE',   prob:25, color:'#6B7A12' },
+  { id:'void',   label:'VOID',   prob:8,  color:'#8A2FBE' },
+  { id:'holo',   label:'HOLO',   prob:2,  color:'#ffccff' },
+];
+
+const SPIN_DURATION_MS = 3000;
+
+let _spinPendingCard = null;
+let _spinPhase       = 'idle';   // idle | spinning | done
+
+// Three.js scene state for the 3D roulette
+const _spin3D = {
+  scene: null, camera: null, renderer: null,
+  group: null, items: [], rafId: null,
+  isSpinning: false,
+  frozen: false,                // true once the wheel lands — kills item rotation + idle orbit
+  reveal: null,                 // active winner-reveal tween, or null
+  lastT: 0, idleSpin: 0.55,
+};
+
+const REVEAL_DURATION_MS = 800;   // winner moves to centre + losers fade
+
+// Loaded pack-symbol image cache (avoid re-loading the same PNG)
+const _packSymbolImgCache = {};
+
+// Map active pack type → horror pack symbol PNG
+function _packSymbolPath() {
+  if (activePackType === 'ewaste') return 'assets/scourge-symbol.png';
+  if (activePackType === 'adpack') return 'assets/ritual-symbol.png';
+  return 'assets/flesh-symbol.png';   // garbage / default
+}
+
+function _loadPackSymbol(cb) {
+  const path = _packSymbolPath();
+  if (_packSymbolImgCache[path]) { cb(_packSymbolImgCache[path]); return; }
+  const img = new Image();
+  img.onload  = () => { _packSymbolImgCache[path] = img; cb(img); };
+  img.onerror = () => cb(null);
+  img.src = path;
+}
+
+// Build a THREE.Texture from a loaded HTMLImageElement, set up for pixel-art
+// (NearestFilter, no mipmaps). Used for the symbol overlay planes.
+function _makeSymbolTexture(symbolImg) {
+  if (!symbolImg) return null;
+  const tex = new THREE.Texture(symbolImg);
+  tex.magFilter       = THREE.NearestFilter;
+  tex.minFilter       = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate     = true;
+  return tex;
+}
+
+// Rounded-square outline used for the token geometry. Returns a THREE.Shape
+// with smooth quadratic-curve corners.
+function _makeRoundedSquareShape(size, cornerRadius) {
+  const s = size / 2;
+  const r = cornerRadius;
+  const shape = new THREE.Shape();
+  shape.moveTo(-s + r, -s);
+  shape.lineTo( s - r, -s);
+  shape.quadraticCurveTo( s, -s,  s, -s + r);
+  shape.lineTo( s,  s - r);
+  shape.quadraticCurveTo( s,  s,  s - r,  s);
+  shape.lineTo(-s + r,  s);
+  shape.quadraticCurveTo(-s,  s, -s,  s - r);
+  shape.lineTo(-s, -s + r);
+  shape.quadraticCurveTo(-s, -s, -s + r, -s);
+  return shape;
+}
+
+// Soft radial glow texture — used by the HOLO bloom plane behind the cube.
+// Pink → purple radial fade, additively blended for a halo.
+function _makeHoloGlowTexture() {
+  const SIZE = 64;
+  const c = document.createElement('canvas');
+  c.width = c.height = SIZE;
+  const ctx = c.getContext('2d');
+  const grad = ctx.createRadialGradient(SIZE/2, SIZE/2, 4, SIZE/2, SIZE/2, SIZE/2);
+  grad.addColorStop(0,   'rgba(255,180,255,0.95)');
+  grad.addColorStop(0.4, 'rgba(220,130,255,0.55)');
+  grad.addColorStop(1,   'rgba(120,60,200,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, SIZE, SIZE);
+  const tex = new THREE.CanvasTexture(c);
+  tex.magFilter = THREE.LinearFilter;  // glow is soft — no need to pixelate
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  return tex;
+}
+
+// Iridescent material for the HOLO cube. Draws:
+//   1. an animated rainbow frame around each face (the "holographic outline")
+//   2. a diagonal shimmer sweep across the inside ("shininess")
+//   3. the pack symbol underneath everything
+function _makeHoloMaterial() {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    uniforms: {
+      time:     { value: 0 },
+      uOpacity: { value: 1.0 },
+    },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      uniform float uOpacity;
+      varying vec2 vUv;
+
+      vec3 rainbow(float h) {
+        h = floor(fract(h) * 8.0) / 8.0;
+        return vec3(
+          0.5 + 0.5 * cos(6.2831 * h + 0.0),
+          0.5 + 0.5 * cos(6.2831 * h + 2.094),
+          0.5 + 0.5 * cos(6.2831 * h + 4.188)
+        );
+      }
+
+      void main() {
+        // Rainbow tint across the full surface — the symbol overlay plane
+        // handles the icon, so the token body is pure iridescence + shimmer.
+        vec3 holoCol = rainbow(vUv.x * 0.4 + vUv.y * 0.3 + time * 0.35);
+        float sweep   = (vUv.x + vUv.y) * 6.0 - time * 4.0;
+        float shimmer = pow(max(0.0, 0.5 + 0.5 * sin(sweep)), 14.0);
+        vec3 col = holoCol * 1.15 + vec3(shimmer * 0.9);
+        gl_FragColor = vec4(col, uOpacity);
+      }
+    `,
+  });
+}
+
+function _initSpin3D() {
+  if (_spin3D.renderer) return;
+  const wrap = document.getElementById('roulette3DWrap');
+  if (!wrap || typeof THREE === 'undefined') return;
+
+  const W = wrap.clientWidth  || 280;
+  const H = wrap.clientHeight || 280;
+
+  _spin3D.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+  _spin3D.renderer.setPixelRatio(1);   // no high-DPI — we want chunky pixels
+  // Render at half res; CSS scales the canvas up to 280×280 with `image-rendering:
+  // pixelated` for that authentic low-poly 3D pixel feel.
+  const renderW = Math.round(W * 0.5);
+  const renderH = Math.round(H * 0.5);
+  _spin3D.renderer.setSize(renderW, renderH, false);
+  const canvasEl = _spin3D.renderer.domElement;
+  canvasEl.style.width  = W + 'px';
+  canvasEl.style.height = H + 'px';
+  _spin3D.renderer.setClearColor(0x000000, 0);
+  wrap.appendChild(canvasEl);
+
+  _spin3D.scene  = new THREE.Scene();
+  _spin3D.camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+  _spin3D.camera.position.set(0, 0, 5);
+  _spin3D.camera.lookAt(0, 0, 0);
+
+  // Orbit container — rotation.z drives the carousel
+  _spin3D.group = new THREE.Group();
+  _spin3D.scene.add(_spin3D.group);
+
+  _spin3D.lastT = performance.now();
+  _spinAnimate();
+}
+
+// Tear down current items and rebuild them with the active pack's symbol.
+// Called each time the horror spin screen is opened.
+function _buildSpinItems() {
+  if (!_spin3D.group) return;
+
+  // Dispose & remove existing items. The winner may have been reparented to
+  // the scene during the previous reveal — remove from whichever parent it's in.
+  _spin3D.items.forEach(item => {
+    [item.mesh, item.glow].forEach(m => {
+      if (!m) return;
+      if (m.parent) m.parent.remove(m);
+      if (m.geometry) m.geometry.dispose();
+      const disposeMat = (mat) => {
+        if (!mat) return;
+        if (mat.map) mat.map.dispose();
+        if (mat.uniforms && mat.uniforms.map && mat.uniforms.map.value) {
+          mat.uniforms.map.value.dispose();
+        }
+        mat.dispose();
+      };
+      if (Array.isArray(m.material)) m.material.forEach(disposeMat);
+      else disposeMat(m.material);
+    });
+  });
+  _spin3D.items  = [];
+  _spin3D.frozen = false;
+  _spin3D.reveal = null;
+
+  _loadPackSymbol((symbolImg) => {
+    const radius = 1.5;
+    const N = HORROR_VARIANTS.length;
+    // One symbol texture shared by all 5 items (same pack PNG)
+    const symbolTex = _makeSymbolTexture(symbolImg);
+
+    HORROR_VARIANTS.forEach((v, i) => {
+      // θ measured CCW from +X. Top = π/2. Clockwise arrangement from top.
+      const theta = Math.PI / 2 - (i * Math.PI * 2 / N);
+      const x = Math.cos(theta) * radius;
+      const y = Math.sin(theta) * radius;
+
+      // Token geometry — flat rounded square, slight extrusion. Centred on Z.
+      const tokenShape = _makeRoundedSquareShape(0.7, 0.16);
+      const tokenGeom  = new THREE.ExtrudeGeometry(tokenShape, {
+        depth:        0.08,
+        bevelEnabled: false,
+        curveSegments: 6,
+      });
+      tokenGeom.translate(0, 0, -0.04);
+
+      let mesh, glow = null;
+
+      if (v.id === 'holo') {
+        // Bloom glow plane behind — billboarded via counter-rotation
+        glow = new THREE.Mesh(
+          new THREE.PlaneGeometry(1.6, 1.6),
+          new THREE.MeshBasicMaterial({
+            map: _makeHoloGlowTexture(),
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          })
+        );
+        glow.position.set(x, y, -0.4);
+        _spin3D.group.add(glow);
+
+        // HOLO token body — pure iridescent shader (rainbow + shimmer)
+        mesh = new THREE.Mesh(tokenGeom, _makeHoloMaterial());
+      } else {
+        // Regular token body — solid rarity colour (the rarity outline IS
+        // the whole token; no canvas-baked frame needed).
+        mesh = new THREE.Mesh(
+          tokenGeom,
+          new THREE.MeshBasicMaterial({
+            color: v.color,
+            transparent: true,
+          })
+        );
+      }
+
+      mesh.position.set(x, y, 0);
+      mesh.userData = {
+        variant: v,
+        spinAxis: new THREE.Vector3(
+          Math.random() - 0.5,
+          Math.random() - 0.5,
+          Math.random() - 0.5
+        ).normalize(),
+        spinSpeed: 0.5 + Math.random() * 0.7,
+      };
+
+      // Symbol overlay — two child planes (front + back), each with the pack
+      // PNG. Because they're separate meshes (not canvas-baked into the token
+      // texture) the PNG renders with full alpha/colour fidelity.
+      if (symbolTex) {
+        const symGeom = new THREE.PlaneGeometry(0.58, 0.58);
+        const symMat  = new THREE.MeshBasicMaterial({
+          map:          symbolTex,
+          transparent:  true,
+          depthWrite:   false,
+        });
+        const symFront = new THREE.Mesh(symGeom, symMat);
+        symFront.position.z = 0.045;
+        mesh.add(symFront);
+
+        const symBack = new THREE.Mesh(symGeom, symMat);
+        symBack.position.z   = -0.045;
+        symBack.rotation.y   = Math.PI;
+        mesh.add(symBack);
+      }
+
+      _spin3D.group.add(mesh);
+      _spin3D.items.push({ mesh, glow, variant: v, x, y });
+    });
+  });
+}
+
+// Apply an opacity value to every material on an item (mesh + glow + child
+// symbol planes). Handles single materials, material arrays, and the HOLO
+// ShaderMaterial's uOpacity uniform.
+function _setItemOpacity(item, opacity) {
+  const apply = (m) => {
+    if (!m) return;
+    if (m.uniforms && m.uniforms.uOpacity) {
+      m.uniforms.uOpacity.value = opacity;
+    } else {
+      m.transparent = true;
+      m.opacity     = opacity;
+    }
+  };
+  const matOf = (mesh) => {
+    if (!mesh) return;
+    const mat = mesh.material;
+    if (Array.isArray(mat)) mat.forEach(apply); else apply(mat);
+  };
+
+  matOf(item.mesh);
+  // Symbol overlay planes are children of the token mesh
+  item.mesh.children.forEach(matOf);
+
+  if (item.glow) {
+    item.glow.material.opacity = opacity * 0.8;
+  }
+}
+
+// Once the wheel lands, run a short tween that pulls the winner to the centre
+// of the screen at a larger scale while the losers fade out where they sit.
+function _startWinnerReveal(winnerIdx) {
+  const winner = _spin3D.items[winnerIdx];
+  if (!winner) return;
+
+  // Detach winner (and its glow) from the orbit group so we can animate them
+  // in world space — otherwise lerping to (0,0,0) lands them at the rotated
+  // group's local origin, not the actual centre of the screen.
+  [winner.mesh, winner.glow].forEach(m => {
+    if (!m) return;
+    const worldPos  = new THREE.Vector3();
+    const worldQuat = new THREE.Quaternion();
+    m.getWorldPosition(worldPos);
+    m.getWorldQuaternion(worldQuat);
+    if (m.parent) m.parent.remove(m);
+    _spin3D.scene.add(m);
+    m.position.copy(worldPos);
+    m.quaternion.copy(worldQuat);
+  });
+
+  _spin3D.reveal = {
+    startTime:  performance.now(),
+    winnerIdx,
+    startPos:   winner.mesh.position.clone(),
+    startQuat:  winner.mesh.quaternion.clone(),
+    startScale: winner.mesh.scale.x,
+    glowStartPos: winner.glow ? winner.glow.position.clone() : null,
+  };
+}
+
+function _spinAnimate() {
+  _spin3D.rafId = requestAnimationFrame(_spinAnimate);
+
+  const now = performance.now();
+  const dt  = Math.min(0.05, (now - _spin3D.lastT) / 1000);
+  _spin3D.lastT = now;
+  const t = now * 0.001;
+
+  // Counter-rotate the HOLO glow plane while it's still parented to the
+  // group, so it always faces the camera as the group rotates.
+  const negZ = -_spin3D.group.rotation.z;
+
+  _spin3D.items.forEach(item => {
+    // Tumble — paused once frozen=true
+    if (!_spin3D.frozen) {
+      item.mesh.rotateOnAxis(item.mesh.userData.spinAxis, dt * item.mesh.userData.spinSpeed);
+    }
+    // HOLO shader time keeps moving even when frozen
+    if (item.mesh.material.uniforms && item.mesh.material.uniforms.time) {
+      item.mesh.material.uniforms.time.value = t;
+    }
+    // Billboard HOLO glow (only while parented to the rotating group)
+    if (item.glow && item.glow.parent === _spin3D.group) {
+      item.glow.rotation.z = negZ;
+    }
+  });
+
+  // Idle orbit — only when not actively spinning AND not yet landed
+  if (!_spin3D.isSpinning && !_spin3D.frozen) {
+    _spin3D.group.rotation.z += _spin3D.idleSpin * dt;
+  }
+
+  // Winner reveal tween — drives the winner to centre and fades losers out
+  if (_spin3D.reveal) {
+    const r = _spin3D.reveal;
+    const p = Math.min(1, (now - r.startTime) / REVEAL_DURATION_MS);
+    const eased = 1 - Math.pow(1 - p, 3);   // cubic ease-out
+
+    const targetPos   = new THREE.Vector3(0, 0, 0.5);
+    const targetQuat  = new THREE.Quaternion();      // identity — face camera
+    const targetScale = 1.45;
+
+    _spin3D.items.forEach((item, i) => {
+      if (i === r.winnerIdx) {
+        // Winner — slide to centre, scale up, rotate to face camera
+        item.mesh.position.lerpVectors(r.startPos, targetPos, eased);
+        const s = r.startScale + (targetScale - r.startScale) * eased;
+        item.mesh.scale.set(s, s, s);
+        item.mesh.quaternion.copy(r.startQuat).slerp(targetQuat, eased);
+        if (item.glow && r.glowStartPos) {
+          item.glow.position.lerpVectors(r.glowStartPos, new THREE.Vector3(0, 0, 0.1), eased);
+          item.glow.scale.set(s, s, 1);
+          item.glow.rotation.z = 0;            // face camera once detached
+          item.glow.material.opacity = 0.9;
+        }
+        // Subtle pulsating brightness for the winner — a "flash" on landing
+        const flash = Math.max(0, 1 - p * 3);  // bright first 1/3 of the tween
+        if (item.mesh.material.uniforms && item.mesh.material.uniforms.uOpacity) {
+          item.mesh.material.uniforms.uOpacity.value = 1.0;
+        }
+        item.mesh.scale.multiplyScalar(1 + flash * 0.12);
+      } else {
+        // Losers — fade out where they sit
+        _setItemOpacity(item, 1 - eased);
+      }
+    });
+
+    if (p >= 1) _spin3D.reveal = null;
+  }
+
+  _spin3D.renderer.render(_spin3D.scene, _spin3D.camera);
+}
+
+function _spinTo(winnerIdx, duration) {
+  const startZ   = _spin3D.group.rotation.z;
+  const N        = HORROR_VARIANTS.length;
+  const segAngle = (Math.PI * 2) / N;
+
+  // Item i starts at θ_i = π/2 - i*segAngle. The group rotates CCW around Z
+  // by rZ, so item's effective angle = θ_i + rZ. To land at π/2 (the top,
+  // under the pointer) we solve: rZ = i * segAngle (mod 2π). NO jitter —
+  // the winner must land dead-centre under the arrow.
+  const targetAngle = winnerIdx * segAngle;
+
+  const startMod = ((startZ % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
+  let delta      = targetAngle - startMod;
+  if (delta < 0) delta += Math.PI * 2;
+  const endZ     = startZ + delta + (5 * Math.PI * 2);   // 5 spins + landing
+
+  const t0 = performance.now();
+  _spin3D.isSpinning = true;
+
+  function tick() {
+    const p = Math.min(1, (performance.now() - t0) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    _spin3D.group.rotation.z = startZ + (endZ - startZ) * eased;
+    if (p < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      _spin3D.group.rotation.z = endZ;
+      _spin3D.isSpinning = false;
+      _spin3D.frozen     = true;          // freeze tumble + idle orbit
+      _startWinnerReveal(winnerIdx);      // begin centre-stage reveal
+    }
+  }
+  tick();
+}
+
+function _rollHorrorVariant() {
+  const total = HORROR_VARIANTS.reduce((s, v) => s + v.prob, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < HORROR_VARIANTS.length; i++) {
+    r -= HORROR_VARIANTS[i].prob;
+    if (r <= 0) return i;
+  }
+  return HORROR_VARIANTS.length - 1;
+}
+
+function showHorrorSpin(card) {
+  _spinPendingCard = card;
+  _spinPhase       = 'idle';
+
+  showScreen('screen-horror-spin');
+
+  // Renderer/camera/group are built once; items get rebuilt every pull so the
+  // texture reflects the current pack type (flesh / scourge / ritual) and the
+  // frozen flag is cleared.
+  _initSpin3D();
+  _buildSpinItems();
+
+  const btn = document.getElementById('rouletteBtn');
+  btn.textContent = 'SPIN';
+  btn.disabled    = false;
+}
+
+function horrorSpinTap() {
+  if (_spinPhase === 'spinning') return;
+
+  // Second tap = confirm
+  if (_spinPhase === 'done') {
+    if (_spinPendingCard) send(_spinPendingCard.command);
+    _spinPendingCard = null;
+    _spinPhase       = 'idle';
+    resetToPackScreen();
+    return;
+  }
+
+  // First tap = spin
+  _spinPhase = 'spinning';
+  const btn  = document.getElementById('rouletteBtn');
+  btn.disabled    = true;
+  btn.textContent = '...';
+
+  const winnerIdx = _rollHorrorVariant();
+  _spinTo(winnerIdx, SPIN_DURATION_MS);
+
+  // CONFIRM appears only after the wheel has landed AND the winner-reveal
+  // tween has finished centring the chosen token.
+  setTimeout(() => {
+    btn.textContent = 'CONFIRM';
+    btn.disabled    = false;
+    _spinPhase      = 'done';
+  }, SPIN_DURATION_MS + REVEAL_DURATION_MS + 100);
+}

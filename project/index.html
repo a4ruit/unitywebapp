@@ -10,6 +10,9 @@
 <body>
   <div class="bg-grid"></div>
   <div class="flash-overlay" id="flashOverlay"></div>
+
+  <!-- DEBUG: phase toggle (temporary — remove before production) -->
+  <button class="debug-phase-btn" id="debugPhaseBtn" onclick="debugTogglePhase()">▸ horror</button>
   <div class="god-pack-banner hidden" id="godPackBanner">
     <span class="god-banner-star">★</span>
     <span class="god-banner-text">GOD PACK</span>
@@ -276,6 +279,13 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- HORROR ROULETTE — 3D floating items orbit and land on winner -->
+      <div class="screen hidden" id="screen-horror-spin">
+        <div class="roulette-pointer"></div>
+        <div class="roulette-3d-wrap" id="roulette3DWrap"></div>
+        <button class="roulette-btn" id="rouletteBtn" onclick="horrorSpinTap()">SPIN</button>
       </div>
 
     </div><!-- end page-pack -->

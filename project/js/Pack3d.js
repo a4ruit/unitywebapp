@@ -2164,10 +2164,14 @@ const Pack3D = (() => {
       1.0 - (progress - 0.70) / 0.30;
     const intensity = Math.max(0, envelope * (0.75 + Math.sin(elapsed * 0.025) * 0.25));
 
-    // 3D pack shake — integer-ish pixel nudge matching the grid aesthetic
+    // 3D pack shake — integer-ish pixel nudge matching the grid aesthetic.
+    // ABSOLUTE offsets from origin, not `+=`. Using `+=` here causes the mesh
+    // to drift away from (0,0,0) over the course of the transition because the
+    // fade-out envelope never reaches exactly zero, leaving the pack slightly
+    // off-centre after every horror transition.
     if (!isThrowing) {
-      packMesh.position.x += (Math.random() - 0.5) * intensity * 0.11;
-      packMesh.position.y += (Math.random() - 0.5) * intensity * 0.06;
+      packMesh.position.x = (Math.random() - 0.5) * intensity * 0.11;
+      packMesh.position.y = (Math.random() - 0.5) * intensity * 0.06;
     }
 
     // Rim light flickers blue→red as corruption takes hold
@@ -2192,6 +2196,10 @@ const Pack3D = (() => {
       glitchActive = false;
       if (glitchOverlay) { glitchOverlay.remove(); glitchOverlay = null; glitchOvCtx = null; }
       if (rimLight) { rimLight.color.setStyle('#e85c1a'); rimLight.intensity = 2.5; }
+      // Reset pack to dead-centre. The shake offsets above can leave a small
+      // residual if intensity wasn't exactly 0 on the final frame — without
+      // this, the pack appears off-centre after every horror transition.
+      if (packMesh && !isThrowing) packMesh.position.set(0, 0, 0);
       document.body.classList.remove('glitch-active');
     }
   }
