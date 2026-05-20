@@ -476,7 +476,10 @@ function doPackOpen(dir) {
   // flesh/horror objects, so in pristine phase we let individual card commands route
   // through the active pack type instead.
   const _gpHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
-  if (isGodPack && _gpHorror) send('spawn_godpack');
+  // Tag spawn commands with this phone's CLIENT_ID so Unity can attach it
+  // to the matching sheep_spawned / duck_spawned broadcast — that way only
+  // the phone that actually pulled the card unlocks the Inhabit button.
+  if (isGodPack && _gpHorror) send(`spawn_godpack|${CLIENT_ID}`);
 
   Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
     if (isGodPack) triggerGodPackFlash();
@@ -559,7 +562,8 @@ function showGodPackClaimGrid() {
   if (cs) cs.textContent = `drop all ${packCards.length} — tap each to release`;
 
   ChoiceGrid3D.showGodPack(packCards, 'choiceGrid', (claimedCard) => {
-    send(claimedCard.command);
+    // Tag with CLIENT_ID — see comment above the spawn_godpack send.
+    send(`${claimedCard.command}|${CLIENT_ID}`);
     godPackClaimed.push(claimedCard);
     if (godPackClaimed.length === packCards.length) {
       setTimeout(showGodPackComplete, 600);
@@ -590,7 +594,10 @@ function dropCard(card) {
     return;
   }
 
-  send(card.command);
+  // Tag spawn commands with CLIENT_ID so Unity's sheep_spawned / duck_spawned
+  // broadcast carries the matching clientId and only THIS phone unlocks the
+  // Inhabit button (not every other phone connected to the install).
+  send(`${card.command}|${CLIENT_ID}`);
   resetToPackScreen();
 }
 
@@ -1141,7 +1148,7 @@ function horrorSpinTap() {
 
   // Second tap = confirm
   if (_spinPhase === 'done') {
-    if (_spinPendingCard) send(_spinPendingCard.command);
+    if (_spinPendingCard) send(`${_spinPendingCard.command}|${CLIENT_ID}`);
     _spinPendingCard = null;
     _spinPhase       = 'idle';
     resetToPackScreen();

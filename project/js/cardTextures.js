@@ -4,8 +4,42 @@
 
 const CardTextures = (() => {
 
+  // ─── Card layout — edit these to reposition card elements ──────────────────
+  // Card canvas is 256 wide × 384 tall. All coordinates below are in canvas pixels.
+  // X=0 is the left edge, Y=0 is the top edge. Centre line is X=128.
+  const LAYOUT = {
+    // Title box (the beveled pixel-bordered rectangle at the top)
+    titleBox: {
+      x: 24,    // distance from the left edge of the card
+      y: 60,    // distance from the top of the card
+      w: 208,   // width
+      h: 38,    // height
+    },
+    titleFontSize:    26,    // size of the title text inside the box (px)
+    titleBevel:       13,     // diagonal-bevel depth on each corner of the title box
+    titleBorderThick: 2,     // pixel thickness of the title box border
+
+    // Central symbol (e.g. leaf-symbol.png)
+    symbolCenterY:    200,   // vertical centre of the symbol on the card
+    symbolHeight:     170,   // height of the symbol (width auto-scales to preserve aspect ratio)
+
+    // Rarity label (small text below the symbol)
+    rarityY:          312,
+    rarityFontSize:   11,
+
+    // Separator line between rarity and description
+    separatorY:       322,
+    separatorPad:     28,    // horizontal padding from card edges
+
+    // Description / flavour text (bottom of card)
+    descStartY:       340,
+    descLineHeight:   16,
+    descFontSize:     14,
+    descMaxWidth:     210,
+  };
+
   const RARITY_CFG = {
-    common:           { border:'#607060', emissive:0x101810, emissiveIntensity:0.05, light:null },
+    common:           { border:'#8bc28b', emissive:0x101810, emissiveIntensity:0.15, light:null },
     uncommon:         { border:'#4a8aaa', emissive:0x0a1820, emissiveIntensity:0.2,  light:{ color:0x4a8aaa, intensity:1.2, dist:5 } },
     rare:             { border:'#9a6ab8', emissive:0x120a1a, emissiveIntensity:0.3,  light:{ color:0x9a6ab8, intensity:1.8, dist:5 } },
     legendary:        { border:'#c89030', emissive:0x201000, emissiveIntensity:0.5,  light:{ color:0xc89030, intensity:2.5, dist:6 } },
@@ -42,6 +76,9 @@ const CardTextures = (() => {
   _loadSkin('nature-common',   'assets/common-card.png');
   _loadSkin('nature-uncommon', 'assets/uncommon-card.png');
   _loadSkin('nature-rare',     'assets/epic-card.png');
+  // Custom symbol art — loaded once, reused as the central illustration for
+  // its respective card. Add new symbols here as they're made.
+  _loadSkin('symbol-leaf',     'assets/leaf-symbol.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -289,11 +326,25 @@ const CardTextures = (() => {
   // â”€â”€â”€ NATURE shape drawers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function drawShapeNature(ctx, rarity, t) {
+    // Custom pixel-art PNG symbol — falls through to procedural drawing if the
+    // image hasn't loaded yet, so the card never renders empty.
+    // Position + size are controlled by LAYOUT.symbolCenterY / LAYOUT.symbolHeight.
+    if (rarity === 'common') {
+      const leaf = _cardSkins['symbol-leaf'];
+      if (leaf && leaf.complete && leaf.naturalWidth > 0) {
+        ctx.imageSmoothingEnabled = false;
+        const targetH = LAYOUT.symbolHeight;
+        const targetW = targetH * (leaf.naturalWidth / leaf.naturalHeight);
+        ctx.drawImage(leaf, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+        return;
+      }
+    }
+
     ctx.save();
     ctx.translate(128, 148);
 
     if (rarity === 'common') {
-      // Fallen Leaf â€” oval with midrib and side veins
+      // Fallen Leaf â€” oval with midrib and side veins (procedural fallback)
       ctx.fillStyle = 'rgba(80,108,72,0.65)';
       ctx.strokeStyle = '#607060';
       ctx.lineWidth = 1.5;
@@ -1786,6 +1837,38 @@ const CardTextures = (() => {
 
   // â”€â”€â”€ Text labels â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  // Draws a chunky pixel-bordered rectangle with diagonal bevels cut from the
+  // four corners — MTG / retro-arcade aesthetic. Stroke colour, thickness and
+  // bevel depth are all configurable. The interior stays untouched so the
+  // existing background art still shows through.
+  function drawBeveledBorder(ctx, x, y, w, h, color, thickness = 2, bevel = 3) {
+    ctx.fillStyle = color;
+    // Top edge — skip the bevel-width on each end
+    ctx.fillRect(x + bevel, y, w - bevel * 2, thickness);
+    // Bottom edge
+    ctx.fillRect(x + bevel, y + h - thickness, w - bevel * 2, thickness);
+    // Left edge
+    ctx.fillRect(x, y + bevel, thickness, h - bevel * 2);
+    // Right edge
+    ctx.fillRect(x + w - thickness, y + bevel, thickness, h - bevel * 2);
+    // Diagonal bevel pixels stepping toward each corner
+    for (let i = 0; i < bevel; i++) {
+      const off = bevel - 1 - i;
+      // Top-left
+      ctx.fillRect(x + i,             y + off,             1, thickness);
+      ctx.fillRect(x + off,           y + i,               thickness, 1);
+      // Top-right
+      ctx.fillRect(x + w - i - 1,     y + off,             1, thickness);
+      ctx.fillRect(x + w - off - 1,   y + i,               thickness, 1);
+      // Bottom-left
+      ctx.fillRect(x + i,             y + h - off - 1,     1, thickness);
+      ctx.fillRect(x + off,           y + h - i - 1,       thickness, 1);
+      // Bottom-right
+      ctx.fillRect(x + w - i - 1,     y + h - off - 1,     1, thickness);
+      ctx.fillRect(x + w - off - 1,   y + h - i - 1,       thickness, 1);
+    }
+  }
+
   function drawLabels(ctx, card, rarity, t) {
     const cfg = getCfg(rarity);
 
@@ -1798,32 +1881,54 @@ const CardTextures = (() => {
       rarityColor = `rgba(${hexToRgb(cfg.border)},0.7)`;
     }
 
-    ctx.font = '11px "Share Tech Mono", monospace';
+    // ── TITLE BOX (top of card, beveled pixel border — MTG style) ────────────
+    // Tweak position/size via LAYOUT.titleBox at the top of this file.
+    const { x: tx, y: ty, w: tw, h: th } = LAYOUT.titleBox;
+
+    // Subtle dark backdrop inside the title box so the text reads
+    // independently of whatever the skin painted underneath
+    ctx.fillStyle = 'rgba(10,16,10,0.55)';
+    ctx.fillRect(tx + LAYOUT.titleBevel, ty + LAYOUT.titleBevel,
+                 tw - LAYOUT.titleBevel * 2, th - LAYOUT.titleBevel * 2);
+
+    drawBeveledBorder(ctx, tx, ty, tw, th, nameColor, LAYOUT.titleBorderThick, LAYOUT.titleBevel);
+
+    // Title text — centred inside the title box
+    ctx.font = `bold ${LAYOUT.titleFontSize}px "VT323", monospace`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = rarityColor;
-    ctx.fillText(rarity.toUpperCase(), 128, 218);
-
-    ctx.font = 'bold 30px "VT323", monospace';
+    ctx.textBaseline = 'middle';
     ctx.fillStyle = nameColor;
-    if (rarity !== 'legendary-alpha') { ctx.shadowColor = nameColor; ctx.shadowBlur = 8; }
-    ctx.fillText(card.name.toUpperCase(), 128, 254);
+    if (rarity !== 'legendary-alpha') { ctx.shadowColor = nameColor; ctx.shadowBlur = 6; }
+    const displayName = card.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    ctx.fillText(displayName, 128, ty + th / 2 + 1);
     ctx.shadowBlur = 0;
+    ctx.textBaseline = 'alphabetic';
 
+    // ── RARITY label (below the symbol) ─────────────────────────────────────
+    ctx.font = `${LAYOUT.rarityFontSize}px "Share Tech Mono", monospace`;
+    ctx.fillStyle = rarityColor;
+    ctx.fillText(rarity.toUpperCase(), 128, LAYOUT.rarityY);
+
+    // Separator line between rarity and description
     ctx.strokeStyle = `rgba(${rarity === 'legendary-alpha' ? '255,255,255' : hexToRgb(cfg.border)},0.3)`;
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(28,266); ctx.lineTo(228,266); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(LAYOUT.separatorPad,         LAYOUT.separatorY);
+    ctx.lineTo(256 - LAYOUT.separatorPad,   LAYOUT.separatorY);
+    ctx.stroke();
 
-    ctx.font = '12px "Share Tech Mono", monospace';
+    // ── DESCRIPTION (bottom of card) ────────────────────────────────────────
+    ctx.font = `${LAYOUT.descFontSize}px "Share Tech Mono", monospace`;
     ctx.fillStyle = 'rgba(232,224,200,0.5)';
     const words = card.desc.split(' ');
-    let line = '', lineY = 290;
+    let line = '', lineY = LAYOUT.descStartY;
     words.forEach(w => {
-      const test = line ? line+' '+w : w;
-      if (ctx.measureText(test).width > 210 && line) {
-        ctx.fillText(line,128,lineY); line=w; lineY+=18;
-      } else { line=test; }
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > LAYOUT.descMaxWidth && line) {
+        ctx.fillText(line, 128, lineY); line = w; lineY += LAYOUT.descLineHeight;
+      } else { line = test; }
     });
-    if (line) ctx.fillText(line,128,lineY);
+    if (line) ctx.fillText(line, 128, lineY);
   }
 
   // â”€â”€â”€ Public: buildFace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

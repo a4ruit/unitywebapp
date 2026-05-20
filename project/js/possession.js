@@ -56,9 +56,18 @@ let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video strea
 let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
 let _placing        = false;  // true while user is moving a placement preview
 let _placementInputInterval = null;
+// Duration of the current possession session — captured at _onGranted time so
+// the GBC "TIME" stat can render as "cur/total" (e.g. 023/030) like an RPG HP bar.
+let _grantDuration  = 30;
 // Session-only: button only unlocks after the user clicks a sheep card in the
 // CURRENT page-life. Reload = locked again. No persistence on purpose.
 let _sheepAvailable = false;
+let _duckAvailable  = false;
+// Which creature is currently possessed — drives which WS verbs to send for
+// joystick input + action button. Null when nothing is being possessed.
+//   'sheep' → sheep_input / sheep_eat / possess_end
+//   'duck'  → duck_input  / duck_flap / duck_possess_end
+let _creatureType   = null;
 // Clean up any leftover flag from prior versions that persisted across reloads.
 try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 
@@ -70,10 +79,13 @@ try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
  * so we only need this to reset the "Requesting…" state if ws dropped mid-request.
  */
 function updatePossessionWS() {
-  // If we were waiting on a grant that never came (ws dropped), reset the button
+  // If we were waiting on a grant that never came (ws dropped), reset both
+  // buttons so the user isn't stuck looking at "Requesting…".
   if (_ui && !_possessed) {
-    _ui.btn.textContent   = 'Inhabit a sheep';
-    _ui.btn.style.opacity = '1';
+    _ui.btn.textContent       = 'Inhabit a sheep';
+    _ui.btn.style.opacity     = '1';
+    _ui.duckBtn.textContent   = 'Inhabit a duck';
+    _ui.duckBtn.style.opacity = '1';
   }
 }
 
@@ -89,11 +101,11 @@ function handlePossessionMessage(data) {
 
   if (msg.startsWith('possess_granted|')) {
     const parts = msg.split('|');            // [0]=cmd [1]=clientId [2]=duration
-    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2])); return true; }
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'sheep'); return true; }
   }
   if (msg.startsWith('possess_denied|')) {
     const parts = msg.split('|');
-    if (parts[1] === CLIENT_ID) { _onDenied(); return true; }
+    if (parts[1] === CLIENT_ID) { _onDenied('sheep'); return true; }
   }
   if (msg.startsWith('possess_ended|')) {
     const parts = msg.split('|');
@@ -102,6 +114,39 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('possess_tick|')) {
     const parts = msg.split('|');            // [1]=clientId [2]=secsLeft
     if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+
+  // ── Duck possession lifecycle (mirrors sheep) ──────────────────────────────
+  if (msg.startsWith('duck_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'duck'); return true; }
+  }
+  if (msg.startsWith('duck_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('duck'); return true; }
+  }
+  if (msg.startsWith('duck_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded(); return true; }
+  }
+  if (msg.startsWith('duck_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+  // Optional confirmation from Unity each time the duck successfully flapped
+  // (matches sheep_ate pattern). Currently we don't display a counter for it,
+  // but we swallow the message so the routing log stays clean.
+  if (msg.startsWith('duck_flapped|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDuckFlapped(Number(parts[2])); return true; }
+  }
+  // Same per-phone filter as sheep_spawned — only the originating CLIENT_ID
+  // unlocks. Untagged broadcasts are ignored (cross-tenant safety).
+  if (msg === 'duck_spawned' || msg.startsWith('duck_spawned|') || msg.startsWith('duck_spawned ')) {
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onDuckSpawned();
+    return true;
   }
 
   // Unity broadcasts this every time the possessed sheep eats a Resource.
@@ -126,10 +171,14 @@ function handlePossessionMessage(data) {
   }
 
   // Unity announces this every time a critter-pack common card spawns a sheep.
-  // Unlocks the "Inhabit a sheep" button (and remembers across page reloads).
-  // Match defensively: trims, accepts pipe-suffixed variants too.
+  // The broadcast goes to EVERY connected phone, so we filter by the trailing
+  // clientId tag — only the phone that actually pulled the card unlocks its
+  // button. Bare "sheep_spawned" (no tag) is treated as legacy/global noise
+  // and ignored, since otherwise idle phones would falsely unlock.
   if (msg === 'sheep_spawned' || msg.startsWith('sheep_spawned|') || msg.startsWith('sheep_spawned ')) {
-    _onSheepSpawned();
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onSheepSpawned();
     return true;
   }
 
@@ -209,40 +258,66 @@ function _buildUI() {
     #poss-btn:active { background: rgba(0,200,180,0.3); }
     #poss-btn.poss-hidden { display: none; }
 
-    /* ── Countdown bar ── */
-    #poss-timer {
+    /* ── Duck inhabit button (sits above the sheep button) ── */
+    #poss-duck-btn {
+      pointer-events: all;
       position: absolute;
-      top: 22px;
+      bottom: 184px;   /* stacked above #poss-btn */
       left: 50%;
       transform: translateX(-50%);
-      color: rgba(255,255,255,0.85);
-      font-size: 12px;
+      padding: 12px 28px;
+      background: rgba(255,176,48,0.12);
+      border: 2px solid rgba(255,176,48,0.6);
+      color: #ffb030;
+      font-size: 13px;
       letter-spacing: 2px;
       text-transform: uppercase;
-      text-shadow: 0 0 10px #00c8b4;
-      display: none;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, opacity 0.2s;
       white-space: nowrap;
-      z-index: 2;
     }
-    /* ── Eaten counter ── */
-    #poss-eaten {
+    #poss-duck-btn:active { background: rgba(255,176,48,0.3); }
+    #poss-duck-btn.poss-hidden { display: none; }
+
+    /* ── Flap button (right thumb, replaces EAT during DUCK possession) ── */
+    #poss-flap {
+      pointer-events: all;
       position: absolute;
-      top: 46px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: #ffb030;
-      font-size: 11px;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(255,210,90,0.18);
+      border: 2px solid rgba(255,210,90,0.85);
+      color: #ffd25a;
+      font-family: monospace;
+      font-size: 16px;
       letter-spacing: 3px;
       text-transform: uppercase;
-      text-shadow: 0 0 8px rgba(255,176,48,0.7);
+      cursor: pointer;
       display: none;
-      white-space: nowrap;
-      z-index: 2;
-      transition: transform 0.15s ease-out;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      text-shadow: 0 0 8px rgba(255,210,90,0.7);
+      box-shadow: 0 0 12px rgba(255,210,90,0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
     }
-    #poss-eaten.bump {
-      transform: translateX(-50%) scale(1.25);
+    #poss-flap:active {
+      background: rgba(255,210,90,0.45);
+      transform: scale(0.92);
     }
+
+    /* Legacy floating timer / eaten labels — kept in the DOM so existing JS
+       references still resolve, but visually replaced by the in-card Game
+       Boy Color footer. Force display:none even when JS toggles them. */
+    #poss-timer, #poss-eaten { display: none !important; }
 
     /* ── Sheep-cam framed as a trading card ──
        Wrap is 5:7 portrait (matches three.js card aspect).
@@ -257,12 +332,114 @@ function _buildUI() {
       aspect-ratio: 5 / 7;
       display: none;
     }
-    /* Art window fills the ENTIRE wrap — video covers the whole card area. */
+    /* Art window sits INSIDE the card frame's visible center — the
+       trading-card border (poss-card-frame img) overlays the outer rim.
+       The Game Boy Color chrome (#gb-frame) flex-fills this area. */
     #poss-art-window {
       position: absolute;
-      inset: 0;
+      top: 6%;
+      bottom: 6%;
+      left: 7%;
+      right: 7%;
       overflow: hidden;
+      background: #0d1a0d;   /* dark olive — visible if the frame is taller than the screen */
+    }
+
+    /* ── Game Boy Color frame ──────────────────────────────────────────
+       Three-row flex: header (wordmark), screen (video), footer (stats).
+       The header/footer are flat pixel-art green; the screen window has
+       a sunken black surround like a real GBC LCD bezel.                */
+    #gb-frame {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      background: #2d4a2d;   /* GBC cartridge green */
+      color: #d8f0c8;
+      font-family: "Share Tech Mono", "VT323", monospace;
+      letter-spacing: 1px;
+      image-rendering: pixelated;
+    }
+
+    /* ── Header: wordmark strip ── */
+    #gb-header {
+      flex: 0 0 12%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(to bottom, #3a5e3a 0%, #243e24 100%);
+      border-bottom: 2px solid #0d1a0d;
+      box-shadow: inset 0 -2px 0 #4a7a4a;
+      text-transform: uppercase;
+      font-size: 10px;
+      font-weight: bold;
+      color: #ffe7a0;
+      text-shadow: 1px 1px 0 #000;
+      letter-spacing: 3px;
+    }
+    #gb-title::before { content: '▸ '; color: #ff5050; }
+    #gb-title::after  { content: ' ◂'; color: #ff5050; }
+
+    /* ── Middle: the LCD screen ── */
+    #gb-screen {
+      flex: 1 1 auto;
+      position: relative;
       background: #000;
+      /* sunken bezel — thick dark inset to evoke the GBC's screen well */
+      border: 3px solid #0d1a0d;
+      box-shadow:
+        inset  1px  1px 0 #4a7a4a,
+        inset -1px -1px 0 #1a3a1a;
+      overflow: hidden;
+    }
+
+    /* ── LCD pixel grid overlay ──
+       A repeating mask of thin dark lines, laid on top of the video. Roughly
+       aligns with the upscaled source pixels: 160-wide stream into a ~220-px
+       card cropped via object-fit:cover shows ~62 source pixels across, so
+       each source pixel ≈ 3-4 display pixels — the grid lands close to the
+       seams and reads as a real LCD pixel matrix.                          */
+    #gb-lcd-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(0,30,0,0.18) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,30,0,0.18) 1px, transparent 1px);
+      background-size: 3px 3px;
+      mix-blend-mode: multiply;   /* darkens the underlying pixels, doesn't blow out colour */
+      z-index: 2;
+    }
+
+    /* ── Footer: HP-style stat bars ── */
+    #gb-footer {
+      flex: 0 0 18%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 3px;
+      padding: 4px 8px;
+      background: linear-gradient(to top, #3a5e3a 0%, #243e24 100%);
+      border-top: 2px solid #0d1a0d;
+      box-shadow: inset 0 2px 0 #4a7a4a;
+    }
+    .gb-stat {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 9px;
+      letter-spacing: 2px;
+    }
+    .gb-stat-label {
+      color: #ff5050;            /* RPG-stat red, matches reference */
+      font-weight: bold;
+      text-shadow: 1px 1px 0 #000;
+      min-width: 32px;
+    }
+    .gb-stat-value {
+      color: #ffe7a0;            /* warm pale yellow numbers */
+      text-shadow: 1px 1px 0 #000;
+      font-variant-numeric: tabular-nums;   /* prevents jitter as digits change */
     }
     #poss-video {
       width: 100%;
@@ -272,6 +449,15 @@ function _buildUI() {
       object-fit: cover;
       display: block;
       background: #000;
+      /* ── Pixel-art upscaling ──────────────────────────────────────────
+         Unity captures the stream at low resolution (e.g. 160×90) to keep
+         bandwidth tiny AND to lean into the game's pixel aesthetic. By
+         default browsers bilinear-smooth video as it scales — we want
+         hard, chunky pixel blocks instead. Each property is a vendor
+         spelling; the browser picks the one it understands.            */
+      image-rendering: pixelated;            /* Chrome / Edge / modern Safari */
+      image-rendering: -moz-crisp-edges;     /* Firefox */
+      image-rendering: crisp-edges;          /* spec name (some Safari) */
     }
     /* Frame is the LAST child so it renders ON TOP of the video. */
     #poss-card-frame {
@@ -544,15 +730,42 @@ function _buildUI() {
   const root = document.createElement('div');
   root.id = 'poss-root';
   root.innerHTML = `
+    <button id="poss-duck-btn">Inhabit a duck</button>
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
     <div id="poss-eaten">EATEN — <span id="poss-eaten-count">0</span></div>
     <div id="poss-video-wrap">
       <div id="poss-art-window">
-        <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
-        <div id="poss-video-label">
-          <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
-          <div id="poss-loading-bar"></div>
+        <!-- ── Game Boy Color chrome ────────────────────────────────────────
+             Three rows: wordmark header, LCD screen with grid overlay, and
+             HP-style stat bars at the bottom. Sits INSIDE the trading-card
+             frame so we get pixel-card-outer + GBC-screen-inner.           -->
+        <div id="gb-frame">
+          <div id="gb-header">
+            <span id="gb-title">SHEEP CAM</span>
+          </div>
+
+          <div id="gb-screen">
+            <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
+            <!-- LCD pixel grid: thin dark lines every few pixels so the
+                 upscaled video reads as a real-LCD pixel matrix.          -->
+            <div id="gb-lcd-grid"></div>
+            <div id="poss-video-label">
+              <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
+              <div id="poss-loading-bar"></div>
+            </div>
+          </div>
+
+          <div id="gb-footer">
+            <div class="gb-stat">
+              <span class="gb-stat-label">TIME</span>
+              <span class="gb-stat-value" id="gb-time">030/030</span>
+            </div>
+            <div class="gb-stat">
+              <span class="gb-stat-label" id="gb-action-label">EAT</span>
+              <span class="gb-stat-value" id="gb-action-value">000</span>
+            </div>
+          </div>
         </div>
       </div>
       <img id="poss-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
@@ -562,6 +775,7 @@ function _buildUI() {
       <div id="poss-joy-knob"></div>
     </div>
     <button id="poss-eat">EAT</button>
+    <button id="poss-flap">FLAP</button>
     <button id="poss-place">PLACE</button>
     <button id="poss-release">release</button>
 
@@ -582,10 +796,16 @@ function _buildUI() {
   _ui = {
     root:             root,
     btn:              root.querySelector('#poss-btn'),
+    duckBtn:          root.querySelector('#poss-duck-btn'),
     timer:            root.querySelector('#poss-timer'),
     secs:             root.querySelector('#poss-secs'),
     eaten:            root.querySelector('#poss-eaten'),
     eatenCount:       root.querySelector('#poss-eaten-count'),
+    // Game Boy Color in-card stat readouts
+    gbTitle:          root.querySelector('#gb-title'),
+    gbTime:           root.querySelector('#gb-time'),
+    gbActionLabel:    root.querySelector('#gb-action-label'),
+    gbActionValue:    root.querySelector('#gb-action-value'),
     vidWrap:          root.querySelector('#poss-video-wrap'),
     video:            root.querySelector('#poss-video'),
     vidLabel:         root.querySelector('#poss-video-label'),
@@ -594,26 +814,33 @@ function _buildUI() {
     joyKnob:          root.querySelector('#poss-joy-knob'),
     release:          root.querySelector('#poss-release'),
     eat:              root.querySelector('#poss-eat'),
+    flap:             root.querySelector('#poss-flap'),
     place:            root.querySelector('#poss-place'),
     placeOverlay:     root.querySelector('#poss-place-overlay'),
     placeCardContent: root.querySelector('#poss-place-card-content'),
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
   };
 
-  _ui.btn.addEventListener('click',     _requestPossession);
-  _ui.release.addEventListener('click', _releasePossession);
+  _ui.btn.addEventListener('click',        _requestPossession);
+  _ui.duckBtn.addEventListener('click',    _requestDuckPossession);
+  _ui.release.addEventListener('click',    _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
   _ui.eat.addEventListener('touchstart',   e => { e.preventDefault(); _eat();          }, { passive: false });
   _ui.eat.addEventListener('click',        _eat);
+  _ui.flap.addEventListener('touchstart',  e => { e.preventDefault(); _flap();         }, { passive: false });
+  _ui.flap.addEventListener('click',       _flap);
   _ui.place.addEventListener('touchstart', e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
   _ui.place.addEventListener('click',      _confirmPlace);
   _setupJoystick();
 
-  // Hide the Inhabit button until at least one sheep has been pulled.
-  // _sheepAvailable starts as true if localStorage remembers a prior pull.
+  // Hide both Inhabit buttons until the matching creature has been pulled.
   if (!_sheepAvailable) {
     _ui.btn.classList.add('poss-hidden');
-    console.log('[possession.js] Inhabit button locked — waiting for first sheep_spawned');
+    console.log('[possession.js] Sheep button locked — waiting for first sheep_spawned');
+  }
+  if (!_duckAvailable) {
+    _ui.duckBtn.classList.add('poss-hidden');
+    console.log('[possession.js] Duck button locked — waiting for first duck_spawned');
   }
 }
 
@@ -681,47 +908,102 @@ function _requestPossession() {
   send(`possess_request|${CLIENT_ID}`);
 }
 
+function _requestDuckPossession() {
+  _ui.duckBtn.textContent   = 'Requesting…';
+  _ui.duckBtn.style.opacity = '0.5';
+
+  // Same iOS autoplay priming as sheep — pre-arms the video element so the
+  // WebRTC stream can autoplay when it arrives.
+  _ui.video.muted = true;
+  _ui.video.play().catch(() => {});
+
+  send(`duck_possess_request|${CLIENT_ID}`);
+}
+
 function _releasePossession() {
-  send(`possess_end|${CLIENT_ID}`);
-  _onEnded();   // optimistic — server will confirm with possess_ended
+  // Send the verb that matches whichever creature we currently inhabit
+  if (_creatureType === 'duck') send(`duck_possess_end|${CLIENT_ID}`);
+  else                          send(`possess_end|${CLIENT_ID}`);
+  _onEnded();   // optimistic — server will confirm with the matching ended message
 }
 
 function _eat() {
-  if (!_possessed) return;
+  if (!_possessed || _creatureType !== 'sheep') return;
   send(`sheep_eat|${CLIENT_ID}`);
 }
 
-function _onGranted(duration) {
-  _possessed = true;
+function _flap() {
+  if (!_possessed || _creatureType !== 'duck') return;
+  send(`duck_flap|${CLIENT_ID}`);
+}
 
+function _onGranted(duration, creature) {
+  _possessed     = true;
+  _creatureType  = creature;   // 'sheep' or 'duck'
+  _grantDuration = duration;
+
+  // Hide BOTH inhabit buttons during a possession (regardless of which one
+  // was just granted). The other one comes back via _onEnded if its credit
+  // is still available.
   _ui.btn.classList.add('poss-hidden');
-  _ui.timer.style.display    = 'block';
-  _ui.eaten.style.display    = 'block';
-  _ui.eatenCount.textContent = '0';
+  _ui.duckBtn.classList.add('poss-hidden');
+
   _ui.vidWrap.style.display  = 'block';
   _ui.vidLabel.style.display = 'flex';   // show "CONNECTING…" until first frame
   _ui.joyZone.style.display  = 'flex';
   _ui.release.style.display  = 'block';
-  _ui.eat.style.display      = 'flex';
   _ui.secs.textContent       = duration;
+
+  // ── Game Boy Color in-card readouts ──
+  // Wordmark, action-button label, and initial stat values. Format numbers
+  // RPG-style with a leading zero pad ("030/030", "000") so the digit widths
+  // stay constant as values change.
+  const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
+  if (_ui.gbTitle)       _ui.gbTitle.textContent       = creature === 'duck' ? 'DUCK CAM' : 'SHEEP CAM';
+  if (_ui.gbTime)        _ui.gbTime.textContent        = `${pad3(duration)}/${pad3(duration)}`;
+  if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = creature === 'duck' ? 'FLAP' : 'EAT';
+  if (_ui.gbActionValue) _ui.gbActionValue.textContent = '000';
+
+  // Show the action button that matches the creature: EAT for sheep, FLAP for duck
+  if (creature === 'duck') {
+    _ui.flap.style.display  = 'flex';
+    _ui.eat.style.display   = 'none';
+  } else {
+    _ui.eat.style.display       = 'flex';
+    _ui.flap.style.display      = 'none';
+    _ui.eatenCount.textContent  = '0';
+  }
 
   // Restart the 10s loading-bar animation by toggling the class with a reflow
   _ui.loadingBar.classList.remove('is-loading');
   void _ui.loadingBar.offsetWidth;        // force reflow to reset animation
   _ui.loadingBar.classList.add('is-loading');
 
-  // Send joystick at 20 fps — always send so sheep stops when stick is centred
+  // Send joystick at 20 fps — always send so the creature stops cleanly when
+  // the stick is centred. Verb depends on what's being possessed.
+  const inputVerb = creature === 'duck' ? 'duck_input' : 'sheep_input';
   _inputInterval = setInterval(() => {
-    send(`sheep_input|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+    send(`${inputVerb}|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
   }, 50);
 
   // WebRTC video: Unity will send a 'webrtc_offer|' message shortly after
   // granting possession. The offer is handled in handlePossessionMessage above.
 }
 
-function _onDenied() {
-  _ui.btn.textContent   = 'Inhabit a sheep';
-  _ui.btn.style.opacity = '1';
+function _onDenied(creature) {
+  // Denial can mean (a) someone else grabbed this creature, (b) the manager
+  // is at its concurrent-stream cap, or (c) no spawned creatures remain.
+  // Flash a short "STREAMS FULL" label, then restore the normal button text.
+  const btn = creature === 'duck' ? _ui.duckBtn : _ui.btn;
+  const restore = creature === 'duck' ? 'Inhabit a duck' : 'Inhabit a sheep';
+  btn.textContent   = 'Streams full — wait';
+  btn.style.opacity = '0.6';
+  setTimeout(() => {
+    if (btn) {
+      btn.textContent   = restore;
+      btn.style.opacity = '1';
+    }
+  }, 1800);
 }
 
 /**
@@ -737,8 +1019,25 @@ function _onSheepSpawned() {
   }
 }
 
+/**
+ * Called when Unity broadcasts that a duck has spawned (uncommon critter pack).
+ * Unlocks the duck inhabit button. Each duck card grants one possession.
+ */
+function _onDuckSpawned() {
+  _duckAvailable = true;
+  if (_ui && !_possessed) {
+    _ui.duckBtn.classList.remove('poss-hidden');
+    console.log('[possession.js] Duck card pulled — duck Inhabit button unlocked');
+  }
+}
+
 function _onTick(secsLeft) {
   _ui.secs.textContent = secsLeft;
+  // Mirror to the GBC TIME stat in "cur/total" RPG-bar format
+  if (_ui.gbTime) {
+    const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
+    _ui.gbTime.textContent = `${pad3(secsLeft)}/${pad3(_grantDuration)}`;
+  }
 }
 
 /**
@@ -749,6 +1048,22 @@ function _onSheepAte(total) {
   _ui.eatenCount.textContent = total;
   _ui.eaten.classList.add('bump');
   setTimeout(() => _ui.eaten && _ui.eaten.classList.remove('bump'), 150);
+  // Mirror to the GBC EAT counter (zero-padded for that fixed-width RPG feel)
+  if (_ui.gbActionValue) {
+    _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
+  }
+}
+
+/**
+ * Called when Unity confirms a duck flap succeeded. Currently no on-screen
+ * counter for it (we use the visual feather burst + wing animation in the
+ * stream instead), but the hook is here for future UI feedback.
+ */
+function _onDuckFlapped(total) {
+  // Mirror to the GBC FLAP counter — same zero-padded pattern as EAT
+  if (_ui.gbActionValue) {
+    _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
+  }
 }
 
 // ── Placement (user-driven card spawning) ──────────────────────────────────
@@ -820,7 +1135,8 @@ function _confirmPlace() {
 }
 
 function _onEnded() {
-  _possessed = false;
+  const wasDuck = _creatureType === 'duck';
+  _possessed    = false;
   clearInterval(_inputInterval);
   _joystickActive = false;
   _joyX = 0; _joyY = 0;
@@ -835,23 +1151,34 @@ function _onEnded() {
   _ui.vidLabel.style.display = 'flex';   // restore "CONNECTING…" loader for next session
   _ui.loadingBar.classList.remove('is-loading');  // reset bar to empty
 
-  // ── Consume the sheep-card credit ───────────────────────────────────────
-  // Each card pull grants ONE possession. Now that this one is done, lock
-  // the button until a NEW sheep_spawned message arrives.
-  _sheepAvailable = false;
+  // ── Consume the credit for whichever creature this possession was ────────
+  // Each card pull grants ONE possession. Lock the matching button until a
+  // new spawn message arrives for that creature type.
+  if (wasDuck) {
+    _duckAvailable = false;
+    _ui.duckBtn.textContent   = 'Inhabit a duck';
+    _ui.duckBtn.style.opacity = '1';
+  } else {
+    _sheepAvailable = false;
+    _ui.btn.textContent   = 'Inhabit a sheep';
+    _ui.btn.style.opacity = '1';
+  }
 
-  _ui.btn.textContent   = 'Inhabit a sheep';
-  _ui.btn.style.opacity = '1';
-  // Button stays hidden — _sheepAvailable is false now, so this is a no-op
-  // unless the user pulls another sheep card later.
+  // Restore any button whose credit is still live (e.g. duck card pulled
+  // during a sheep possession — the duck button should reappear after release).
   if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
+  if (_duckAvailable)  _ui.duckBtn.classList.remove('poss-hidden');
+
   _ui.timer.style.display   = 'none';
   _ui.eaten.style.display   = 'none';
   _ui.vidWrap.style.display = 'none';
   _ui.joyZone.style.display = 'none';
   _ui.release.style.display = 'none';
   _ui.eat.style.display     = 'none';
+  _ui.flap.style.display    = 'none';
   _ui.joyKnob.style.transform = 'translate(-50%,-50%)';
+
+  _creatureType = null;
 }
 
 // ── WebRTC receive ─────────────────────────────────────────────────────────
