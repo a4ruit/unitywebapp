@@ -1764,6 +1764,18 @@ body.pristine-phase #screen-pack .pack-carousel-stage {
   color: rgba(220, 80, 80, 0.85);
 }
 
+/* Stack the secondary debug buttons below the phase toggle */
+.debug-boss-btn {
+  top: 36px;
+  border-color: rgba(204, 17, 17, 0.4);
+  color: rgba(220, 80, 80, 0.75);
+}
+.debug-fleshling-btn {
+  top: 64px;
+  border-color: rgba(180, 40, 80, 0.4);
+  color: rgba(220, 100, 140, 0.75);
+}
+
 /* ── HORROR ROULETTE (Three.js) ──────────────────────────────────────────── */
 /* NOTE: never put `display: flex` directly on the ID — `.screen.hidden { display:none }`
    would lose the specificity war and the screen would render on top of every other one. */

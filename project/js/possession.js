@@ -87,6 +87,34 @@ function updatePossessionWS() {
     _ui.duckBtn.textContent   = 'Inhabit a duck';
     _ui.duckBtn.style.opacity = '1';
   }
+
+  // ── Connected-clients heartbeat ──────────────────────────────────────────
+  // Tell Unity we're here. Unity tracks the count via the QR banner's
+  // "X / Y PLAYERS" counter so visitors can see how busy the install is
+  // BEFORE they tap "Inhabit". Without these pings, Unity only knows about
+  // phones that are mid-possession — idle browsers wouldn't be counted.
+  _startHeartbeat();
+}
+
+// Internal heartbeat machinery — kept module-private so main.js doesn't need
+// to know it exists. _startHeartbeat is idempotent (safe to call on every WS
+// reconnect; only one interval ever runs).
+let _heartbeatInterval = null;
+function _startHeartbeat() {
+  // Fire an immediate hello so Unity counts us before the first ping interval
+  send(`client_hello|${CLIENT_ID}`);
+
+  if (_heartbeatInterval) return;   // already running
+
+  _heartbeatInterval = setInterval(() => {
+    send(`client_ping|${CLIENT_ID}`);
+  }, 5000);   // every 5s — matches Unity's clientStaleSeconds=15 budget (3 pings of grace)
+
+  // Best-effort goodbye on page close. Mobile browsers often kill the WS
+  // before this fires, which is why Unity prunes by heartbeat staleness too.
+  window.addEventListener('beforeunload', () => {
+    try { send(`client_bye|${CLIENT_ID}`); } catch (e) {}
+  });
 }
 
 /**

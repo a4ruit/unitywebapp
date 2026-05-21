@@ -653,6 +653,21 @@ function debugTogglePhase() {
   }
 }
 
+// Direct boss spawn — bypasses the legendary-pull gate so we can iterate on
+// the fight without grinding packs. Unity handles `debug_spawn_boss` by
+// calling FleshBoss.Spawn at a ground point regardless of phase.
+function debugSpawnBoss() {
+  send('debug_spawn_boss');
+  console.log('[DEBUG] requested boss spawn');
+}
+
+// Direct fleshling spawn — same idea for the small horror minions. Each call
+// spawns one fleshling at a random ground point.
+function debugSpawnFleshling() {
+  send('debug_spawn_fleshling');
+  console.log('[DEBUG] requested fleshling spawn');
+}
+
 // ── Horror Phase Roulette (Three.js) ──────────────────────────────────────
 // Five 3D items orbit around the Z axis. They spin individually on their own
 // axes too. On tap, the orbit accelerates and decelerates via cubic ease-out
