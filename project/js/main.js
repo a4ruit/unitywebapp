@@ -84,12 +84,19 @@ function getActiveCardPool() {
 }
 
 // ─── Corruption / progression ──────────────────────────────────────────────────
+// `packsOpened` is now driven by Unity's CorruptionManager broadcasts (the
+// collective count across every connected phone) — corruption-bar.js calls
+// updateCorruption(packCount) whenever the authoritative count changes.
+// We still keep this variable so any legacy reads continue to work.
 let packsOpened = 0;
-const HORROR_THRESHOLD = 15;  // packs opened before horror phase begins
+const HORROR_THRESHOLD = 15;  // packs opened (collective) before horror phase begins
 const CORRUPTION_MAX   = 18;  // max corruption level (HORROR_THRESHOLD + a few horror ticks)
 
-function updateCorruption() {
+function updateCorruption(externalPackCount) {
   const prevLevel = parseInt(document.body.dataset.corruption || '0');
+  // If corruption-bar.js called us with the authoritative count from Unity,
+  // use that. Otherwise fall back to the local counter (legacy callers).
+  if (typeof externalPackCount === 'number') packsOpened = externalPackCount;
   const level     = Math.min(packsOpened, CORRUPTION_MAX);
   document.body.dataset.corruption = level;
   const isPristine = level < HORROR_THRESHOLD;
@@ -295,7 +302,13 @@ function connect() {
     ws.onopen  = () => { setStatus(true); ws.send('web_client'); clearTimeout(reconnectTimer); sendPackType(); updatePossessionWS(); };
     ws.onclose = () => { setStatus(false); reconnectTimer = setTimeout(connect, 3000); };
     ws.onerror = () => ws.close();
-    ws.onmessage = (e) => { console.log('[WS]', e.data); handlePossessionMessage(e.data); };
+    ws.onmessage = (e) => {
+      console.log('[WS]', e.data);
+      // Order matters: corruption messages are checked first because they're
+      // high-frequency (every 0.5s) and we want to short-circuit early.
+      if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
+      handlePossessionMessage(e.data);
+    };
   } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
 }
 
@@ -457,8 +470,12 @@ function adpackCancel() {
 }
 
 function doPackOpen(dir) {
-  packsOpened++;
-  updateCorruption();   // also calls sendPackType() internally
+  // ── Collective corruption ──
+  // We DO NOT bump local packsOpened here anymore. Unity is now the source of
+  // truth — it tracks the count across every connected phone, decays it when
+  // idle, and broadcasts `corruption|level|packCount|phase` back. The bar and
+  // packsOpened both update via corruption-bar.js when that broadcast arrives.
+  // Round-trip is ~200-500ms; the pack-open animation hides the latency.
   send('pack_opened');
   BloodDrip.onPackOpened();
 
