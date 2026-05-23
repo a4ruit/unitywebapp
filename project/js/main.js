@@ -47,14 +47,16 @@ const SCOURGE_CARDS = [
 ];
 
 // ─── FUNGI (adpack / pristine) ────────────────────────────────────────────────
+// common → legendary get placement (joystick modal + PLACE confirm, same as
+// wildflower / flower bush). mythical and above are direct-spawns only.
 const FUNGI_CARDS = [
-  { id:'small_cube', name:'White Mushroom',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Overnight. Unannounced.' },
-  { id:'large_cube', name:'Fairy Cap',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Do not eat. Do not touch.' },
-  { id:'sphere',     name:'Chanterelle',      rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'The forest floor gives selectively.' },
-  { id:'triangle',   name:'Giant Puffball',   rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Ten trillion spores. Patient.' },
-  { id:'octagon',    name:'Death Cap',        rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Beautiful. Absolute.' },
-  { id:'triad',      name:'Spore Release',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Already airborne. Already everywhere.' },
-  { id:'star',       name:'The Network',      rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It remembered this forest before the trees did.' },
+  { id:'small_cube', name:'White Mushroom',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', placement:'fungi', desc:'Overnight. Unannounced.' },
+  { id:'large_cube', name:'Fairy Cap',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', placement:'fungi', desc:'Do not eat. Do not touch.' },
+  { id:'sphere',     name:'Chanterelle',      rarity:'rare',            rarityRank:2, command:'spawn_sphere',     placement:'fungi', desc:'The forest floor gives selectively.' },
+  { id:'triangle',   name:'Giant Puffball',   rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   placement:'fungi', desc:'Ten trillion spores. Patient.' },
+  { id:'octagon',    name:'Death Cap',        rarity:'mythical',        rarityRank:4, command:'spawn_octagon',                       desc:'Beautiful. Absolute.' },
+  { id:'triad',      name:'Spore Release',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',                         desc:'Already airborne. Already everywhere.' },
+  { id:'star',       name:'The Network',      rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',                          desc:'It remembered this forest before the trees did.' },
 ];
 
 // ─── RITUAL (adpack / horror) ─────────────────────────────────────────────────
