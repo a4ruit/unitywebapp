@@ -1,22 +1,40 @@
 // Blood drip overlay — pixelated, two-layer canvas system.
 // Renders at 1/PIXEL resolution, scaled up with image-rendering:pixelated.
-// Triggered after 3 pack opens. Stains accumulate permanently until reload.
-// Pack drips are ephemeral — they fade out without staining.
+//
+// ── Driven by COLLECTIVE corruption level (post-refactor) ─────────────────
+// Before: local `packsOpened++` per pack, triggered at 15 LOCAL pulls.
+// Now:    setCorruptionLevel(0..1) called by corruption-bar.js on every Unity
+//         broadcast. The bleed appears on every connected phone at the same
+//         time, driven by the room's collective state. When the room heals
+//         (level drops below threshold), drips stop spawning and stains fade.
+//
+// Pack-opening still triggers a small local BURST as tactile feedback — but
+// only while the collective is already past the threshold (i.e. it's not a
+// trigger, just an amplifier).
+//
+// Stains accumulate while in horror; they fade out smoothly during healing
+// so the screen isn't permanently corrupted across decay cycles.
 
 const BloodDrip = (() => {
   const PIXEL = 5; // each grid unit = 5×5 screen pixels
 
-  let stainCanvas, stainCtx; // permanent stain layer — never cleared
+  // ── Threshold (0..1) at which the bleed activates ──
+  // Must match CorruptionManager.horrorThreshold in Unity. The default 0.60
+  // is the same value Unity uses out of the box — they can be retuned together.
+  const HORROR_LEVEL_THRESHOLD = 0.60;
+
+  let stainCanvas, stainCtx; // accumulating stain layer — fades during healing
   let dripCanvas,  dripCtx;  // active drip layer — cleared each frame
   let GW, GH;                // grid dimensions
 
-  let drips         = [];
-  let packsOpened   = 0;
-  let initialized   = false; // canvases + loop exist
-  let running       = false; // full stain system active (packsOpened >= 15)
-  let raf           = null;
-  let spawnTimer    = null;
-  let packDripTimer = null;
+  let drips           = [];
+  let corruptionLevel = 0;       // 0..1, authoritative from Unity
+  let initialized     = false;   // canvases + loop exist
+  let running         = false;   // active when corruptionLevel >= HORROR_LEVEL_THRESHOLD
+  let stainAlpha      = 1.0;     // multiplier for stain layer opacity — drops during heal
+  let raf             = null;
+  let spawnTimer      = null;
+  let packDripTimer   = null;
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -106,8 +124,11 @@ const BloodDrip = (() => {
 
   // ── Drip spawning ─────────────────────────────────────────────────────────
 
+  // Intensity ramps 0..10 once the collective corruption is past the threshold.
+  // level=0.60 → 0   |   level=1.00 → 10   (linear above the threshold)
   function intensity() {
-    return Math.max(0, Math.floor((packsOpened - 15) / 1.5));
+    if (corruptionLevel < HORROR_LEVEL_THRESHOLD) return 0;
+    return Math.max(0, Math.floor((corruptionLevel - HORROR_LEVEL_THRESHOLD) * 25));
   }
 
   function spawnDrip() {
@@ -363,24 +384,82 @@ const BloodDrip = (() => {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
+  // Called by main.js on every LOCAL pack pull. Now purely an amplifier — only
+  // spawns a burst if the COLLECTIVE corruption is already in horror. The
+  // initial activation comes from setCorruptionLevel() instead.
   function onPackOpened() {
-    packsOpened++;
-
-    if (!running && packsOpened >= 15) {
-      running = true;
-      ensureInit();
-      scheduleNextSpawn();
-    }
-
-    if (!running) return;
+    if (!running) return;   // collective bar not in horror yet — silent
 
     const level = intensity();
     const burst = 1 + Math.floor(level / 2);
     for (let i = 0; i < burst; i++) {
       setTimeout(() => spawnDrip(), i * 130);
     }
-    if (packsOpened >= 17) setTimeout(() => { spawnDrip(); spawnDrip(); }, 500);
-    if (packsOpened >= 20) setTimeout(() => { for (let i = 0; i < 3; i++) spawnDrip(); }, 900);
+    // Extra-bloody bursts at higher collective levels
+    if (corruptionLevel >= 0.80) setTimeout(() => { spawnDrip(); spawnDrip(); }, 500);
+    if (corruptionLevel >= 0.92) setTimeout(() => { for (let i = 0; i < 3; i++) spawnDrip(); }, 900);
+  }
+
+  // Called by corruption-bar.js on EVERY Unity broadcast (every 0.5s + on pulls).
+  // Drives the bleed activation, intensity, and reversibility.
+  //
+  // Transitions:
+  //   nature → horror   (level crosses up):  start drip spawning, stainAlpha=1
+  //   horror → nature   (level crosses down): stop new drips, fade stains to 0
+  //   horror → horror   (level changes):     intensity() picks up new value automatically
+  function setCorruptionLevel(level) {
+    const next = Math.max(0, Math.min(1, level));
+    const wasRunning = running;
+    corruptionLevel = next;
+
+    if (next >= HORROR_LEVEL_THRESHOLD) {
+      if (!wasRunning) {
+        running     = true;
+        stainAlpha  = 1.0;   // stains visible again at full opacity
+        ensureInit();
+        scheduleNextSpawn();
+      }
+      // Apply current stain alpha (in case we were mid-fade)
+      if (stainCanvas) stainCanvas.style.opacity = String(stainAlpha);
+    } else {
+      // Healing back to nature — stop new drips, fade existing stains gracefully.
+      if (wasRunning) {
+        running = false;
+        if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
+        _startStainFadeOut();
+      }
+    }
+  }
+
+  // Smooth fade of the accumulated stain layer when the collective heals.
+  // Targets opacity 0 over ~2.5 seconds — the room is recovering, the marks lift.
+  // If corruption returns mid-fade, setCorruptionLevel() will reset alpha to 1.
+  let _fadeRaf = null;
+  function _startStainFadeOut() {
+    if (!stainCanvas) return;
+    cancelAnimationFrame(_fadeRaf);
+    const startAlpha = stainAlpha;
+    const startTime  = performance.now();
+    const duration   = 2500;
+
+    function tick(now) {
+      if (running) {   // corruption returned mid-fade — abort
+        _fadeRaf = null;
+        return;
+      }
+      const t = Math.min(1, (now - startTime) / duration);
+      stainAlpha = startAlpha * (1 - t);
+      stainCanvas.style.opacity = String(stainAlpha);
+      if (t < 1) {
+        _fadeRaf = requestAnimationFrame(tick);
+      } else {
+        _fadeRaf = null;
+        // Fully faded — clear the stain canvas so it's a clean slate next time
+        if (stainCtx) stainCtx.clearRect(0, 0, GW, GH);
+        stainAlpha = 1.0;   // reset for the next horror cycle
+      }
+    }
+    _fadeRaf = requestAnimationFrame(tick);
   }
 
   function startPackDrips() {
@@ -388,5 +467,5 @@ const BloodDrip = (() => {
     schedulePackDrips();
   }
 
-  return { onPackOpened, startPackDrips };
+  return { onPackOpened, startPackDrips, setCorruptionLevel };
 })();

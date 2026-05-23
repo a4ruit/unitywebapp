@@ -74,20 +74,44 @@ function _applyCorruption(level, packCount, phase) {
   _corrPackCount = packCount;
   _corrPhase     = phase;
 
-  // Only fire main.js's updateCorruption() (which drives Pack3D glitch
-  // transitions, pack tab refresh, sendPackType, etc.) when the AUTHORITATIVE
-  // packCount actually changes. Otherwise the 0.5s heartbeat broadcasts would
-  // thrash the DOM every tick and re-run sendPackType pointlessly.
-  if (packCount !== _lastPackCount) {
-    _lastPackCount = packCount;
+  // ── Mirror level → "effective pack pressure" for legacy code ──
+  // The existing pack-tab / pack-pool / Pack3D code all read
+  // `document.body.dataset.corruption` and compare against HORROR_THRESHOLD (15).
+  //
+  // BUT: packCount is cumulative — it never decreases — so if we wrote it
+  // straight to the dataset, the world could NEVER heal back to nature even
+  // when Unity decays the level. Refresh, decay, anything — the dataset would
+  // stay stuck at the high-water mark.
+  //
+  // Instead we derive an effective value from the LIVE LEVEL, mapped into the
+  // same scale (0..25, with 15 = horror threshold). When Unity decays the
+  // level, this value DROPS, the pristine-phase class comes back, packs heal.
+  //
+  //   level=0.00 → effective=0    (full nature)
+  //   level=0.60 → effective=15   (horror threshold — matches HORROR_THRESHOLD)
+  //   level=1.00 → effective=25   (full corruption)
+  const HT_LEVEL   = 0.60;   // matches Unity CorruptionManager.horrorThreshold
+  const HT_WEB     = window.HORROR_THRESHOLD ?? 15;
+  const effective  = Math.round(_corrLevel * (HT_WEB / HT_LEVEL));
+
+  if (effective !== _lastPackCount) {
+    _lastPackCount = effective;
     if (typeof updateCorruption === 'function') {
-      updateCorruption(packCount);   // sets dataset, toggles pristine-phase, fires Pack3D
+      // Drives dataset.corruption, pristine-phase class, pack tab refresh,
+      // Pack3D.startGlitchTransition on threshold cross, sendPackType, etc.
+      updateCorruption(effective);
     } else {
-      // Fallback in case main.js hasn't loaded yet (script-order safety)
-      document.body.dataset.corruption = packCount;
-      const HT = window.HORROR_THRESHOLD ?? 15;
-      document.body.classList.toggle('pristine-phase', packCount < HT);
+      // Fallback if main.js hasn't loaded yet
+      document.body.dataset.corruption = effective;
+      document.body.classList.toggle('pristine-phase', effective < HT_WEB);
     }
+  }
+
+  // ── Drive the screen bleed off the SAME collective level ──
+  // Removes the per-player "15 local pulls" trigger that used to live in
+  // bloodDrip.js. Now every connected phone bleeds when the ROOM is in horror.
+  if (typeof BloodDrip !== 'undefined' && BloodDrip.setCorruptionLevel) {
+    BloodDrip.setCorruptionLevel(_corrLevel);
   }
 
   if (!_corrUI) return;

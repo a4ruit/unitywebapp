@@ -661,8 +661,10 @@ initCounter();
 function debugTogglePhase() {
   const btn = document.getElementById('debugPhaseBtn');
   const inHorror = packsOpened >= HORROR_THRESHOLD;
-  packsOpened = inHorror ? 0 : HORROR_THRESHOLD;
-  updateCorruption();
+  // Speak to Unity so the COLLECTIVE bar moves — every phone flips with us.
+  // (Old behaviour mutated only the local packsOpened; that no longer drives
+  // anything since corruption is Unity-authoritative now.)
+  send(inHorror ? 'debug_corruption_reset' : 'debug_corruption_horror');
   if (inHorror) {
     btn.textContent = '▸ horror';
     btn.dataset.phase = 'pristine';
