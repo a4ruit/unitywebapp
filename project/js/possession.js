@@ -1318,51 +1318,41 @@ function _triggerSpore() {
 
 /**
  * Unity confirms the cloud fired.
- * Show ACTIVE phase for `duration` seconds, then count down `cooldown` seconds.
+ * The spore ability is ONE-SHOT per placed mushroom — flash "ACTIVE!" briefly
+ * for confirmation, then hide the panel entirely. It only reappears when the
+ * player pulls another fungi card and places a new mushroom.
  */
 function _onSporeActivated(duration, cooldown) {
-  _sporeCooldownSecs = duration + cooldown;   // total blocked window
+  // Consume the ability immediately so a second tap cannot fire
+  _sporeOwned        = false;
+  _sporeCooldownSecs = duration + cooldown;
   clearInterval(_sporeCooldownTimer);
+  _sporeCooldownTimer = null;
 
+  // Brief "ACTIVE!" visual confirmation before the panel vanishes
   _ui.sporeBtn.classList.remove('spore-ready', 'spore-cooldown');
   _ui.sporeBtn.classList.add('spore-active');
-  _ui.sporeStatus.textContent = `ACTIVE ${Math.ceil(duration)}s`;
+  _ui.sporeStatus.textContent = 'ACTIVE!';
 
-  let activeRemaining = duration;
+  setTimeout(() => {
+    if (_ui && _ui.sporePanel) _ui.sporePanel.style.display = 'none';
+    // Reset button state for next time it appears
+    _ui.sporeBtn.classList.remove('spore-active', 'spore-cooldown');
+    _ui.sporeBtn.classList.add('spore-ready');
+    _ui.sporeStatus.textContent = 'READY';
+    _sporeCooldownSecs = 0;
+  }, 1400);   // 1.4s — long enough to read, short enough to feel responsive
 
-  _sporeCooldownTimer = setInterval(() => {
-    _sporeCooldownSecs  -= 1;
-    activeRemaining     -= 1;
-
-    if (activeRemaining > 0) {
-      // Cloud still live in Unity
-      _ui.sporeStatus.textContent = `ACTIVE ${Math.ceil(activeRemaining)}s`;
-    } else if (_sporeCooldownSecs > 0) {
-      // Cloud dissipated — post-cloud cooldown ticking
-      _ui.sporeBtn.classList.remove('spore-active');
-      _ui.sporeBtn.classList.add('spore-cooldown');
-      _ui.sporeStatus.textContent = `COOLDOWN ${Math.ceil(_sporeCooldownSecs)}s`;
-    } else {
-      // Fully ready again
-      _sporeCooldownSecs = 0;
-      clearInterval(_sporeCooldownTimer);
-      _sporeCooldownTimer = null;
-      _ui.sporeBtn.classList.remove('spore-active', 'spore-cooldown');
-      _ui.sporeBtn.classList.add('spore-ready');
-      _ui.sporeStatus.textContent = 'READY';
-    }
-  }, 1000);
+  console.log('[possession.js] Spore fired — panel will dismiss after flash');
 }
 
 /**
- * Unity rejected the spore request — it was already on cooldown.
- * Sync our display to Unity's authoritative remaining time.
+ * Unity rejected the spore request (race condition — panel should already be
+ * hidden by this point, but hide it defensively just in case).
  */
 function _onSporeOnCooldown(secsLeft) {
-  _sporeCooldownSecs = secsLeft;
-  _ui.sporeBtn.classList.remove('spore-ready', 'spore-active');
-  _ui.sporeBtn.classList.add('spore-cooldown');
-  _ui.sporeStatus.textContent = `COOLDOWN ${Math.ceil(secsLeft)}s`;
+  _sporeOwned = false;
+  if (_ui && _ui.sporePanel) _ui.sporePanel.style.display = 'none';
 }
 
 /**
