@@ -29,7 +29,7 @@
 // ── Version stamp ──────────────────────────────────────────────────────────
 // If you don't see this in the console on page load, your browser is serving
 // cached possession.js — hard refresh (Ctrl+Shift+R) or disable cache in DevTools.
-console.log('%c[possession.js] v2025-05-17 — WebRTC stats poller + MediaStream fallback',
+console.log('%c[possession.js] v2025-05-23 — fungi spore panel + requestPlacement global',
   'color:#00c8b4; font-weight:bold');
 
 // ── TURN server configuration ──────────────────────────────────────────────
@@ -71,6 +71,13 @@ let _creatureType   = null;
 // Clean up any leftover flag from prior versions that persisted across reloads.
 try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 
+// ── Fungi spore state ─────────────────────────────────────────────────────
+// Entirely independent of possession sessions — the mushroom keeps existing
+// on the ground after the possession timer expires.
+let _sporeOwned         = false;  // this client has a living placed mushroom
+let _sporeCooldownTimer = null;   // setInterval counting down active + cooldown
+let _sporeCooldownSecs  = 0;      // seconds remaining in the blocked window
+
 // ── Globals called by main.js ──────────────────────────────────────────────
 
 /**
@@ -94,6 +101,18 @@ function updatePossessionWS() {
   // BEFORE they tap "Inhabit". Without these pings, Unity only knows about
   // phones that are mid-possession — idle browsers wouldn't be counted.
   _startHeartbeat();
+}
+
+/**
+ * Called by main.js when a placement-eligible card (wildflower, flower bush,
+ * fungi) is tapped. Sends the placement request to Unity via the WebSocket.
+ *   cardType  — 'wildflower' | 'flowerbush' | 'fungi' | 'mushroom'
+ *   rarity    — 'common' | 'uncommon' | 'rare' …
+ *   cardName  — display label used for the placement modal header
+ */
+function requestPlacement(cardType, rarity, cardName) {
+  send(`placement_request|${CLIENT_ID}|${cardType}|${rarity}|${cardName || cardType}`);
+  console.log('[possession.js] Placement requested:', cardType, rarity, cardName);
 }
 
 // Internal heartbeat machinery — kept module-private so main.js doesn't need
@@ -208,6 +227,28 @@ function handlePossessionMessage(data) {
     const spawnerId = parts[1];
     if (spawnerId === CLIENT_ID) _onSheepSpawned();
     return true;
+  }
+
+  // ── Fungi spore lifecycle ──────────────────────────────────────────────────
+  // fungi_placed|clientId|cooldownSecs — mushroom confirmed on ground, show spore panel
+  if (msg.startsWith('fungi_placed|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onFungiPlaced(Number(parts[2])); return true; }
+  }
+  // fungi_spore_activated|clientId|duration|cooldown — cloud is now live in Unity
+  if (msg.startsWith('fungi_spore_activated|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onSporeActivated(Number(parts[2]), Number(parts[3])); return true; }
+  }
+  // fungi_spore_cooldown|clientId|secsLeft — Unity rejected request (already on cooldown)
+  if (msg.startsWith('fungi_spore_cooldown|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onSporeOnCooldown(Number(parts[2])); return true; }
+  }
+  // fungi_destroyed|clientId — mushroom was eaten; dismiss the spore panel
+  if (msg.startsWith('fungi_destroyed|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onFungiDestroyed(); return true; }
   }
 
   // Unity sends the WebRTC offer once the possession camera is ready.
@@ -752,6 +793,77 @@ function _buildUI() {
       display: none;
       white-space: nowrap;
     }
+
+    /* ── Fungi spore panel ───────────────────────────────────────────────────
+       Persistent top-left overlay shown after the user places a mushroom.
+       Stays alive independently of possession sessions — the mushroom keeps
+       existing on the ground after the possession timer expires.
+       Dismissed only when fungi_destroyed arrives (boss/fleshling ate it). */
+    #poss-spore-panel {
+      pointer-events: all;
+      position: fixed;
+      top: 24px;
+      left: 24px;
+      display: none;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      z-index: 10000;
+    }
+    #poss-spore-btn {
+      padding: 12px 20px;
+      background: rgba(101,255,76,0.12);
+      border: 2px solid rgba(101,255,76,0.68);
+      color: #65ff4c;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      white-space: nowrap;
+      text-shadow: 0 0 10px rgba(101,255,76,0.55);
+      box-shadow: 0 0 12px rgba(101,255,76,0.25);
+      transition: background 0.15s, transform 0.08s;
+      user-select: none;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #poss-spore-btn:active {
+      background: rgba(101,255,76,0.38);
+      transform: scale(0.93);
+    }
+    /* Pulsing glow when ready to fire */
+    #poss-spore-btn.spore-ready {
+      animation: spore-pulse 1.8s ease-in-out infinite;
+    }
+    /* Rapid pulse while the cloud is live in Unity */
+    #poss-spore-btn.spore-active {
+      background: rgba(101,255,76,0.28);
+      opacity: 0.80;
+      cursor: default;
+      animation: spore-pulse 0.55s ease-in-out infinite;
+    }
+    /* Dimmed, non-interactive during cooldown */
+    #poss-spore-btn.spore-cooldown {
+      opacity: 0.38;
+      cursor: not-allowed;
+      animation: none;
+      box-shadow: none;
+    }
+    @keyframes spore-pulse {
+      0%, 100% { box-shadow: 0 0 12px rgba(101,255,76,0.25); }
+      50%       { box-shadow: 0 0 26px rgba(101,255,76,0.80), 0 0 6px rgba(101,255,76,0.95); }
+    }
+    /* Status line: READY / ACTIVE Xs / COOLDOWN Xs */
+    #poss-spore-status {
+      color: rgba(101,255,76,0.58);
+      font-family: monospace;
+      font-size: 10px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      padding-left: 2px;
+    }
   `;
   document.head.appendChild(style);
 
@@ -818,6 +930,13 @@ function _buildUI() {
         <img id="poss-place-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
       </div>
     </div>
+
+    <!-- Fungi spore panel — top-left corner, persists after mushroom placement.
+         Hidden by default; shown on fungi_placed, dismissed on fungi_destroyed. -->
+    <div id="poss-spore-panel">
+      <button id="poss-spore-btn">&#x2601; SPORE CLOUD</button>
+      <div id="poss-spore-status">READY</div>
+    </div>
   `;
   document.body.appendChild(root);
 
@@ -847,6 +966,10 @@ function _buildUI() {
     placeOverlay:     root.querySelector('#poss-place-overlay'),
     placeCardContent: root.querySelector('#poss-place-card-content'),
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
+    // Fungi spore panel
+    sporePanel:       root.querySelector('#poss-spore-panel'),
+    sporeBtn:         root.querySelector('#poss-spore-btn'),
+    sporeStatus:      root.querySelector('#poss-spore-status'),
   };
 
   _ui.btn.addEventListener('click',        _requestPossession);
@@ -859,6 +982,9 @@ function _buildUI() {
   _ui.flap.addEventListener('click',       _flap);
   _ui.place.addEventListener('touchstart', e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
   _ui.place.addEventListener('click',      _confirmPlace);
+  // Spore button — touchstart for zero-latency on mobile, click as desktop fallback
+  _ui.sporeBtn.addEventListener('touchstart', e => { e.preventDefault(); _triggerSpore(); }, { passive: false });
+  _ui.sporeBtn.addEventListener('click',      _triggerSpore);
   _setupJoystick();
 
   // Hide both Inhabit buttons until the matching creature has been pulled.
@@ -1160,6 +1286,96 @@ function _onPlacementDone() {
 function _confirmPlace() {
   if (!_placing) return;
   send(`placement_confirm|${CLIENT_ID}`);
+}
+
+// ── Fungi spore panel ──────────────────────────────────────────────────────
+
+/**
+ * Unity confirmed the mushroom is planted and registered.
+ * Show the spore panel in the READY state.
+ */
+function _onFungiPlaced(cooldownSecs) {
+  _sporeOwned        = true;
+  _sporeCooldownSecs = 0;
+  clearInterval(_sporeCooldownTimer);
+  _sporeCooldownTimer = null;
+
+  _ui.sporePanel.style.display = 'flex';
+  _ui.sporeBtn.classList.remove('spore-cooldown', 'spore-active');
+  _ui.sporeBtn.classList.add('spore-ready');
+  _ui.sporeStatus.textContent = 'READY';
+
+  console.log('[possession.js] Fungi placed — spore panel shown (cooldown:', cooldownSecs + 's)');
+}
+
+/**
+ * User presses SPORE CLOUD. Ignored if already on cooldown or no mushroom placed.
+ */
+function _triggerSpore() {
+  if (!_sporeOwned || _sporeCooldownSecs > 0) return;
+  send(`fungi_spore|${CLIENT_ID}`);
+}
+
+/**
+ * Unity confirms the cloud fired.
+ * Show ACTIVE phase for `duration` seconds, then count down `cooldown` seconds.
+ */
+function _onSporeActivated(duration, cooldown) {
+  _sporeCooldownSecs = duration + cooldown;   // total blocked window
+  clearInterval(_sporeCooldownTimer);
+
+  _ui.sporeBtn.classList.remove('spore-ready', 'spore-cooldown');
+  _ui.sporeBtn.classList.add('spore-active');
+  _ui.sporeStatus.textContent = `ACTIVE ${Math.ceil(duration)}s`;
+
+  let activeRemaining = duration;
+
+  _sporeCooldownTimer = setInterval(() => {
+    _sporeCooldownSecs  -= 1;
+    activeRemaining     -= 1;
+
+    if (activeRemaining > 0) {
+      // Cloud still live in Unity
+      _ui.sporeStatus.textContent = `ACTIVE ${Math.ceil(activeRemaining)}s`;
+    } else if (_sporeCooldownSecs > 0) {
+      // Cloud dissipated — post-cloud cooldown ticking
+      _ui.sporeBtn.classList.remove('spore-active');
+      _ui.sporeBtn.classList.add('spore-cooldown');
+      _ui.sporeStatus.textContent = `COOLDOWN ${Math.ceil(_sporeCooldownSecs)}s`;
+    } else {
+      // Fully ready again
+      _sporeCooldownSecs = 0;
+      clearInterval(_sporeCooldownTimer);
+      _sporeCooldownTimer = null;
+      _ui.sporeBtn.classList.remove('spore-active', 'spore-cooldown');
+      _ui.sporeBtn.classList.add('spore-ready');
+      _ui.sporeStatus.textContent = 'READY';
+    }
+  }, 1000);
+}
+
+/**
+ * Unity rejected the spore request — it was already on cooldown.
+ * Sync our display to Unity's authoritative remaining time.
+ */
+function _onSporeOnCooldown(secsLeft) {
+  _sporeCooldownSecs = secsLeft;
+  _ui.sporeBtn.classList.remove('spore-ready', 'spore-active');
+  _ui.sporeBtn.classList.add('spore-cooldown');
+  _ui.sporeStatus.textContent = `COOLDOWN ${Math.ceil(secsLeft)}s`;
+}
+
+/**
+ * The mushroom was eaten by a boss or fleshling — close the spore panel.
+ */
+function _onFungiDestroyed() {
+  _sporeOwned        = false;
+  _sporeCooldownSecs = 0;
+  clearInterval(_sporeCooldownTimer);
+  _sporeCooldownTimer = null;
+
+  if (_ui && _ui.sporePanel) _ui.sporePanel.style.display = 'none';
+  console.log('[possession.js] Fungi destroyed — spore panel dismissed');
 }
 
 function _onEnded() {
