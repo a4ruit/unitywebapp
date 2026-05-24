@@ -86,37 +86,16 @@ function getActiveCardPool() {
 }
 
 // ─── Corruption / progression ──────────────────────────────────────────────────
-// `packsOpened` is now driven by Unity's CorruptionManager broadcasts (the
-// collective count across every connected phone) — corruption-bar.js calls
-// updateCorruption(packCount) whenever the authoritative count changes.
-// We still keep this variable so any legacy reads continue to work.
+// packsOpened — collective Unity count (still received from server broadcasts).
+// No bar displayed; kept for logging and legacy pack_type_* fallback.
 let packsOpened = 0;
-// ── Personal vs collective phase split (Direction A) ──────────────────────────
-// personalPacksOpened — this phone's own pull count. Drives:
-//   • card pool (NATURE vs FLESH, CRITTER vs SCOURGE, FUNGI vs RITUAL)
-//   • pack tab labels / icons (updatePersonalPhase → updateFirstPackTab etc.)
-//   • pristine-phase CSS class (green bottom row)
-//   • Three.js glitch transition on crossing the threshold
-//   • sendPackType() — tells Unity what to spawn for THIS player
-//   • horror spin gate (dropCard) and god-pack horror check
-// packsOpened — the Unity-authoritative COLLECTIVE count. Drives ONLY:
-//   • document.body.dataset.corruption (visual bar, blood drip)
-// Two players can be in different personal phases simultaneously; the world
-// visuals remain collective (everyone sees the same corruption bar rise).
+// personalPacksOpened — THIS phone's own pull count. Drives everything:
+//   card pool · tab labels · pristine-phase CSS · glitch transition
+//   sendPackType · horror spin gate · god-pack horror check
 let personalPacksOpened = 0;
 let _prevPersonalLevel  = 0;
 const HORROR_THRESHOLD = 15;  // packs opened before horror phase begins
 const CORRUPTION_MAX   = 18;  // max corruption level (HORROR_THRESHOLD + a few horror ticks)
-
-// Called by corruption-bar.js with the Unity-authoritative collective count.
-// We still sync packsOpened for logging / server-side awareness, but the BAR
-// is now personal — it reflects THIS phone's own pulls only, so other players
-// opening packs don't move your bar.
-function updateCorruption(externalPackCount) {
-  if (typeof externalPackCount === 'number') packsOpened = externalPackCount;
-  // Use personalPacksOpened so the visual bar stays private to this phone.
-  document.body.dataset.corruption = Math.min(personalPacksOpened, CORRUPTION_MAX);
-}
 
 // Drives everything tied to THIS phone's personal phase (called on every pull
 // and on WS reconnect). Does NOT touch the collective bar or packsOpened.
@@ -689,11 +668,10 @@ setTickerState('idle');
 initCounter();
 
 // ── DEBUG: phase toggle (temporary) ───────────────────────────────────────
-// Single button in top-left flips packsOpened between 0 (pristine) and 15
-// (horror threshold). Calls the regular updateCorruption() so the existing
+// Flips personalPacksOpened between 0 (pristine) and HORROR_THRESHOLD so the
 // transition logic — tab swaps, glitch effect, pack type sync — fires exactly
-// as it would after a real 15-pack grind. Remove this block + the HTML button
-// + the CSS rule before production.
+// as it would after a real grind. Remove this block + the HTML button +
+// the CSS rule before production.
 
 function debugTogglePhase() {
   const btn = document.getElementById('debugPhaseBtn');
