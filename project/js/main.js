@@ -112,9 +112,12 @@ function updatePersonalPhase() {
   updateSecondPackTab(isPristine);
   updateThirdPackTab(isPristine);
   // On the personal nature→horror crossing, fire the 3D glitch transition
+  // and automatically spawn the Flesh Boss for this player.
   if (typeof Pack3D !== 'undefined') {
     if (_prevPersonalLevel < HORROR_THRESHOLD && level >= HORROR_THRESHOLD) {
       Pack3D.startGlitchTransition();
+      // Tell Unity to spawn the boss — gated server-side (one at a time).
+      if (typeof CLIENT_ID !== 'undefined') send(`spawn_boss|${CLIENT_ID}`);
     } else {
       Pack3D.onCorruptionUpdate();
     }
@@ -702,6 +705,14 @@ function debugSpawnBoss() {
 function debugSpawnFleshling() {
   send('debug_spawn_fleshling');
   console.log('[DEBUG] requested fleshling spawn');
+}
+
+// Blind Box debug spawn — spawns the inhabitable horror box without needing
+// a flesh-rare pull. The Inhabit button appears on any phone that taps it
+// after the box lands in the world.
+function debugSpawnBlindBox() {
+  send('debug_spawn_blind_box');
+  console.log('[DEBUG] requested blind box spawn');
 }
 
 // ── Horror Phase Roulette (Three.js) ──────────────────────────────────────

@@ -284,6 +284,17 @@ function handlePossessionMessage(data) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onBoxTick(Number(parts[2])); return true; }
   }
+  if (msg.startsWith('box_lings_released|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) {
+      // Disable the OPEN BOX button — one shot per session
+      if (_ui.openBox) {
+        _ui.openBox.disabled  = true;
+        _ui.openBox.innerHTML = '&#x2713; RELEASED';
+      }
+      return true;
+    }
+  }
 
   // Unity sends the WebRTC offer once the possession camera is ready.
   // SDP may contain '|', so we rejoin everything after the clientId field.
@@ -828,6 +839,48 @@ function _buildUI() {
       white-space: nowrap;
     }
 
+    /* ── Open Box button (box possession only, once per session) ── */
+    #poss-open-box {
+      pointer-events: all;
+      position: absolute;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(140,16,16,0.20);
+      border: 2px solid rgba(200,28,28,0.75);
+      color: #e85050;
+      font-family: monospace;
+      font-size: 13px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      line-height: 1.25;
+      text-shadow: 0 0 10px rgba(220,40,40,0.8);
+      box-shadow: 0 0 14px rgba(180,20,20,0.45);
+      transition: transform 0.08s ease-out, background 0.1s, opacity 0.2s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-open-box:active {
+      background: rgba(180,20,20,0.40);
+      transform: scale(0.91);
+    }
+    #poss-open-box:disabled {
+      opacity: 0.28;
+      pointer-events: none;
+      box-shadow: none;
+      text-shadow: none;
+    }
+
     /* ── Fungi spore panel ───────────────────────────────────────────────────
        Persistent top-left overlay shown after the user places a mushroom.
        Stays alive independently of possession sessions — the mushroom keeps
@@ -930,28 +983,30 @@ function _buildUI() {
                              0 0  5px rgba(200, 28, 28, 0.95); }
     }
 
-    /* ── Blind screen — what the box "sees" ───────────────────────────────
-       Shown inside #gb-screen instead of the WebRTC video during Blind Box
-       possession. Simulates severely degraded vision: near-black field,
-       drifting film-grain noise, and a cataract vignette (milky smear at
-       centre, deep red-black at the edges). The player rolls in the dark. */
+    /* ── Blind screen — degraded vision overlay ───────────────────────────
+       Sits on top of the blurry WebRTC video feed during Blind Box
+       possession. Background is transparent so the video shows through.
+       Layers: thin drifting film-grain + edge vignette that's fully clear
+       at the centre. Together they create a cataract-like effect — you can
+       make out rough shapes and colours but can't navigate cleanly.       */
     #poss-blind-screen {
       position: absolute;
       inset: 0;
-      background: #060101;
+      background: transparent;   /* video shows through — not a solid block */
       display: none;
       overflow: hidden;
+      pointer-events: none;
+      z-index: 1;                /* sits above video, below lcd-grid */
     }
 
-    /* Film-grain layer: SVG fractal noise tile, shifts position every few
-       frames to animate without JS or canvas. Cheap on mobile.            */
+    /* Film-grain layer: lighter opacity than before so the video shows. */
     #poss-blind-screen::before {
       content: '';
       position: absolute;
       inset: -10%;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
       background-size: 160px 160px;
-      opacity: 0.16;
+      opacity: 0.09;
       mix-blend-mode: screen;
       filter: blur(0.6px);
       animation: blind-grain-drift 0.28s steps(3) infinite;
@@ -963,23 +1018,34 @@ function _buildUI() {
       100% { transform: translate( -2px,  4px); }
     }
 
-    /* Cataract vignette: warm blurry smear in the centre surrounded by
-       deep red-black — the biological signature of clouded lenses.        */
+    /* Cataract vignette: fully transparent at the centre (video visible),
+       dark red at the edges — biological signature of clouded lenses.
+       The player can see shapes near centre, nothing at the periphery.   */
     #poss-blind-screen::after {
       content: '';
       position: absolute;
       inset: 0;
       background: radial-gradient(
         ellipse at 50% 48%,
-        rgba(200, 155, 110, 0.06)  0%,
-        rgba( 90,  35,  20, 0.62) 42%,
-        rgba( 12,   2,   2, 0.94) 78%,
-        rgba(  3,   0,   0, 1.00) 100%);
+        rgba(200, 155, 110, 0.00)  0%,    /* centre: fully transparent */
+        rgba( 90,  35,  20, 0.18) 38%,    /* mild amber ring */
+        rgba( 12,   2,   2, 0.72) 68%,    /* deep red approaching edges */
+        rgba(  3,   0,   0, 0.97) 100%);  /* near-black corners */
       animation: cataract-pulse 3.8s ease-in-out infinite alternate;
     }
     @keyframes cataract-pulse {
       from { transform: scale(1.00); opacity: 1.00; }
-      to   { transform: scale(1.05); opacity: 0.86; }
+      to   { transform: scale(1.06); opacity: 0.88; }
+    }
+
+    /* ── Box-mode video filter ─────────────────────────────────────────────
+       The WebRTC stream from the overhead box camera is deliberately degraded:
+       moderate blur removes fine detail while preserving rough shapes and
+       colours — the player can make out the environment but not navigate
+       cleanly. Slightly more visible than before (blur reduced, saturation
+       and brightness raised) while still keeping the disorienting feel.   */
+    #gb-frame.box-mode #poss-video {
+      filter: blur(6px) saturate(0.35) brightness(0.68) contrast(0.85);
     }
 
     /* Horror colour overrides for the GBC chrome during Box possession.
@@ -1063,6 +1129,7 @@ function _buildUI() {
     <button id="poss-eat">EAT</button>
     <button id="poss-flap">FLAP</button>
     <button id="poss-place">PLACE</button>
+    <button id="poss-open-box">OPEN<br>BOX</button>
     <button id="poss-release">release</button>
 
     <!-- Placement modal: blocks background, houses joystick + PLACE button -->
@@ -1108,6 +1175,7 @@ function _buildUI() {
     joyZone:          root.querySelector('#poss-joy-zone'),
     joyKnob:          root.querySelector('#poss-joy-knob'),
     release:          root.querySelector('#poss-release'),
+    openBox:          root.querySelector('#poss-open-box'),
     eat:              root.querySelector('#poss-eat'),
     flap:             root.querySelector('#poss-flap'),
     place:            root.querySelector('#poss-place'),
@@ -1123,6 +1191,7 @@ function _buildUI() {
   _ui.btn.addEventListener('click',        _requestPossession);
   _ui.duckBtn.addEventListener('click',    _requestDuckPossession);
   _ui.boxBtn.addEventListener('click',     _requestBoxPossession);
+  _ui.openBox.addEventListener('click',    _openBox);
   _ui.release.addEventListener('click',    _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
   _ui.eat.addEventListener('touchstart',   e => { e.preventDefault(); _eat();          }, { passive: false });
@@ -1522,9 +1591,31 @@ function _onFungiDestroyed() {
 
 // ── Blind Box possession ───────────────────────────────────────────────────
 
+/**
+ * Player pressed OPEN BOX. Disable the button immediately for optimistic UI,
+ * then tell Unity to flip the lid and fountain 3 Glitchlings into the world.
+ * Unity confirms with box_lings_released|clientId, which locks the button
+ * permanently for this session with a ✓ RELEASED label.
+ */
+function _openBox() {
+  if (!_possessed || _creatureType !== 'box') return;
+  if (!_ui.openBox || _ui.openBox.disabled) return;
+
+  // Optimistic disable so rapid taps don't double-fire
+  _ui.openBox.disabled  = true;
+  _ui.openBox.innerHTML = 'OPENING&hellip;';
+
+  send(`box_open|${CLIENT_ID}`);
+}
+
 function _requestBoxPossession() {
   _ui.boxBtn.textContent   = 'Entering…';
   _ui.boxBtn.style.opacity = '0.5';
+  // iOS Safari autoplay priming — same as sheep/duck. The WebRTC stream will
+  // arrive asynchronously; pre-arming .play() here (inside the user gesture)
+  // gives the video element autoplay permission before the stream lands.
+  _ui.video.muted = true;
+  _ui.video.play().catch(() => {});
   send(`box_possess_request|${CLIENT_ID}`);
 }
 
@@ -1546,13 +1637,20 @@ function _onBoxGranted(duration) {
   _ui.duckBtn.classList.add('poss-hidden');
   _ui.boxBtn.classList.add('poss-hidden');
 
-  // Show GBC card with BLIND SCREEN instead of WebRTC video.
-  // There is no camera inside the box — the box has eyes but they don't work.
-  // The player navigates by feeling alone.
+  // Show GBC card. The video element receives a blurry WebRTC overhead feed —
+  // Unity mounts a camera above the box and streams it here. Vision is deliberately
+  // degraded via CSS (heavy blur + desaturation) so the player can make out rough
+  // shapes and colours but can't navigate clearly. The blind-screen layer sits on
+  // top as a thin grain + edge-vignette overlay to enhance the cataract feeling.
   _ui.vidWrap.style.display     = 'block';
-  _ui.vidLabel.style.display    = 'none';       // no "CONNECTING…" — there's no signal
-  _ui.video.style.display       = 'none';       // hide the WebRTC video element
-  _ui.blindScreen.style.display = 'block';      // show animated cataract noise
+  _ui.vidLabel.style.display    = 'flex';       // show "CONNECTING…" until first frame
+  _ui.video.style.display       = '';           // show video — receives WebRTC stream
+  _ui.blindScreen.style.display = 'block';      // grain + cataract vignette overlay
+
+  // Restart loading-bar animation (same flow as sheep)
+  _ui.loadingBar.classList.remove('is-loading');
+  void _ui.loadingBar.offsetWidth;
+  _ui.loadingBar.classList.add('is-loading');
 
   // Horror-theme the GBC chrome
   const gbFrame = _ui.root.querySelector('#gb-frame');
@@ -1565,11 +1663,15 @@ function _onBoxGranted(duration) {
   if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = 'ROLL';
   if (_ui.gbActionValue) _ui.gbActionValue.textContent = '---';
 
-  // Joystick + release; no EAT or FLAP — boxes don't have mouths or wings
-  _ui.joyZone.style.display = 'flex';
-  _ui.release.style.display = 'block';
-  _ui.eat.style.display     = 'none';
-  _ui.flap.style.display    = 'none';
+  // Joystick + release + OPEN BOX; no EAT or FLAP — boxes don't have mouths or wings
+  _ui.joyZone.style.display    = 'flex';
+  _ui.release.style.display    = 'block';
+  _ui.eat.style.display        = 'none';
+  _ui.flap.style.display       = 'none';
+  // OPEN BOX button — starts enabled; consumed once the lings are released
+  _ui.openBox.style.display    = 'flex';
+  _ui.openBox.disabled         = false;
+  _ui.openBox.innerHTML        = 'OPEN<br>BOX';
 
   // Send joystick at 20 fps — same cadence as sheep/duck
   _inputInterval = setInterval(() => {
@@ -1617,17 +1719,24 @@ function _onEnded() {
 
   // ── Credit handling — differs by creature type ────────────────────────────
   if (wasBox) {
-    // Box stays in the world after the session ends — the player can re-inhabit
-    // it any number of times until the boss eats it. No credit consumed.
-    // Clean up the box-specific UI.
+    // Session over — the box still exists in the world, but the inhabit
+    // credit is consumed for this pull. The button stays hidden until a new
+    // blind_box_spawned|clientId arrives (i.e. another card is pulled or a
+    // new box is debug-spawned). This prevents re-entry after release.
+    _blindBoxAvailable = false;
     const gbFrame = _ui.root && _ui.root.querySelector('#gb-frame');
     if (gbFrame) gbFrame.classList.remove('box-mode');
     if (_ui.blindScreen) _ui.blindScreen.style.display = 'none';
-    if (_ui.video)       _ui.video.style.display        = '';  // restore for next sheep/duck session
+    if (_ui.video)       _ui.video.style.display        = '';  // restore for next sheep/duck
     _ui.boxBtn.textContent   = 'Inhabit the Blind Box';
     _ui.boxBtn.style.opacity = '1';
-    // Re-show the box button so they can enter again
-    if (_blindBoxAvailable) _ui.boxBtn.classList.remove('poss-hidden');
+    // button stays poss-hidden — _blindBoxAvailable is now false
+    // Hide and reset the OPEN BOX button for next session
+    if (_ui.openBox) {
+      _ui.openBox.style.display = 'none';
+      _ui.openBox.disabled      = false;
+      _ui.openBox.innerHTML     = 'OPEN<br>BOX';
+    }
   } else if (wasDuck) {
     // Each duck card pull = one possession. Lock the button until next duck card.
     _duckAvailable = false;

@@ -1775,6 +1775,11 @@ body.pristine-phase #screen-pack .pack-carousel-stage {
   border-color: rgba(180, 40, 80, 0.4);
   color: rgba(220, 100, 140, 0.75);
 }
+.debug-blindbox-btn {
+  top: 92px;
+  border-color: rgba(120, 90, 140, 0.4);
+  color: rgba(180, 150, 200, 0.75);
+}
 
 /* ── HORROR ROULETTE (Three.js) ──────────────────────────────────────────── */
 /* NOTE: never put `display: flex` directly on the ID — `.screen.hidden { display:none }`
