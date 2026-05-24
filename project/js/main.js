@@ -108,13 +108,14 @@ let _prevPersonalLevel  = 0;
 const HORROR_THRESHOLD = 15;  // packs opened before horror phase begins
 const CORRUPTION_MAX   = 18;  // max corruption level (HORROR_THRESHOLD + a few horror ticks)
 
-// Visual bar only — the Unity-authoritative collective pack count drives the
-// world corruption bar and blood drip. Everything that belongs to THIS phone's
-// personal phase is handled in updatePersonalPhase() below.
+// Called by corruption-bar.js with the Unity-authoritative collective count.
+// We still sync packsOpened for logging / server-side awareness, but the BAR
+// is now personal — it reflects THIS phone's own pulls only, so other players
+// opening packs don't move your bar.
 function updateCorruption(externalPackCount) {
   if (typeof externalPackCount === 'number') packsOpened = externalPackCount;
-  const level = Math.min(packsOpened, CORRUPTION_MAX);
-  document.body.dataset.corruption = level;
+  // Use personalPacksOpened so the visual bar stays private to this phone.
+  document.body.dataset.corruption = Math.min(personalPacksOpened, CORRUPTION_MAX);
 }
 
 // Drives everything tied to THIS phone's personal phase (called on every pull
@@ -122,6 +123,9 @@ function updateCorruption(externalPackCount) {
 function updatePersonalPhase() {
   const level      = personalPacksOpened;
   const isPristine = level < HORROR_THRESHOLD;
+  // Update the bar immediately — don't wait for the next Unity broadcast.
+  // Other players' pulls no longer move this phone's bar.
+  document.body.dataset.corruption = Math.min(level, CORRUPTION_MAX);
   // Toggle pristine-phase CSS class (drives green bottom-row styling)
   document.body.classList.toggle('pristine-phase', isPristine);
   // Update pack tab labels / icons (NATURE↔FLESH, CRITTER↔SCOURGE, FUNGI↔RITUAL)
