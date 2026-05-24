@@ -17,7 +17,7 @@ const NATURE_CARDS = [
 const FLESH_CARDS = [
   { id:'small_cube', name:'Unidentified Tissue', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
   { id:'large_cube', name:'Pale Growth',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Found attached to nothing. Still warm.' },
-  { id:'sphere',     name:'Wet Membrane',        rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Permeable. Spreading.' },
+  { id:'sphere',     name:'Blind Box',            rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It has eyes. They do not work. But it knows you are here.' },
   { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. Pre-dates the colony.' },
   { id:'octagon',    name:'Unnamed Organ',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'It has a function. You do not want to know what it is.' },
   { id:'triad',      name:'Spore Cluster',       rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three. Already airborne.' },
@@ -74,9 +74,11 @@ const RITUAL_CARDS = [
 let activePackType = 'garbage';
 const PACK_TYPE_ORDER = ['garbage', 'ewaste', 'adpack'];
 
-// Returns the correct card pool for the current pack type + corruption phase
+// Returns the correct card pool for this phone's personal phase + active pack type.
+// Personal phase is independent of the collective bar — two players can be in
+// different pools simultaneously (one pulls FLESH while another pulls NATURE).
 function getActiveCardPool() {
-  const isHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
+  const isHorror = personalPacksOpened >= HORROR_THRESHOLD;
   if (activePackType === 'garbage') return isHorror ? FLESH_CARDS   : NATURE_CARDS;
   if (activePackType === 'ewaste')  return isHorror ? SCOURGE_CARDS : CRITTER_CARDS;
   if (activePackType === 'adpack')  return isHorror ? RITUAL_CARDS  : FUNGI_CARDS;
@@ -89,32 +91,53 @@ function getActiveCardPool() {
 // updateCorruption(packCount) whenever the authoritative count changes.
 // We still keep this variable so any legacy reads continue to work.
 let packsOpened = 0;
-const HORROR_THRESHOLD = 15;  // packs opened (collective) before horror phase begins
+// ── Personal vs collective phase split (Direction A) ──────────────────────────
+// personalPacksOpened — this phone's own pull count. Drives:
+//   • card pool (NATURE vs FLESH, CRITTER vs SCOURGE, FUNGI vs RITUAL)
+//   • pack tab labels / icons (updatePersonalPhase → updateFirstPackTab etc.)
+//   • pristine-phase CSS class (green bottom row)
+//   • Three.js glitch transition on crossing the threshold
+//   • sendPackType() — tells Unity what to spawn for THIS player
+//   • horror spin gate (dropCard) and god-pack horror check
+// packsOpened — the Unity-authoritative COLLECTIVE count. Drives ONLY:
+//   • document.body.dataset.corruption (visual bar, blood drip)
+// Two players can be in different personal phases simultaneously; the world
+// visuals remain collective (everyone sees the same corruption bar rise).
+let personalPacksOpened = 0;
+let _prevPersonalLevel  = 0;
+const HORROR_THRESHOLD = 15;  // packs opened before horror phase begins
 const CORRUPTION_MAX   = 18;  // max corruption level (HORROR_THRESHOLD + a few horror ticks)
 
+// Visual bar only — the Unity-authoritative collective pack count drives the
+// world corruption bar and blood drip. Everything that belongs to THIS phone's
+// personal phase is handled in updatePersonalPhase() below.
 function updateCorruption(externalPackCount) {
-  const prevLevel = parseInt(document.body.dataset.corruption || '0');
-  // If corruption-bar.js called us with the authoritative count from Unity,
-  // use that. Otherwise fall back to the local counter (legacy callers).
   if (typeof externalPackCount === 'number') packsOpened = externalPackCount;
-  const level     = Math.min(packsOpened, CORRUPTION_MAX);
+  const level = Math.min(packsOpened, CORRUPTION_MAX);
   document.body.dataset.corruption = level;
+}
+
+// Drives everything tied to THIS phone's personal phase (called on every pull
+// and on WS reconnect). Does NOT touch the collective bar or packsOpened.
+function updatePersonalPhase() {
+  const level      = personalPacksOpened;
   const isPristine = level < HORROR_THRESHOLD;
-  // Toggle pristine-phase class (drives green bottom-row CSS)
+  // Toggle pristine-phase CSS class (drives green bottom-row styling)
   document.body.classList.toggle('pristine-phase', isPristine);
-  // Update pack tab labels/icons to reflect current phase
+  // Update pack tab labels / icons (NATURE↔FLESH, CRITTER↔SCOURGE, FUNGI↔RITUAL)
   updateFirstPackTab(isPristine);
   updateSecondPackTab(isPristine);
   updateThirdPackTab(isPristine);
-  // On the nature→flesh crossing, run glitch transition (handles onCorruptionUpdate internally)
+  // On the personal nature→horror crossing, fire the 3D glitch transition
   if (typeof Pack3D !== 'undefined') {
-    if (prevLevel < HORROR_THRESHOLD && level >= HORROR_THRESHOLD) {
+    if (_prevPersonalLevel < HORROR_THRESHOLD && level >= HORROR_THRESHOLD) {
       Pack3D.startGlitchTransition();
     } else {
       Pack3D.onCorruptionUpdate();
     }
   }
-  // Notify Unity of the new pack type (phase crossing may change nature↔flesh etc.)
+  _prevPersonalLevel = level;
+  // Tell Unity THIS player's current pack type so per-spawn routing is correct
   sendPackType();
 }
 
@@ -220,14 +243,13 @@ function setPackType(type) {
   document.getElementById('packTypeGarbage')?.classList.toggle('active', type === 'garbage');
   document.getElementById('packTypeEwaste')?.classList.toggle('active',  type === 'ewaste');
   document.getElementById('packTypeAdpack')?.classList.toggle('active',  type === 'adpack');
-  const corruption = parseInt(document.body.dataset.corruption) || 0;
   document.body.classList.toggle('scourge-active', type === 'ewaste');
-  document.body.classList.toggle('ritual-active',  type === 'adpack' && corruption >= HORROR_THRESHOLD);
+  document.body.classList.toggle('ritual-active',  type === 'adpack' && personalPacksOpened >= HORROR_THRESHOLD);
   updatePackCarousel(type);
   animatePackTypeSwitch(prevType, type);
-  // Toggle adpack glow on screen-pack
+  // Toggle adpack glow on screen-pack (personal phase — not collective bar)
   const sp = document.getElementById('screen-pack');
-  if (sp) sp.classList.toggle('adpack-active', type === 'adpack' && (parseInt(document.body.dataset.corruption) || 0) >= HORROR_THRESHOLD);
+  if (sp) sp.classList.toggle('adpack-active', type === 'adpack' && personalPacksOpened >= HORROR_THRESHOLD);
   const stage = document.getElementById('packCarouselStage');
   if (stage) {
     stage.classList.remove('adpack-shimmer-burst');
@@ -322,10 +344,12 @@ function send(msg) {
 
 // ─── Unity pack type sync ─────────────────────────────────────────────────────
 
-// Maps web-app internal type + corruption phase → Unity pack_type_* message name
+// Maps this phone's personal phase + active pack tab → Unity spawn type name.
+// Embedded in every spawn command: spawn_sphere|CLIENT_ID|<type>
+// so Unity routes each card to the correct object set for THIS player,
+// regardless of the global collective phase.
 function getUnityPackType() {
-  const corruption = parseInt(document.body.dataset.corruption || '0');
-  const isHorror   = corruption >= HORROR_THRESHOLD;
+  const isHorror = personalPacksOpened >= HORROR_THRESHOLD;
   if (activePackType === 'garbage') return isHorror ? 'flesh'   : 'nature';
   if (activePackType === 'ewaste')  return isHorror ? 'scourge' : 'critter';
   if (activePackType === 'adpack')  return isHorror ? 'ritual'  : 'fungi';
@@ -470,31 +494,39 @@ function adpackCancel() {
 }
 
 function doPackOpen(dir) {
-  // ── Collective corruption ──
-  // We DO NOT bump local packsOpened here anymore. Unity is now the source of
-  // truth — it tracks the count across every connected phone, decays it when
-  // idle, and broadcasts `corruption|level|packCount|phase` back. The bar and
-  // packsOpened both update via corruption-bar.js when that broadcast arrives.
-  // Round-trip is ~200-500ms; the pack-open animation hides the latency.
-  send('pack_opened');
-  BloodDrip.onPackOpened();
-
+  // Roll the pack FIRST so we know the top card's rarity before we tell Unity.
+  // Rarity is forwarded in the pack_opened message so CorruptionManager can
+  // scale the damage: common pulls add less corruption, legendary pulls add more.
+  // "Engagement is the damage — and rarity is the intensity."
   packCards      = rollPack();
   revealIndex    = 0;
   godPackClaimed = [];
+
+  // ── Personal phase — count this pull and update THIS phone's pool ──────────
+  // Drives card pool, tab labels, glitch transition, sendPackType.
+  // Runs BEFORE we sample topCard so getActiveCardPool() reflects the new count.
+  personalPacksOpened++;
+  updatePersonalPhase();
+
+  // ── Collective corruption (rarity-scaled) ──
+  // Unity is the source of truth. It increments the shared level by an amount
+  // that scales with rarity, then broadcasts back to every connected phone.
+  // Round-trip is ~200-500ms; the pack-open animation hides the latency.
+  const topCard = packCards[packCards.length - 1];
+  send('pack_opened|' + (topCard?.rarity ?? 'common'));
+  BloodDrip.onPackOpened();
 
   const isAdpack = activePackType === 'adpack';
   setTickerState(isGodPack ? 'godpack' : isAdpack ? 'adpack' : 'active');
 
   // Flash for high rarity pulls
-  const topCard = packCards[packCards.length - 1];
   const isHighRarity = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(topCard?.rarity);
   if (isHighRarity) triggerFlash();
 
-  // Only send spawn_godpack in horror phase — Unity's SpawnGodPack always spawns
-  // flesh/horror objects, so in pristine phase we let individual card commands route
-  // through the active pack type instead.
-  const _gpHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
+  // Only send spawn_godpack in personal horror phase — Unity's SpawnGodPack
+  // always queues flesh objects, so in pristine phase individual card commands
+  // route through the player's personal pack type instead.
+  const _gpHorror = personalPacksOpened >= HORROR_THRESHOLD;
   // Tag spawn commands with this phone's CLIENT_ID so Unity can attach it
   // to the matching sheep_spawned / duck_spawned broadcast — that way only
   // the phone that actually pulled the card unlocks the Inhabit button.
@@ -581,8 +613,8 @@ function showGodPackClaimGrid() {
   if (cs) cs.textContent = `drop all ${packCards.length} — tap each to release`;
 
   ChoiceGrid3D.showGodPack(packCards, 'choiceGrid', (claimedCard) => {
-    // Tag with CLIENT_ID — see comment above the spawn_godpack send.
-    send(`${claimedCard.command}|${CLIENT_ID}`);
+    // Tag with CLIENT_ID + personal pack type — Unity routes per-spawn.
+    send(`${claimedCard.command}|${CLIENT_ID}|${getUnityPackType()}`);
     godPackClaimed.push(claimedCard);
     if (godPackClaimed.length === packCards.length) {
       setTimeout(showGodPackComplete, 600);
@@ -606,17 +638,18 @@ function dropCard(card) {
     return;
   }
 
-  // Horror phase (non-godpack) gets an extra variant spin before spawning
-  const isHorror = parseInt(document.body.dataset.corruption || '0') >= HORROR_THRESHOLD;
+  // Personal horror phase (non-godpack) gets an extra variant spin before spawning.
+  // Uses personalPacksOpened — each phone's own phase, not the collective bar.
+  const isHorror = personalPacksOpened >= HORROR_THRESHOLD;
   if (isHorror && !isGodPack) {
     showHorrorSpin(card);   // resetToPackScreen() fires inside the spin confirm
     return;
   }
 
-  // Tag spawn commands with CLIENT_ID so Unity's sheep_spawned / duck_spawned
-  // broadcast carries the matching clientId and only THIS phone unlocks the
-  // Inhabit button (not every other phone connected to the install).
-  send(`${card.command}|${CLIENT_ID}`);
+  // Tag spawn commands with CLIENT_ID + personal pack type so Unity routes
+  // this spawn to the correct object set (nature vs flesh etc.) for THIS player,
+  // independent of what other phones are currently sending.
+  send(`${card.command}|${CLIENT_ID}|${getUnityPackType()}`);
   resetToPackScreen();
 }
 
@@ -660,7 +693,7 @@ initCounter();
 
 function debugTogglePhase() {
   const btn = document.getElementById('debugPhaseBtn');
-  const inHorror = packsOpened >= HORROR_THRESHOLD;
+  const inHorror = personalPacksOpened >= HORROR_THRESHOLD;
   // Speak to Unity so the COLLECTIVE bar moves — every phone flips with us.
   // (Old behaviour mutated only the local packsOpened; that no longer drives
   // anything since corruption is Unity-authoritative now.)
@@ -1182,9 +1215,9 @@ function showHorrorSpin(card) {
 function horrorSpinTap() {
   if (_spinPhase === 'spinning') return;
 
-  // Second tap = confirm
+  // Second tap = confirm — include personal pack type so Unity routes correctly
   if (_spinPhase === 'done') {
-    if (_spinPendingCard) send(`${_spinPendingCard.command}|${CLIENT_ID}`);
+    if (_spinPendingCard) send(`${_spinPendingCard.command}|${CLIENT_ID}|${getUnityPackType()}`);
     _spinPendingCard = null;
     _spinPhase       = 'idle';
     resetToPackScreen();

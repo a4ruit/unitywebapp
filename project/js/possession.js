@@ -71,6 +71,12 @@ let _creatureType   = null;
 // Clean up any leftover flag from prior versions that persisted across reloads.
 try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 
+// ── Blind Box possession state ────────────────────────────────────────────
+// Entirely independent of critter possession. The box is a horror-phase
+// object that stays in the world after each session, so the credit is
+// NOT consumed — the same player can re-inhabit it until the box is eaten.
+let _blindBoxAvailable = false;
+
 // ── Fungi spore state ─────────────────────────────────────────────────────
 // Entirely independent of possession sessions — the mushroom keeps existing
 // on the ground after the possession timer expires.
@@ -93,6 +99,8 @@ function updatePossessionWS() {
     _ui.btn.style.opacity     = '1';
     _ui.duckBtn.textContent   = 'Inhabit a duck';
     _ui.duckBtn.style.opacity = '1';
+    _ui.boxBtn.textContent    = 'Inhabit the Blind Box';
+    _ui.boxBtn.style.opacity  = '1';
   }
 
   // ── Connected-clients heartbeat ──────────────────────────────────────────
@@ -249,6 +257,32 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('fungi_destroyed|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onFungiDestroyed(); return true; }
+  }
+
+  // ── Blind Box lifecycle ───────────────────────────────────────────────────
+  // Only the player who pulled the card receives blind_box_spawned — same
+  // clientId-tag filter as sheep_spawned / duck_spawned.
+  if (msg.startsWith('blind_box_spawned|')) {
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onBoxSpawned();
+    return true;
+  }
+  if (msg.startsWith('box_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onBoxGranted(Number(parts[2])); return true; }
+  }
+  if (msg.startsWith('box_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onBoxDenied(); return true; }
+  }
+  if (msg.startsWith('box_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded(); return true; }
+  }
+  if (msg.startsWith('box_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onBoxTick(Number(parts[2])); return true; }
   }
 
   // Unity sends the WebRTC offer once the possession camera is ready.
@@ -864,12 +898,121 @@ function _buildUI() {
       text-transform: uppercase;
       padding-left: 2px;
     }
+
+    /* ── Blind Box inhabit button ──────────────────────────────────────────
+       Horror red — sits above the sheep and duck buttons. Pulses with a
+       slow blood-glow so it reads as "wrong" in the nature phase and
+       "inevitable" in the horror phase.                                    */
+    #poss-box-btn {
+      pointer-events: all;
+      position: absolute;
+      bottom: 228px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 28px;
+      background: rgba(200, 28, 28, 0.12);
+      border: 2px solid rgba(200, 28, 28, 0.70);
+      color: #c81c1c;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+      animation: box-btn-bleed 2.6s ease-in-out infinite;
+    }
+    #poss-box-btn:active { background: rgba(200, 28, 28, 0.38); }
+    #poss-box-btn.poss-hidden { display: none; }
+    @keyframes box-btn-bleed {
+      0%, 100% { box-shadow: 0 0  6px rgba(200, 28, 28, 0.30); }
+      50%      { box-shadow: 0 0 20px rgba(200, 28, 28, 0.80),
+                             0 0  5px rgba(200, 28, 28, 0.95); }
+    }
+
+    /* ── Blind screen — what the box "sees" ───────────────────────────────
+       Shown inside #gb-screen instead of the WebRTC video during Blind Box
+       possession. Simulates severely degraded vision: near-black field,
+       drifting film-grain noise, and a cataract vignette (milky smear at
+       centre, deep red-black at the edges). The player rolls in the dark. */
+    #poss-blind-screen {
+      position: absolute;
+      inset: 0;
+      background: #060101;
+      display: none;
+      overflow: hidden;
+    }
+
+    /* Film-grain layer: SVG fractal noise tile, shifts position every few
+       frames to animate without JS or canvas. Cheap on mobile.            */
+    #poss-blind-screen::before {
+      content: '';
+      position: absolute;
+      inset: -10%;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='256' height='256'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-size: 160px 160px;
+      opacity: 0.16;
+      mix-blend-mode: screen;
+      filter: blur(0.6px);
+      animation: blind-grain-drift 0.28s steps(3) infinite;
+    }
+    @keyframes blind-grain-drift {
+      0%   { transform: translate(  0px,  0px); }
+      33%  { transform: translate( -4px,  2px); }
+      66%  { transform: translate(  3px, -3px); }
+      100% { transform: translate( -2px,  4px); }
+    }
+
+    /* Cataract vignette: warm blurry smear in the centre surrounded by
+       deep red-black — the biological signature of clouded lenses.        */
+    #poss-blind-screen::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        ellipse at 50% 48%,
+        rgba(200, 155, 110, 0.06)  0%,
+        rgba( 90,  35,  20, 0.62) 42%,
+        rgba( 12,   2,   2, 0.94) 78%,
+        rgba(  3,   0,   0, 1.00) 100%);
+      animation: cataract-pulse 3.8s ease-in-out infinite alternate;
+    }
+    @keyframes cataract-pulse {
+      from { transform: scale(1.00); opacity: 1.00; }
+      to   { transform: scale(1.05); opacity: 0.86; }
+    }
+
+    /* Horror colour overrides for the GBC chrome during Box possession.
+       The trading-card frame goes dark, wordmark turns blood-red.         */
+    #gb-frame.box-mode {
+      background: #190606;
+    }
+    #gb-frame.box-mode #gb-header {
+      background: linear-gradient(to bottom, #2e0e0e 0%, #160606 100%);
+      color: #c81c1c;
+      text-shadow: 0 0 8px rgba(200,28,28,0.7), 1px 1px 0 #000;
+    }
+    #gb-frame.box-mode #gb-header #gb-title::before { content: '✕ '; color: #8c1010; }
+    #gb-frame.box-mode #gb-header #gb-title::after  { content: ' ✕'; color: #8c1010; }
+    #gb-frame.box-mode #gb-screen {
+      border-color: #1e0808;
+      box-shadow:
+        inset  1px  1px 0 #4a1010,
+        inset -1px -1px 0 #0e0404;
+    }
+    #gb-frame.box-mode #gb-footer {
+      background: linear-gradient(to top, #2e0e0e 0%, #160606 100%);
+      border-top-color: #1e0808;
+    }
+    #gb-frame.box-mode .gb-stat-label { color: #c81c1c; }
+    #gb-frame.box-mode .gb-stat-value { color: #ffaaaa; }
   `;
   document.head.appendChild(style);
 
   const root = document.createElement('div');
   root.id = 'poss-root';
   root.innerHTML = `
+    <button id="poss-box-btn">Inhabit the Blind Box</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
@@ -887,6 +1030,9 @@ function _buildUI() {
 
           <div id="gb-screen">
             <video id="poss-video" autoplay playsinline webkit-playsinline muted disablePictureInPicture x-webkit-airplay="deny"></video>
+            <!-- Blind Box "vision" — shown instead of the video feed during
+                 box possession. CSS noise + cataract vignette. No signal. -->
+            <div id="poss-blind-screen"></div>
             <!-- LCD pixel grid: thin dark lines every few pixels so the
                  upscaled video reads as a real-LCD pixel matrix.          -->
             <div id="gb-lcd-grid"></div>
@@ -944,6 +1090,8 @@ function _buildUI() {
     root:             root,
     btn:              root.querySelector('#poss-btn'),
     duckBtn:          root.querySelector('#poss-duck-btn'),
+    boxBtn:           root.querySelector('#poss-box-btn'),
+    blindScreen:      root.querySelector('#poss-blind-screen'),
     timer:            root.querySelector('#poss-timer'),
     secs:             root.querySelector('#poss-secs'),
     eaten:            root.querySelector('#poss-eaten'),
@@ -974,6 +1122,7 @@ function _buildUI() {
 
   _ui.btn.addEventListener('click',        _requestPossession);
   _ui.duckBtn.addEventListener('click',    _requestDuckPossession);
+  _ui.boxBtn.addEventListener('click',     _requestBoxPossession);
   _ui.release.addEventListener('click',    _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
   _ui.eat.addEventListener('touchstart',   e => { e.preventDefault(); _eat();          }, { passive: false });
@@ -996,6 +1145,8 @@ function _buildUI() {
     _ui.duckBtn.classList.add('poss-hidden');
     console.log('[possession.js] Duck button locked — waiting for first duck_spawned');
   }
+  // Box button is always hidden until blind_box_spawned|clientId arrives
+  _ui.boxBtn.classList.add('poss-hidden');
 }
 
 // ── Joystick ───────────────────────────────────────────────────────────────
@@ -1076,8 +1227,9 @@ function _requestDuckPossession() {
 
 function _releasePossession() {
   // Send the verb that matches whichever creature we currently inhabit
-  if (_creatureType === 'duck') send(`duck_possess_end|${CLIENT_ID}`);
-  else                          send(`possess_end|${CLIENT_ID}`);
+  if      (_creatureType === 'duck') send(`duck_possess_end|${CLIENT_ID}`);
+  else if (_creatureType === 'box')  send(`box_possess_end|${CLIENT_ID}`);
+  else                               send(`possess_end|${CLIENT_ID}`);
   _onEnded();   // optimistic — server will confirm with the matching ended message
 }
 
@@ -1368,8 +1520,86 @@ function _onFungiDestroyed() {
   console.log('[possession.js] Fungi destroyed — spore panel dismissed');
 }
 
+// ── Blind Box possession ───────────────────────────────────────────────────
+
+function _requestBoxPossession() {
+  _ui.boxBtn.textContent   = 'Entering…';
+  _ui.boxBtn.style.opacity = '0.5';
+  send(`box_possess_request|${CLIENT_ID}`);
+}
+
+function _onBoxSpawned() {
+  _blindBoxAvailable = true;
+  if (_ui && !_possessed) {
+    _ui.boxBtn.classList.remove('poss-hidden');
+    console.log('[possession.js] Blind Box spawned — inhabit button unlocked');
+  }
+}
+
+function _onBoxGranted(duration) {
+  _possessed     = true;
+  _creatureType  = 'box';
+  _grantDuration = duration;
+
+  // Hide all inhabit buttons while inside the box
+  _ui.btn.classList.add('poss-hidden');
+  _ui.duckBtn.classList.add('poss-hidden');
+  _ui.boxBtn.classList.add('poss-hidden');
+
+  // Show GBC card with BLIND SCREEN instead of WebRTC video.
+  // There is no camera inside the box — the box has eyes but they don't work.
+  // The player navigates by feeling alone.
+  _ui.vidWrap.style.display     = 'block';
+  _ui.vidLabel.style.display    = 'none';       // no "CONNECTING…" — there's no signal
+  _ui.video.style.display       = 'none';       // hide the WebRTC video element
+  _ui.blindScreen.style.display = 'block';      // show animated cataract noise
+
+  // Horror-theme the GBC chrome
+  const gbFrame = _ui.root.querySelector('#gb-frame');
+  if (gbFrame) gbFrame.classList.add('box-mode');
+
+  // GBC stat readouts
+  const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
+  if (_ui.gbTitle)       _ui.gbTitle.textContent       = 'BOX CAM';
+  if (_ui.gbTime)        _ui.gbTime.textContent        = `${pad3(duration)}/${pad3(duration)}`;
+  if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = 'ROLL';
+  if (_ui.gbActionValue) _ui.gbActionValue.textContent = '---';
+
+  // Joystick + release; no EAT or FLAP — boxes don't have mouths or wings
+  _ui.joyZone.style.display = 'flex';
+  _ui.release.style.display = 'block';
+  _ui.eat.style.display     = 'none';
+  _ui.flap.style.display    = 'none';
+
+  // Send joystick at 20 fps — same cadence as sheep/duck
+  _inputInterval = setInterval(() => {
+    send(`box_input|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+  }, 50);
+
+  console.log('[possession.js] Inside the Blind Box — no vision. Roll anyway.');
+}
+
+function _onBoxDenied() {
+  _ui.boxBtn.textContent   = 'Box is occupied';
+  _ui.boxBtn.style.opacity = '0.6';
+  setTimeout(() => {
+    if (_ui.boxBtn) {
+      _ui.boxBtn.textContent   = 'Inhabit the Blind Box';
+      _ui.boxBtn.style.opacity = '1';
+    }
+  }, 1800);
+}
+
+function _onBoxTick(secsLeft) {
+  if (_ui.gbTime) {
+    const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
+    _ui.gbTime.textContent = `${pad3(secsLeft)}/${pad3(_grantDuration)}`;
+  }
+}
+
 function _onEnded() {
   const wasDuck = _creatureType === 'duck';
+  const wasBox  = _creatureType === 'box';
   _possessed    = false;
   clearInterval(_inputInterval);
   _joystickActive = false;
@@ -1385,21 +1615,32 @@ function _onEnded() {
   _ui.vidLabel.style.display = 'flex';   // restore "CONNECTING…" loader for next session
   _ui.loadingBar.classList.remove('is-loading');  // reset bar to empty
 
-  // ── Consume the credit for whichever creature this possession was ────────
-  // Each card pull grants ONE possession. Lock the matching button until a
-  // new spawn message arrives for that creature type.
-  if (wasDuck) {
+  // ── Credit handling — differs by creature type ────────────────────────────
+  if (wasBox) {
+    // Box stays in the world after the session ends — the player can re-inhabit
+    // it any number of times until the boss eats it. No credit consumed.
+    // Clean up the box-specific UI.
+    const gbFrame = _ui.root && _ui.root.querySelector('#gb-frame');
+    if (gbFrame) gbFrame.classList.remove('box-mode');
+    if (_ui.blindScreen) _ui.blindScreen.style.display = 'none';
+    if (_ui.video)       _ui.video.style.display        = '';  // restore for next sheep/duck session
+    _ui.boxBtn.textContent   = 'Inhabit the Blind Box';
+    _ui.boxBtn.style.opacity = '1';
+    // Re-show the box button so they can enter again
+    if (_blindBoxAvailable) _ui.boxBtn.classList.remove('poss-hidden');
+  } else if (wasDuck) {
+    // Each duck card pull = one possession. Lock the button until next duck card.
     _duckAvailable = false;
     _ui.duckBtn.textContent   = 'Inhabit a duck';
     _ui.duckBtn.style.opacity = '1';
   } else {
+    // Same one-per-pull model for sheep
     _sheepAvailable = false;
     _ui.btn.textContent   = 'Inhabit a sheep';
     _ui.btn.style.opacity = '1';
   }
 
-  // Restore any button whose credit is still live (e.g. duck card pulled
-  // during a sheep possession — the duck button should reappear after release).
+  // Restore buttons whose credits are still live
   if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
   if (_duckAvailable)  _ui.duckBtn.classList.remove('poss-hidden');
 
