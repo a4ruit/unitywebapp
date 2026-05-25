@@ -68,10 +68,33 @@ body:not(.pristine-phase) .bg-grid::before {
   opacity: 1;
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   BACKGROUND TINT — 6 pack states
+   filter: hue-rotate() shifts the green-toned base image toward each theme
+   colour. Adjust hue-rotate, saturate, brightness freely per state.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* 1. NATURE  — sky blue  #81d4fa */
+body.nature-active .bg-grid {
+  filter: hue-rotate(0deg) saturate(0.85) brightness(0.95);
+}
+/* 2. FLESH   — orange-red  #e85c1a  (flesh-bg.png fades in automatically) */
+body.flesh-active .bg-grid {
+  filter: hue-rotate(0deg) saturate(1.0) brightness(1.0);
+}
+/* 3. CRITTER — pastel pink  #f0b8d0 */
+body.critter-active .bg-grid {
+  filter: hue-rotate(130deg) saturate(0.65) brightness(1.1);
+}
+/* 4. SCOURGE — lime green  #8bc820  (flesh-bg.png fades in automatically) */
 body.scourge-active .bg-grid {
   filter: hue-rotate(90deg) saturate(1.2) brightness(1.1);
 }
-
+/* 5. FUNGI   — earthy amber  #d4a870 */
+body.fungi-active .bg-grid {
+  filter: hue-rotate(250deg) saturate(1.95) brightness(1.05);
+}
+/* 6. RITUAL  — purple  #b060e8  (flesh-bg.png fades in automatically) */
 body.ritual-active .bg-grid {
   filter: hue-rotate(280deg) saturate(1.6) brightness(0.9);
 }
@@ -482,6 +505,77 @@ body::after {
 }
 .pack-canvas-wrap:active { cursor:grabbing; }
 .pack-canvas-wrap canvas { display:block; width:100%!important; height:100%!important; image-rendering:pixelated; }
+
+/* ── GOD RAYS — pristine phase only, white, breathing + slow rotation ──────── */
+
+/* Primary rays — long, soft-edged streaks, slow clockwise spin */
+body.pristine-phase .pack-canvas-wrap::before {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(5px);
+  background: repeating-conic-gradient(
+    from 0deg at 50% 50%,
+    rgba(255,255,255,0.00)  0deg,
+    rgba(255,255,255,0.75)  2deg,
+    rgba(255,255,255,0.30)  5deg,
+    transparent              6deg  22deg,
+    rgba(255,255,255,0.24)  22deg,
+    rgba(255,255,255,0.10)  25deg,
+    transparent              27deg 48deg
+  );
+  -webkit-mask-image: radial-gradient(ellipse 50% 56% at 50% 50%, black 0%, transparent 85%);
+          mask-image: radial-gradient(ellipse 50% 56% at 50% 50%, black 0%, transparent 85%);
+  animation: godRayBreathe 5s ease-in-out infinite,
+             godRaySpin 65s linear infinite;
+}
+
+/* Secondary rays — shorter, soft streaks, slow counter-clockwise spin */
+body.pristine-phase .pack-canvas-wrap::after {
+  content: '';
+  position: absolute;
+  inset: -16%;
+  z-index: -1;
+  pointer-events: none;
+  filter: blur(4px);
+  background: repeating-conic-gradient(
+    from 11deg at 50% 50%,
+    rgba(255,255,255,0.00)  0deg,
+    rgba(255,255,255,0.55)  1.5deg,
+    rgba(255,255,255,0.22)  4deg,
+    transparent              5deg  20deg,
+    rgba(255,255,255,0.18)  20deg,
+    rgba(255,255,255,0.08)  22deg,
+    transparent              23deg 40deg
+  );
+  -webkit-mask-image: radial-gradient(ellipse 46% 52% at 50% 50%, black 0%, transparent 82%);
+          mask-image: radial-gradient(ellipse 46% 52% at 50% 50%, black 0%, transparent 82%);
+  animation: godRayBreathe 5s ease-in-out infinite 1.4s,
+             godRaySpin 65s linear infinite reverse;
+}
+
+@keyframes godRayBreathe {
+  0%, 100% { opacity: 0.80; }
+  50%       { opacity: 1.00; }
+}
+@keyframes godRaySpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Collapse rays inward when pack dissolves */
+body.pristine-phase.pack-dissolving .pack-canvas-wrap::before {
+  animation: godRayCollapse 0.7s ease-in forwards;
+}
+body.pristine-phase.pack-dissolving .pack-canvas-wrap::after {
+  animation: godRayCollapse 0.7s ease-in forwards 0.05s;
+}
+@keyframes godRayCollapse {
+  from { opacity: 1; transform: rotate(0deg)  scale(1);    }
+  to   { opacity: 0; transform: rotate(12deg) scale(0.08); }
+}
 
 /* ── Corruption glitch transition ────────────────────────────────────────── */
 /* Pixel-nudge on the Three.js pack canvas — integer pixel shifts only       */
@@ -1112,12 +1206,12 @@ body.glitch-active .star-counter-row {
 
 /* Scourge pack type button — green active state */
 #packTypeEwaste.active {
-  border-color: #8bc820;
+  border-color: #5fc05a;
   background: #071203;
 }
 #packTypeEwaste.active .pack-type-label,
 #packTypeEwaste.active .pack-type-icon {
-  color: #8bc820;
+  color: #5fc05a;
 }
 
 /* ── SHOP SCREEN ─────────────────────────────────── */
@@ -1583,7 +1677,131 @@ body.glitch-active .star-counter-row {
   50%     { filter: drop-shadow(0 0 13px rgba(120,30,180,0.5)) drop-shadow(0 0 30px rgba(120,30,180,0.2)); }
 }
 
-/* ── SCOURGE: bottom row green theme ──────────────── */
+/* ══════════════════════════════════════════════════════════════════════════
+   BOTTOM-ROW THEME — 6 pack states
+   Each block controls: pack-counter · star-counter · star-shop-btn
+   Body class is set exclusively by syncPackThemeClass() in main.js.
+   Edit the colour values here freely — one block per state.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. NATURE  (garbage tab · pristine phase) ──────────────────────────── */
+body.nature-active .pack-counter {
+  border-color: rgba(129,212,250,0.78);
+  box-shadow: 0 0 8px rgba(129,212,250,0.16);
+}
+body.nature-active .counter-packs {
+  color: #81d4fa;
+  text-shadow: 0 0 6px rgba(129,212,250,0.85), 0 0 12px rgba(129,212,250,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.nature-active .counter-label,
+body.nature-active .counter-tag { color: rgba(129,212,250,0.95); }
+body.nature-active .star-counter {
+  border-color: rgba(129,212,250,0.78);
+  box-shadow: 0 0 8px rgba(129,212,250,0.16);
+}
+body.nature-active .star-counter-icon {
+  color: #81d4fa;
+  text-shadow: 0 0 6px rgba(129,212,250,0.8), 0 0 12px rgba(129,212,250,0.35);
+}
+body.nature-active .star-counter-value {
+  color: #81d4fa;
+  text-shadow: 0 0 6px rgba(129,212,250,0.7);
+}
+body.nature-active .star-counter-label { color: rgba(129,212,250,0.95); }
+body.nature-active .star-shop-btn {
+  border-color: rgba(129,212,250,0.85);
+  background: #010810;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(129,212,250,0.18);
+}
+body.nature-active .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(129,212,250,0.34);
+  background: #031020;
+}
+body.nature-active .star-shop-btn-icon {
+  color: #81d4fa;
+  text-shadow: 0 0 8px rgba(129,212,250,0.8);
+}
+body.nature-active .star-shop-btn-label { color: rgba(129,212,250,0.9); }
+
+/* ── 2. FLESH   (garbage tab · horror phase) ────────────────────────────── */
+body.flesh-active .pack-counter {
+  border-color: rgba(232,92,26,0.78);
+  box-shadow: 0 0 8px rgba(232,92,26,0.16);
+}
+body.flesh-active .counter-packs {
+  color: #e85c1a;
+  text-shadow: 0 0 6px rgba(232,92,26,0.85), 0 0 12px rgba(232,92,26,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.flesh-active .counter-label,
+body.flesh-active .counter-tag { color: rgba(232,92,26,0.95); }
+body.flesh-active .star-counter {
+  border-color: rgba(232,92,26,0.78);
+  box-shadow: 0 0 8px rgba(232,92,26,0.16);
+}
+body.flesh-active .star-counter-icon {
+  color: #e85c1a;
+  text-shadow: 0 0 6px rgba(232,92,26,0.8), 0 0 12px rgba(232,92,26,0.35);
+}
+body.flesh-active .star-counter-value {
+  color: #e85c1a;
+  text-shadow: 0 0 6px rgba(232,92,26,0.7);
+}
+body.flesh-active .star-counter-label { color: rgba(232,92,26,0.95); }
+body.flesh-active .star-shop-btn {
+  border-color: rgba(232,92,26,0.85);
+  background: #120400;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(232,92,26,0.18);
+}
+body.flesh-active .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(232,92,26,0.34);
+  background: #1e0700;
+}
+body.flesh-active .star-shop-btn-icon {
+  color: #e85c1a;
+  text-shadow: 0 0 8px rgba(232,92,26,0.8);
+}
+body.flesh-active .star-shop-btn-label { color: rgba(232,92,26,0.9); }
+
+/* ── 3. CRITTER (ewaste tab · pristine phase) ───────────────────────────── */
+body.critter-active .pack-counter {
+  border-color: rgba(240,184,208,0.78);
+  box-shadow: 0 0 8px rgba(240,184,208,0.16);
+}
+body.critter-active .counter-packs {
+  color: #f0b8d0;
+  text-shadow: 0 0 6px rgba(240,184,208,0.85), 0 0 12px rgba(240,184,208,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.critter-active .counter-label,
+body.critter-active .counter-tag { color: rgba(240,184,208,0.95); }
+body.critter-active .star-counter {
+  border-color: rgba(240,184,208,0.78);
+  box-shadow: 0 0 8px rgba(240,184,208,0.16);
+}
+body.critter-active .star-counter-icon {
+  color: #f0b8d0;
+  text-shadow: 0 0 6px rgba(240,184,208,0.8), 0 0 12px rgba(240,184,208,0.35);
+}
+body.critter-active .star-counter-value {
+  color: #f0b8d0;
+  text-shadow: 0 0 6px rgba(240,184,208,0.7);
+}
+body.critter-active .star-counter-label { color: rgba(240,184,208,0.95); }
+body.critter-active .star-shop-btn {
+  border-color: rgba(240,184,208,0.85);
+  background: #120a10;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(240,184,208,0.18);
+}
+body.critter-active .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(240,184,208,0.34);
+  background: #1e1018;
+}
+body.critter-active .star-shop-btn-icon {
+  color: #f0b8d0;
+  text-shadow: 0 0 8px rgba(240,184,208,0.8);
+}
+body.critter-active .star-shop-btn-label { color: rgba(240,184,208,0.9); }
+
+/* ── 4. SCOURGE (ewaste tab · horror phase) ─────────────────────────────── */
 body.scourge-active .pack-counter {
   border-color: rgba(100,200,20,0.78);
   box-shadow: 0 0 8px rgba(100,200,20,0.16);
@@ -1593,10 +1811,7 @@ body.scourge-active .counter-packs {
   text-shadow: 0 0 6px rgba(100,200,20,0.85), 0 0 12px rgba(100,200,20,0.42), 2px 2px 0 rgba(0,0,0,0.8);
 }
 body.scourge-active .counter-label,
-body.scourge-active .counter-tag {
-  color: rgba(100,200,20,0.95);
-}
-
+body.scourge-active .counter-tag { color: rgba(100,200,20,0.95); }
 body.scourge-active .star-counter {
   border-color: rgba(100,200,20,0.78);
   box-shadow: 0 0 8px rgba(100,200,20,0.16);
@@ -1609,10 +1824,7 @@ body.scourge-active .star-counter-value {
   color: #8bc820;
   text-shadow: 0 0 6px rgba(100,200,20,0.7);
 }
-body.scourge-active .star-counter-label {
-  color: rgba(100,200,20,0.95);
-}
-
+body.scourge-active .star-counter-label { color: rgba(100,200,20,0.95); }
 body.scourge-active .star-shop-btn {
   border-color: rgba(100,200,20,0.85);
   background: #031303;
@@ -1626,11 +1838,48 @@ body.scourge-active .star-shop-btn-icon {
   color: #8bc820;
   text-shadow: 0 0 8px rgba(100,200,20,0.8);
 }
-body.scourge-active .star-shop-btn-label {
-  color: rgba(100,200,20,0.9);
-}
+body.scourge-active .star-shop-btn-label { color: rgba(100,200,20,0.9); }
 
-/* ── RITUAL: bottom row purple theme ──────────────── */
+/* ── 5. FUNGI   (adpack tab · pristine phase) ───────────────────────────── */
+body.fungi-active .pack-counter {
+  border-color: rgba(120, 198, 96, 0.78);
+  box-shadow: 0 0 8px rgba(212,168,112,0.16);
+}
+body.fungi-active .counter-packs {
+  color: rgba(120, 198, 96, 0.78);
+  text-shadow: 0 0 6px rgba(120, 198, 96, 0.78), 0 0 12px rgba(212,168,112,0.42), 2px 2px 0 rgba(0,0,0,0.8);
+}
+body.fungi-active .counter-label,
+body.fungi-active .counter-tag { color: rgba(120, 198, 96, 0.78) }
+body.fungi-active .star-counter {
+  border-color: rgba(120, 198, 96, 0.78);
+  box-shadow: 0 0 8px rgba(212,168,112,0.16);
+}
+body.fungi-active .star-counter-icon {
+  color: rgba(120, 198, 96, 0.78);
+  text-shadow: 0 0 6px rgba(120, 198, 96, 0.78), 0 0 12px rgba(212,168,112,0.35);
+}
+body.fungi-active .star-counter-value {
+  color: rgba(120, 198, 96, 0.78);
+  text-shadow: 0 0 6px rgba(120, 198, 96, 0.78);
+}
+body.fungi-active .star-counter-label { color: rgba(120, 198, 96, 0.78) }
+body.fungi-active .star-shop-btn {
+  border-color: rgba(120, 198, 96, 0.78);
+  background: #100d04;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(212,168,112,0.18);
+}
+body.fungi-active .star-shop-btn:hover {
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(212,168,112,0.34);
+  background: #1a1408;
+}
+body.fungi-active .star-shop-btn-icon {
+  color: rgba(120, 198, 96, 0.78);
+  text-shadow: 0 0 8px rgba(120, 198, 96, 0.78);
+}
+body.fungi-active .star-shop-btn-label { color: rgba(120, 198, 96, 0.78) }
+
+/* ── 6. RITUAL  (adpack tab · horror phase) ─────────────────────────────── */
 body.ritual-active .pack-counter {
   border-color: rgba(120,30,180,0.78);
   box-shadow: 0 0 8px rgba(120,30,180,0.16);
@@ -1640,10 +1889,7 @@ body.ritual-active .counter-packs {
   text-shadow: 0 0 6px rgba(120,30,180,0.85), 0 0 12px rgba(120,30,180,0.42), 2px 2px 0 rgba(0,0,0,0.8);
 }
 body.ritual-active .counter-label,
-body.ritual-active .counter-tag {
-  color: rgba(120,30,180,0.95);
-}
-
+body.ritual-active .counter-tag { color: rgba(120,30,180,0.95); }
 body.ritual-active .star-counter {
   border-color: rgba(120,30,180,0.78);
   box-shadow: 0 0 8px rgba(120,30,180,0.16);
@@ -1656,10 +1902,7 @@ body.ritual-active .star-counter-value {
   color: #b060e8;
   text-shadow: 0 0 6px rgba(120,30,180,0.7);
 }
-body.ritual-active .star-counter-label {
-  color: rgba(120,30,180,0.95);
-}
-
+body.ritual-active .star-counter-label { color: rgba(120,30,180,0.95); }
 body.ritual-active .star-shop-btn {
   border-color: rgba(120,30,180,0.85);
   background: #08020e;
@@ -1673,71 +1916,67 @@ body.ritual-active .star-shop-btn-icon {
   color: #b060e8;
   text-shadow: 0 0 8px rgba(120,30,180,0.8);
 }
-body.ritual-active .star-shop-btn-label {
-  color: rgba(120,30,180,0.9);
+body.ritual-active .star-shop-btn-label { color: rgba(120,30,180,0.9); }
+
+/* Canvas stage glow: blue in pristine, red in corrupted */
+body.pristine-phase #screen-pack .pack-carousel-stage {
+  filter: drop-shadow(0 0 6px rgba(129,212,250,0.25)) drop-shadow(0 0 14px rgba(129,212,250,0.10));
 }
 
-/* ── PRISTINE PHASE: bottom row green (nature state of the flesh pack) ─── */
-body.pristine-phase .pack-counter {
-  border-color: rgba(129,212,250,0.78);
-  box-shadow: 0 0 8px rgba(129,212,250,0.16);
-}
-body.pristine-phase .counter-packs {
-  color: #81d4fa;
-  text-shadow: 0 0 6px rgba(129,212,250,0.85), 0 0 12px rgba(129,212,250,0.42), 2px 2px 0 rgba(0,0,0,0.8);
-}
-body.pristine-phase .counter-label,
-body.pristine-phase .counter-tag {
-  color: rgba(129,212,250,0.95);
-}
+/* ══════════════════════════════════════════════════════════════════════════
+   TOP-ROW BUTTON THEME — pristine phase states only
+   Edit colours here freely. Horror-phase button colours are unchanged.
+   These target the active (selected) tab for each pristine pack type.
+   ══════════════════════════════════════════════════════════════════════════ */
 
-body.pristine-phase .star-counter {
-  border-color: rgba(129,212,250,0.78);
-  box-shadow: 0 0 8px rgba(129,212,250,0.16);
-}
-body.pristine-phase .star-counter-icon {
-  color: #81d4fa;
-  text-shadow: 0 0 6px rgba(129,212,250,0.8), 0 0 12px rgba(129,212,250,0.35);
-}
-body.pristine-phase .star-counter-value {
-  color: #81d4fa;
-  text-shadow: 0 0 6px rgba(129,212,250,0.7);
-}
-body.pristine-phase .star-counter-label {
-  color: rgba(129,212,250,0.95);
-}
-
-body.pristine-phase .star-shop-btn {
-  border-color: rgba(129,212,250,0.85);
-  background: #010810;
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 8px rgba(129,212,250,0.18);
-}
-body.pristine-phase .star-shop-btn:hover {
-  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 16px rgba(129,212,250,0.34);
-  background: #031020;
-}
-body.pristine-phase .star-shop-btn-icon {
-  color: #81d4fa;
-  text-shadow: 0 0 8px rgba(129,212,250,0.8);
-}
-body.pristine-phase .star-shop-btn-label {
-  color: rgba(129,212,250,0.9);
-}
-
-/* Active pack tab goes green in pristine phase */
-body.pristine-phase #packTypeGarbage.active {
+/* 1. NATURE  (garbage tab · pristine)  — sky blue  #81d4fa */
+body.nature-active #packTypeGarbage.active {
   border-color: rgba(129,212,250,0.85);
   background: #010810;
   box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(129,212,250,0.2);
 }
-body.pristine-phase #packTypeGarbage.active .pack-type-label,
-body.pristine-phase #packTypeGarbage.active .pack-type-icon {
+body.nature-active #packTypeGarbage.active .pack-type-label,
+body.nature-active #packTypeGarbage.active .pack-type-icon {
   color: #81d4fa !important;
 }
+/* Inactive tabs while nature is selected */
+body.nature-active #packTypeGarbage:not(.active) .pack-type-label,
+body.nature-active #packTypeGarbage:not(.active) .pack-type-icon {
+  color: #4a8fb0;
+}
 
-/* Canvas stage glow: green in pristine, red in corrupted (default is red from adpack-active logic) */
-body.pristine-phase #screen-pack .pack-carousel-stage {
-  filter: drop-shadow(0 0 6px rgba(129,212,250,0.25)) drop-shadow(0 0 14px rgba(129,212,250,0.10));
+/* 3. CRITTER (ewaste tab · pristine)   — pastel pink  #f0b8d0 */
+body.critter-active #packTypeEwaste.active {
+  border-color: rgba(240,184,208,0.85);
+  background: #130b10;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(240,184,208,0.2);
+}
+body.critter-active #packTypeEwaste.active .pack-type-label,
+body.critter-active #packTypeEwaste.active .pack-type-icon {
+  color: #f0b8d0 !important;
+}
+/* Inactive tabs while critter is selected */
+body.critter-active #packTypeEwaste:not(.active) .pack-type-label,
+body.critter-active #packTypeEwaste:not(.active) .pack-type-icon {
+  color: #c490a8;
+}
+
+/* 5. FUNGI   (adpack tab · pristine)   — earthy amber  #d4a870
+   Uses !important to override the permanent adpack purple defaults. */
+body.fungi-active #packTypeAdpack.active {
+  border-color: rgba(109, 187, 85, 0.78) !important;
+  background: #100e08 !important;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.5), 0 0 10px rgba(212,168,112,0.25) !important;
+  animation: none !important;
+}
+body.fungi-active #packTypeAdpack.active .pack-type-label,
+body.fungi-active #packTypeAdpack.active .pack-type-icon {
+  color: rgba(109, 187, 85, 0.78) !important;
+}
+/* Inactive tabs while fungi is selected */
+body.fungi-active #packTypeAdpack:not(.active) .pack-type-label,
+body.fungi-active #packTypeAdpack:not(.active) .pack-type-icon {
+  color: #a07848 !important;
 }
 
 /* ── DEBUG: phase toggle button (temporary) ──────────────────────────────── */

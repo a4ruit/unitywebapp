@@ -105,8 +105,10 @@ function updatePersonalPhase() {
   // Update the bar immediately — don't wait for the next Unity broadcast.
   // Other players' pulls no longer move this phone's bar.
   document.body.dataset.corruption = Math.min(level, CORRUPTION_MAX);
-  // Toggle pristine-phase CSS class (drives green bottom-row styling)
+  // Toggle pristine-phase CSS class (drives tab + carousel styling)
   document.body.classList.toggle('pristine-phase', isPristine);
+  // Keep the 6-way pack theme class in sync whenever phase changes
+  syncPackThemeClass();
   // Update pack tab labels / icons (NATURE↔FLESH, CRITTER↔SCOURGE, FUNGI↔RITUAL)
   updateFirstPackTab(isPristine);
   updateSecondPackTab(isPristine);
@@ -144,9 +146,8 @@ function updateThirdPackTab(isFungi) {
   if (icon) icon.src = isFungi ? 'assets/fungi-symbol.png' : 'assets/ritual-symbol.png';
   if (label) label.textContent = isFungi ? 'FUNGI' : 'RITUAL';
   btn.classList.toggle('fungi-mode', isFungi);
-  // Keep ritual-active + adpack-active in sync if adpack is currently selected
   if (btn.classList.contains('active')) {
-    document.body.classList.toggle('ritual-active', !isFungi);
+    syncPackThemeClass();
     const sp = document.getElementById('screen-pack');
     if (sp) sp.classList.toggle('adpack-active', !isFungi);
   }
@@ -160,6 +161,32 @@ function updateSecondPackTab(isCritter) {
   if (icon) icon.src = isCritter ? 'assets/critter-symbol.png' : 'assets/scourge-symbol.png';
   if (label) label.textContent = isCritter ? 'CRITTER' : 'SCOURGE';
   btn.classList.toggle('critter-mode', isCritter);
+}
+
+// ── Pack theme class sync ──────────────────────────────────────────────────
+// Keeps exactly one of 6 mutually-exclusive body classes active so the CSS
+// can target each pack state independently.
+//   nature-active   — garbage tab · pristine phase
+//   flesh-active    — garbage tab · horror phase
+//   critter-active  — ewaste tab  · pristine phase
+//   scourge-active  — ewaste tab  · horror phase
+//   fungi-active    — adpack tab  · pristine phase
+//   ritual-active   — adpack tab  · horror phase
+const _PACK_THEME_CLASSES = [
+  'nature-active','flesh-active',
+  'critter-active','scourge-active',
+  'fungi-active','ritual-active',
+];
+function syncPackThemeClass() {
+  const isHorror = personalPacksOpened >= HORROR_THRESHOLD;
+  _PACK_THEME_CLASSES.forEach(c => document.body.classList.remove(c));
+  if (activePackType === 'garbage') {
+    document.body.classList.add(isHorror ? 'flesh-active'   : 'nature-active');
+  } else if (activePackType === 'ewaste') {
+    document.body.classList.add(isHorror ? 'scourge-active' : 'critter-active');
+  } else if (activePackType === 'adpack') {
+    document.body.classList.add(isHorror ? 'ritual-active'  : 'fungi-active');
+  }
 }
 
 let isPackTypeSwitching = false;
@@ -229,8 +256,7 @@ function setPackType(type) {
   document.getElementById('packTypeGarbage')?.classList.toggle('active', type === 'garbage');
   document.getElementById('packTypeEwaste')?.classList.toggle('active',  type === 'ewaste');
   document.getElementById('packTypeAdpack')?.classList.toggle('active',  type === 'adpack');
-  document.body.classList.toggle('scourge-active', type === 'ewaste');
-  document.body.classList.toggle('ritual-active',  type === 'adpack' && personalPacksOpened >= HORROR_THRESHOLD);
+  syncPackThemeClass();
   updatePackCarousel(type);
   animatePackTypeSwitch(prevType, type);
   // Toggle adpack glow on screen-pack (personal phase — not collective bar)
@@ -519,11 +545,14 @@ function doPackOpen(dir) {
   if (isGodPack && _gpHorror) send(`spawn_godpack|${CLIENT_ID}`);
 
   Pack3D.throwPack(dir === 'left' ? -1 : 1, () => {
-    if (isGodPack) triggerGodPackFlash();
-    setTimeout(() => {
-      // Skip reveal — go straight to choice grid (suspension is in the face-down hold)
-      isGodPack ? showGodPackClaimGrid() : showChoiceGrid();
-    }, isGodPack ? 900 : 120);
+    if (isGodPack) {
+      triggerGodPackFlash();
+      // God-pack flash still needs time to play before the grid appears
+      setTimeout(showGodPackClaimGrid, 900);
+    } else {
+      // Choice grid appears the instant the closing blip ends — no dead air
+      showChoiceGrid();
+    }
   });
 }
 
@@ -662,8 +691,7 @@ function resetToPackScreen() {
 
 window.activePackType = 'garbage'; // default for cardTextures.js
 document.body.dataset.corruption = 0; // start fully pristine
-document.body.classList.add('pristine-phase');
-updateFirstPackTab(true); // set tab to NATURE at startup
+updatePersonalPhase();    // sets pristine-phase, syncs all tab labels, applies nature-active theme
 connect();
 initPack();
 updatePackCarousel(activePackType);

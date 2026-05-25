@@ -78,7 +78,9 @@ const CardTextures = (() => {
   _loadSkin('nature-rare',     'assets/epic-card.png');
   // Custom symbol art — loaded once, reused as the central illustration for
   // its respective card. Add new symbols here as they're made.
-  _loadSkin('symbol-leaf',     'assets/leaf-symbol.png');
+  _loadSkin('symbol-leaf',       'assets/leaf-symbol.png');
+  _loadSkin('symbol-critter',    'assets/critter-symbol.png');
+  _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -330,12 +332,23 @@ const CardTextures = (() => {
     // image hasn't loaded yet, so the card never renders empty.
     // Position + size are controlled by LAYOUT.symbolCenterY / LAYOUT.symbolHeight.
     if (rarity === 'common') {
-      const leaf = _cardSkins['symbol-leaf'];
-      if (leaf && leaf.complete && leaf.naturalWidth > 0) {
+      const sym = _cardSkins['symbol-leaf'];
+      if (sym && sym.complete && sym.naturalWidth > 0) {
         ctx.imageSmoothingEnabled = false;
         const targetH = LAYOUT.symbolHeight;
-        const targetW = targetH * (leaf.naturalWidth / leaf.naturalHeight);
-        ctx.drawImage(leaf, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+        const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+        ctx.drawImage(sym, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+        return;
+      }
+    }
+
+    if (rarity === 'uncommon') {
+      const wf = _cardSkins['symbol-wildflower'];
+      if (wf && wf.complete && wf.naturalWidth > 0) {
+        ctx.imageSmoothingEnabled = false;
+        const targetH = LAYOUT.symbolHeight;
+        const targetW = targetH * (wf.naturalWidth / wf.naturalHeight);
+        ctx.drawImage(wf, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
         return;
       }
     }
@@ -368,7 +381,7 @@ const CardTextures = (() => {
       ctx.beginPath(); ctx.moveTo(0, 34); ctx.quadraticCurveTo(3, 42, 2, 48); ctx.stroke();
 
     } else if (rarity === 'uncommon') {
-      // Wildflowers — cluster of meadow flowers at different heights
+      // Wildflowers — procedural fallback (PNG handled above before translate)
       ctx.lineCap = 'round';
       const flowers = [
         { x: -16, y:  6, r: 10, petals: 5, stemY: 38 },
@@ -1282,12 +1295,24 @@ const CardTextures = (() => {
   // ─── CRITTER shape drawers ─────────────────────────────────────────────────────
 
   function drawShapeCritter(ctx, rarity, t) {
+    // Image-first: use PNG symbol art when available, fall back to procedural.
+    if (rarity === 'common') {
+      const sym = _cardSkins['symbol-critter'];
+      if (sym && sym.complete && sym.naturalWidth > 0) {
+        ctx.imageSmoothingEnabled = false;
+        const targetH = LAYOUT.symbolHeight;
+        const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+        ctx.drawImage(sym, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+        return;
+      }
+    }
+
     ctx.save();
     ctx.translate(128, 148);
     ctx.lineCap = 'round';
 
     if (rarity === 'common') {
-      // Sheep — fluffy round body, small head, four peg legs
+      // Sheep — fluffy round body, small head, four peg legs (procedural fallback)
       ctx.strokeStyle = '#607060'; ctx.lineWidth = 1.5;
       // Body base
       ctx.fillStyle = 'rgba(200,198,190,0.62)';

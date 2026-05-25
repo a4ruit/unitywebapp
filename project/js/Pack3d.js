@@ -1716,6 +1716,211 @@ const Pack3D = (() => {
     return tex;
   }
 
+  // ─── Dissolve transition (paper-burn + B/W glitch) ────────────────────────
+  // Replaces the materials on packMesh with shader materials that eat away
+  // each face from the edges inward, using a noise threshold. Pixels near
+  // the burn front flicker between solid black and white to read as digital
+  // corruption rather than fire.
+  let _origMaterials = null;
+  let _dissolveMats  = null;
+  let _dummyTex      = null;
+
+  function _getDummyTex() {
+    if (_dummyTex) return _dummyTex;
+    const c = document.createElement('canvas');
+    c.width = c.height = 1;
+    c.getContext('2d').fillRect(0, 0, 1, 1);
+    _dummyTex = new THREE.CanvasTexture(c);
+    return _dummyTex;
+  }
+
+  function buildDissolveMaterial(map, edgeColorHex) {
+    const hasMap = !!map;
+    return new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.DoubleSide,
+      uniforms: {
+        map:       { value: map || _getDummyTex() },
+        dissolve:  { value: 0 },
+        time:      { value: 0 },
+        useMap:    { value: hasMap ? 1.0 : 0.0 },
+        edgeColor: { value: new THREE.Color(edgeColorHex ?? 0x1a1408) },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D map;
+        uniform float dissolve;
+        uniform float time;
+        uniform float useMap;
+        uniform vec3 edgeColor;
+        varying vec2 vUv;
+
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        void main() {
+          // Polar coordinates centred on the face. r = 0 at centre, ~1 at edge.
+          vec2  p  = vUv - 0.5;
+          float r  = clamp(length(p) * 2.0, 0.0, 1.0);
+          float a  = atan(p.y, p.x);
+          float aN = (a + 3.14159265) / 6.28318531;  // 0..1 round the face
+
+          // Spiral burn order — outer ring at angle 0 burns first, the front
+          // sweeps CCW while winding inward. 'loops' controls the curl tightness.
+          float loops      = 2.0;
+          float spiralLvl  = (aN + (1.0 - r) * loops) / (1.0 + loops);
+
+          // Coarse noise breaks the spiral arc into organic flakes
+          float blob    = hash(floor(vUv * 22.0));
+          float burnLvl = spiralLvl + blob * 0.10;
+
+          if (burnLvl < dissolve) discard;
+
+          vec4 col = useMap > 0.5 ? texture2D(map, vUv) : vec4(edgeColor, 1.0);
+
+          // Fuse-wire front: a narrow white-hot tip, with a B/W glitch trail
+          // behind it that fades back to the surface art.
+          float zone = burnLvl - dissolve;
+          if (zone < 0.12) {
+            float hotness = 1.0 - smoothstep(0.0, 0.025, zone);
+            float flicker = hash(floor(vUv * 200.0) + vec2(floor(time * 26.0)));
+            float bw      = flicker > 0.5 ? 1.0 : 0.0;
+            float mixAmt  = 1.0 - zone / 0.12;
+            col.rgb = mix(col.rgb, vec3(bw), mixAmt * 0.85);
+            col.rgb = mix(col.rgb, vec3(1.0), hotness);
+            float bar = hash(vec2(floor(vUv.y * 50.0), floor(time * 18.0)));
+            if (bar > 0.86 && mixAmt > 0.3) {
+              col.rgb = vec3(bar > 0.95 ? 1.0 : 0.0);
+            }
+          }
+
+          gl_FragColor = col;
+        }
+      `,
+    });
+  }
+
+  function startDissolve() {
+    document.body.classList.add('pack-dissolving');
+    if (!packMesh || _origMaterials) return;
+    _origMaterials = packMesh.material;
+    const edgeCol = 0x1a1408;
+    _dissolveMats = [
+      buildDissolveMaterial(null, edgeCol),
+      buildDissolveMaterial(null, edgeCol),
+      buildDissolveMaterial(null, edgeCol),
+      buildDissolveMaterial(null, edgeCol),
+      buildDissolveMaterial(_origMaterials[4]?.map, edgeCol),
+      buildDissolveMaterial(_origMaterials[5]?.map, edgeCol),
+    ];
+    packMesh.material = _dissolveMats;
+  }
+
+  function endDissolve() {
+    document.body.classList.remove('pack-dissolving');
+    if (!_origMaterials) return;
+    packMesh.material = _origMaterials;
+    if (_dissolveMats) {
+      _dissolveMats.forEach(m => m.dispose());
+      _dissolveMats = null;
+    }
+    _origMaterials = null;
+  }
+
+  // ─── CRT-style closing pulse — elongated glitch star ──────────────────────
+  // Shader-driven additive plane that fires as the dissolve completes. Draws
+  // an elongated 4-point star with scanline tear, strobe row chops and B/W
+  // sparkle so the closing carries the same glitch vocabulary as the burn.
+  let crtPulseMesh = null;
+
+  function _ensureCrtPulseMesh() {
+    if (crtPulseMesh) return;
+    const geo = new THREE.PlaneGeometry(2.6, 0.7);
+    const mat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite:  false,
+      blending:    THREE.AdditiveBlending,
+      uniforms: {
+        time:     { value: 0 },
+        tear:     { value: 0 },
+        uOpacity: { value: 0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform float tear;
+        uniform float uOpacity;
+        varying vec2 vUv;
+
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+
+        void main() {
+          // Per-row horizontal scanline tear — corruption baked in
+          float row     = floor(vUv.y * 24.0);
+          float tearOff = (hash(vec2(row, floor(time * 18.0))) - 0.5) * tear;
+          vec2  starUv  = vec2(vUv.x + tearOff, vUv.y);
+
+          vec2 p = starUv - 0.5;
+          float ax = abs(p.x);
+          float ay = abs(p.y);
+
+          // Elongated 4-point star: long horizontal arm, short vertical arm
+          float horiz = max(0.0, 1.0 - ax * 2.05) * pow(max(0.0, 1.0 - ay * 30.0), 1.6);
+          float vert  = max(0.0, 1.0 - ay * 4.5)  * pow(max(0.0, 1.0 - ax * 70.0), 1.6);
+          // Hot core (slightly squashed vertically to match elongation)
+          float core  = pow(max(0.0, 1.0 - length(p * vec2(1.0, 1.6)) * 6.0), 3.5);
+
+          float starI = clamp(horiz + vert + core, 0.0, 1.6);
+
+          // Strobe gap — chops a horizontal row out at random
+          float bar = hash(vec2(floor(vUv.y * 36.0), floor(time * 22.0)));
+          if (bar > 0.93) starI = 0.0;
+
+          // B/W pixel sparkle around the mid-bright edges of the star
+          float sparkleN = hash(floor(vUv * 200.0) + vec2(floor(time * 28.0)));
+          if (starI > 0.12 && starI < 0.55 && sparkleN > 0.92) {
+            starI = 1.4;
+          }
+
+          gl_FragColor = vec4(1.0, 1.0, 1.0, starI * uOpacity);
+        }
+      `,
+    });
+    crtPulseMesh = new THREE.Mesh(geo, mat);
+    crtPulseMesh.position.set(0, 0, 0.5);
+    scene.add(crtPulseMesh);
+  }
+
+  function _hideCrtPulse() {
+    if (!crtPulseMesh) return;
+    crtPulseMesh.material.uniforms.uOpacity.value = 0;
+    crtPulseMesh.material.uniforms.tear.value     = 0;
+    crtPulseMesh.scale.set(1, 1, 1);
+  }
+
+  function _disposeCrtPulse() {
+    if (!crtPulseMesh) return;
+    scene?.remove(crtPulseMesh);
+    crtPulseMesh.geometry.dispose();
+    crtPulseMesh.material.dispose();
+    crtPulseMesh = null;
+  }
+
   // ─── Init ──────────────────────────────────────────────────────────────────
 
   function init() {
@@ -1801,25 +2006,92 @@ const Pack3D = (() => {
     borderAnimFrame++;
 
     if (isThrowing) {
-      throwProgress += 0.045;
-      const t  = throwProgress;
-      packMesh.position.x = throwDirX * t * 4.5;
-      packMesh.position.y = Math.sin(t * Math.PI) * 0.4 - t * 1.2;
-      packMesh.rotation.z += throwDirX * 0.06;
-      packMesh.rotation.x += 0.02;
+      throwProgress += 0.018;
+      const t = throwProgress;
 
-      const fade = Math.max(0, 1 - throwProgress * 1.4);
-      packMesh.material?.forEach?.(m => {
-        if (m.emissiveIntensity !== undefined) m.emissiveIntensity = 0.15 * fade;
-      });
+      // Pack stays put — subtle shake that intensifies as it burns. Shake
+      // tapers off once the dissolve completes so the CRT pulse sits still.
+      const shake = Math.min(t, 0.7) * 0.022;
+      packMesh.position.x = (Math.random() - 0.5) * shake;
+      packMesh.position.y = (Math.random() - 0.5) * shake;
+      packMesh.rotation.z = Math.sin(t * Math.PI * 4) * 0.012 * throwDirX;
+      packMesh.rotation.x = 0.08 + (Math.random() - 0.5) * shake * 0.6;
 
-      // Spawn particles at the moment of throw
-      if (throwProgress > 0.1 && throwProgress < 0.15 && particles.length === 0) {
-        spawnParticles();
+      // Spiral dissolve runs over the first 60% — leaves the back end for
+      // the CRT closing pulse to land cleanly on an empty stage. The uniform
+      // overshoots to 1.15 because the noise term in the shader pushes
+      // burnLvl up to ~1.10; without overshoot ~10% of pixels survive.
+      if (_dissolveMats) {
+        const dLevel = Math.min(1.15, (t / 0.60) * 1.15);
+        _dissolveMats.forEach(m => {
+          m.uniforms.dissolve.value = dLevel;
+          m.uniforms.time.value     = idleT;
+        });
       }
 
-      if (throwProgress >= 0.85 && onThrowComplete) {
+      // Fade pack decorations alongside the dissolve so nothing lingers
+      const childFade = Math.max(0, 1 - t * 1.55);
+      if (symbolMesh) symbolMesh.material.opacity = childFade;
+      if (textMesh)   textMesh.material.opacity   = childFade;
+      if (pbMesh)     pbMesh.material.opacity     = childFade;
+      if (circleMesh) circleMesh.material.opacity = childFade * 0.92;
+      flyMeshes.forEach(m => { m.material.opacity = childFade; });
+      cloudMeshes.forEach((m, i) => {
+        const s = cloudStates[i];
+        m.material.opacity = (s?.baseOpacity ?? 0.5) * childFade;
+      });
+
+      // CRT-style closing — elongated glitch star punctuates the animation
+      const PULSE_START = 0.62;
+      if (t >= PULSE_START) {
+        _ensureCrtPulseMesh();
+        const pt = Math.min(1, (t - PULSE_START) / (1.0 - PULSE_START));
+        const u  = crtPulseMesh.material.uniforms;
+        u.time.value = idleT;
+
+        if (pt < 0.18) {
+          // Star pops in — small to full, glitch already humming
+          const e = pt / 0.18;
+          crtPulseMesh.scale.set(0.55 + e * 0.45, 0.65 + e * 0.35, 1);
+          u.tear.value     = 0.015;
+          u.uOpacity.value = e;
+        } else if (pt < 0.50) {
+          // Held bright — heavy scanline tear, slight breathing wobble
+          const e = (pt - 0.18) / 0.32;
+          crtPulseMesh.scale.set(
+            1 + Math.sin(e * Math.PI * 2) * 0.07,
+            1 + Math.sin(e * Math.PI * 3) * 0.12,
+            1
+          );
+          u.tear.value     = 0.028 + Math.sin(e * Math.PI * 5) * 0.012;
+          u.uOpacity.value = 1;
+        } else if (pt < 0.88) {
+          // Wind up then snap — horizontal stretch first, then crunch back in
+          const e     = (pt - 0.50) / 0.38;
+          const eased = e * e * (3 - 2 * e);
+          const xScale = e < 0.28
+            ? 1 + (e / 0.28) * 0.45
+            : 1.45 - ((e - 0.28) / 0.72) * 1.40;
+          const yScale = 1 - eased * 0.55;
+          crtPulseMesh.scale.set(xScale, yScale, 1);
+          u.tear.value     = 0.028 - eased * 0.028;
+          u.uOpacity.value = 1;
+        } else {
+          // Final blip — small bright pop that fades to nothing
+          const e = (pt - 0.88) / 0.12;
+          crtPulseMesh.scale.set(0.06 + e * 0.45, 0.35 + e * 0.55, 1);
+          u.tear.value     = 0;
+          u.uOpacity.value = 1 - e;
+        }
+      }
+
+      if (throwProgress >= 1.0 && onThrowComplete) {
         isThrowing = false;
+        // Kill the whole pack subtree until reset — stops the cloud / fly
+        // animations from re-setting opacity and leaving residual fragments
+        // in the window before the choice screen takes over.
+        packMesh.visible = false;
+        _hideCrtPulse();
         onThrowComplete();
         onThrowComplete = null;
       }
@@ -1895,7 +2167,9 @@ const Pack3D = (() => {
       if (Math.abs(s.by + s.offsetY) > 1.2) s.driftY *= -1;
       m.position.x = s.bx + s.offsetX;
       m.position.y = s.by + s.offsetY;
-      m.material.opacity = s.baseOpacity * (0.55 + 0.45 * Math.sin(s.pulsePhase));
+      if (!isThrowing) {
+        m.material.opacity = s.baseOpacity * (0.55 + 0.45 * Math.sin(s.pulsePhase));
+      }
     });
 
     updateParticles();
@@ -1971,11 +2245,15 @@ const Pack3D = (() => {
     throwDirX     = dir;
     throwProgress = 0;
     onThrowComplete = callback;
+    startDissolve();
   }
 
   function resetPack() {
     if (!packMesh) return;
     isThrowing = false; throwProgress = 0;
+    endDissolve();
+    _hideCrtPulse();
+    packMesh.visible = true;
     packMesh.position.set(0, 0, 0);
     packMesh.rotation.set(0.08, 0, 0);
     rotX = 0.08; rotY = 0; targetRotX = 0.08; targetRotY = 0;
@@ -2031,6 +2309,9 @@ const Pack3D = (() => {
     clearTimeout(pbTimer); pbTimer = null; pbDrips = [];
     if (pbMesh) { packMesh?.remove(pbMesh); pbMesh.geometry.dispose(); pbMesh.material.map?.dispose(); pbMesh.material.dispose(); pbMesh = null; }
     pbTex = null; pbCtx = null; pbCanvas = null;
+    endDissolve();
+    _disposeCrtPulse();
+    if (_dummyTex) { _dummyTex.dispose(); _dummyTex = null; }
     clearParticles();
     renderer?.dispose();
   }
