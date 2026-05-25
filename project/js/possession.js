@@ -51,6 +51,43 @@ let _inputInterval  = null;
 let _joystickActive = false;
 let _joyX           = 0;
 let _joyY           = 0;
+
+// ── Joystick send-rate limiter ──────────────────────────────────────────────
+// The input loops below tick at 20 Hz, but we only actually transmit when
+// the stick value has changed (with a small deadzone) OR when the keep-alive
+// window has elapsed. With 3–4 simultaneous players this drops idle traffic
+// from constant 80–160 msg/sec down to ~4 msg/sec, which keeps the WS server
+// (and the Node event loop hosting it) from getting flooded.
+//
+// _markInputSent() is called immediately AFTER every send; _shouldSendInput()
+// is what each interval polls to decide whether this tick gets transmitted.
+// Calling _resetInputSendTracking() forces the next tick to send unconditionally
+// — used at the start of every new possession / placement session so Unity
+// always gets a fresh authoritative value at hand-over.
+const INPUT_DEADZONE     = 0.015;   // ~1.5% of full stick deflection
+const INPUT_KEEPALIVE_MS = 750;     // worst-case "I'm still here, stick is X"
+let _lastSentX = 0;
+let _lastSentY = 0;
+let _lastSentT = 0;
+function _shouldSendInput() {
+  if (Math.abs(_joyX - _lastSentX) > INPUT_DEADZONE) return true;
+  if (Math.abs(_joyY - _lastSentY) > INPUT_DEADZONE) return true;
+  if (performance.now() - _lastSentT > INPUT_KEEPALIVE_MS) return true;
+  return false;
+}
+function _markInputSent() {
+  _lastSentX = _joyX;
+  _lastSentY = _joyY;
+  _lastSentT = performance.now();
+}
+function _resetInputSendTracking() {
+  // Setting _lastSentT to 0 forces _shouldSendInput() to return true on the
+  // first poll (since now - 0 always exceeds KEEPALIVE_MS), so the next
+  // tick fires regardless of joystick state.
+  _lastSentX = NaN;   // NaN compares >DEADZONE for any real value
+  _lastSentY = NaN;
+  _lastSentT = 0;
+}
 let _ui             = null;   // DOM refs, built once on load
 let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
 let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
@@ -1354,11 +1391,18 @@ function _onGranted(duration, creature) {
   void _ui.loadingBar.offsetWidth;        // force reflow to reset animation
   _ui.loadingBar.classList.add('is-loading');
 
-  // Send joystick at 20 fps — always send so the creature stops cleanly when
-  // the stick is centred. Verb depends on what's being possessed.
+  // Send joystick at 20 fps — but only when the stick value has actually
+  // changed, with a keep-alive every ~750ms so Unity knows we're still
+  // connected even while idle. Drops the per-player message rate from a
+  // constant 20/s to ~1–2/s when the stick is centred. Verb depends on
+  // what's being possessed.
   const inputVerb = creature === 'duck' ? 'duck_input' : 'sheep_input';
+  _resetInputSendTracking();  // first tick always fires
   _inputInterval = setInterval(() => {
-    send(`${inputVerb}|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+    if (_shouldSendInput()) {
+      send(`${inputVerb}|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+      _markInputSent();
+    }
   }, 50);
 
   // WebRTC video: Unity will send a 'webrtc_offer|' message shortly after
@@ -1467,9 +1511,14 @@ function _onPlacementGranted(cardName) {
   // Hide the inhabit button while placing
   _ui.btn.classList.add('poss-hidden');
 
-  // Stream joystick magnitude/direction to Unity at 20fps as placement_move
+  // Stream joystick to Unity as placement_move at up to 20 fps — gated by
+  // the dirty-flag helpers so idle ticks don't waste WS bandwidth.
+  _resetInputSendTracking();  // first tick always fires
   _placementInputInterval = setInterval(() => {
-    send(`placement_move|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+    if (_shouldSendInput()) {
+      send(`placement_move|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+      _markInputSent();
+    }
   }, 50);
 
   console.log('[possession.js] Placement started — UI modal active, background blocked');
@@ -1673,9 +1722,13 @@ function _onBoxGranted(duration) {
   _ui.openBox.disabled         = false;
   _ui.openBox.innerHTML        = 'OPEN<br>BOX';
 
-  // Send joystick at 20 fps — same cadence as sheep/duck
+  // Send joystick at up to 20 fps — same dirty-flag gating as sheep/duck.
+  _resetInputSendTracking();  // first tick always fires
   _inputInterval = setInterval(() => {
-    send(`box_input|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+    if (_shouldSendInput()) {
+      send(`box_input|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+      _markInputSent();
+    }
   }, 50);
 
   console.log('[possession.js] Inside the Blind Box — no vision. Roll anyway.');

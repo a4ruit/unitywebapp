@@ -1,4 +1,28 @@
-const WS_URL = 'wss://unitywebapp.onrender.com';
+// ─── WebSocket endpoints — primary + backup ──────────────────────────────────
+// Primary is the Sydney DigitalOcean droplet (low latency for Melbourne
+// players). Backup is the original Render Singapore deployment, kept alive
+// as a failover in case the droplet goes down mid-installation.
+//
+// Both servers run an identical index.js — they're interchangeable from the
+// client's perspective. The failover logic in connect() below swaps to the
+// other URL whenever a WebSocket fails to open at all (= URL unreachable),
+// then keeps alternating until one comes back. If we connect and THEN drop,
+// we retry the same URL (= transient blip, not a server outage).
+//
+// Manual override for testing:  ?server=do  or  ?server=render  in the URL.
+const WS_PRIMARY = 'wss://packmentality.duckdns.org';
+const WS_BACKUP  = 'wss://unitywebapp.onrender.com';
+
+const _wsOverride = (() => {
+  try {
+    const v = new URLSearchParams(location.search).get('server');
+    if (v === 'do'     || v === 'primary') return WS_PRIMARY;
+    if (v === 'render' || v === 'backup')  return WS_BACKUP;
+  } catch (e) {}
+  return null;
+})();
+
+let WS_URL = _wsOverride || WS_PRIMARY;
 
 // ─── Card pools ───────────────────────────────────────────────────────────────
 
@@ -330,14 +354,54 @@ function setStatus(connected) {
   label.textContent = connected ? 'live' : 'offline';
 }
 
+// ── WS verbose logging gate ─────────────────────────────────────────────────
+// Per-message console.log fires for every send AND every receive. On a phone
+// during multi-player play that's dozens of writes/sec, each of which can
+// jank the render thread when DevTools is attached. Flip with
+//   ?wsdebug=1  in the URL (or `localStorage.wsDebug='1'` in DevTools).
+// Off by default for production play.
+const WS_DEBUG = (() => {
+  try {
+    if (new URLSearchParams(location.search).get('wsdebug')) return true;
+    if (localStorage.getItem('wsDebug')) return true;
+  } catch (e) {}
+  return false;
+})();
+
+// Tracks whether the current attempt ever reached the `open` state.
+// Used by onclose to decide between failover (never opened = bad URL) and
+// plain retry (was open, dropped = transient).
+let _wsHadOpenThisAttempt = false;
+
 function connect() {
   try {
+    _wsHadOpenThisAttempt = false;
+    if (WS_DEBUG) console.log('[WS] Connecting to', WS_URL);
     ws = new WebSocket(WS_URL);
-    ws.onopen  = () => { setStatus(true); ws.send('web_client'); clearTimeout(reconnectTimer); sendPackType(); updatePossessionWS(); };
-    ws.onclose = () => { setStatus(false); reconnectTimer = setTimeout(connect, 3000); };
+    ws.onopen  = () => {
+      _wsHadOpenThisAttempt = true;
+      setStatus(true);
+      ws.send('web_client');
+      clearTimeout(reconnectTimer);
+      sendPackType();
+      updatePossessionWS();
+    };
+    ws.onclose = () => {
+      setStatus(false);
+      // Never reached `open` → this URL is unreachable. Swap to the other
+      // endpoint for the next attempt (unless the URL was forced via
+      // ?server= override — then the user explicitly chose this server,
+      // so honor that and keep retrying it).
+      if (!_wsHadOpenThisAttempt && !_wsOverride && WS_PRIMARY !== WS_BACKUP) {
+        const other = (WS_URL === WS_PRIMARY) ? WS_BACKUP : WS_PRIMARY;
+        console.warn('[WS] Failover:', WS_URL, '→', other);
+        WS_URL = other;
+      }
+      reconnectTimer = setTimeout(connect, 3000);
+    };
     ws.onerror = () => ws.close();
     ws.onmessage = (e) => {
-      console.log('[WS]', e.data);
+      if (WS_DEBUG) console.log('[WS]', e.data);
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
@@ -348,7 +412,8 @@ function connect() {
 
 function send(msg) {
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(msg); console.log('[WS] Sent:', msg);
+    ws.send(msg);
+    if (WS_DEBUG) console.log('[WS] Sent:', msg);
   } else {
     console.warn('[WS] Not connected:', msg);
   }
