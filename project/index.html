@@ -6,6 +6,7 @@
   <title>PACK MENTALITY</title>
   <link rel="stylesheet" href="https://use.typekit.net/yki8oca.css">
   <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -35,8 +36,23 @@
     <!-- PAGE: Pack -->
     <div class="page" id="page-pack">
 
+      <!-- NAME PROMPT — shown on load, before pack screen -->
+      <div class="screen" id="screen-name">
+        <div class="name-term">
+          <div class="name-term-logo">PACK MENTALITY</div>
+          <div class="name-term-field">
+            <span class="name-term-label">username:</span>
+            <input class="name-term-input" id="nameInput"
+                   type="text" maxlength="16"
+                   autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
+                   onkeydown="if(event.key==='Enter') submitPlayerName()">
+          </div>
+          <button class="name-term-btn" onclick="submitPlayerName()">[ enter world ]</button>
+        </div>
+      </div>
+
       <!-- PACK SCREEN -->
-      <div class="screen" id="screen-pack">
+      <div class="screen hidden" id="screen-pack">
         <div id="packStack" class="pack-stack-behind"></div>
 
         <!-- Pack type selector -->

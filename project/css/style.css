@@ -1667,6 +1667,108 @@ body.glitch-active .star-counter-row {
   text-align: center;
 }
 
+/* ─── NAME PROMPT (terminal) ───────────────────────────────────────────────── */
+
+#screen-name {
+  justify-content: center;
+  align-items: center;
+  padding: 0 24px;
+}
+
+.name-term {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+  max-width: 280px;
+  padding: 28px 24px;
+  font-family: 'VT323', 'Courier New', monospace;
+  border: 2px solid var(--green);
+  background: rgba(10,16,10,0.97);
+  box-shadow:
+    0 0 0 1px rgba(42,122,42,0.15),
+    0 0 24px rgba(42,122,42,0.18),
+    inset 0 0 20px rgba(42,122,42,0.04);
+  image-rendering: pixelated;
+}
+
+.name-term-logo {
+  font-size: 30px;
+  color: var(--cream);
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 10px rgba(58,170,58,0.3);
+  line-height: 1;
+  text-align: center;
+}
+
+.name-term-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.name-term-label {
+  font-size: 20px;
+  color: var(--green-lt);
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-align: center;
+}
+
+.name-term-input {
+  background: rgba(42,122,42,0.07);
+  border: 1px solid var(--green);
+  color: var(--cream);
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 26px;
+  width: 100%;
+  outline: none;
+  text-transform: uppercase;
+  caret-color: var(--green-lt);
+  padding: 4px 8px;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.name-term-input:focus {
+  border-color: var(--green-lt);
+  background: rgba(42,122,42,0.12);
+}
+
+@keyframes nameInputShake {
+  0%,100% { transform: translateX(0); }
+  25%     { transform: translateX(-5px); }
+  75%     { transform: translateX(5px); }
+}
+
+.name-input-shake {
+  animation: nameInputShake 0.28s steps(4) forwards;
+  border-color: var(--orange) !important;
+}
+
+.name-term-btn {
+  background: transparent;
+  border: 1px solid var(--green-lt);
+  color: var(--green-lt);
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 22px;
+  letter-spacing: 0.12em;
+  padding: 4px 24px 6px;
+  cursor: pointer;
+  text-shadow: 0 0 8px rgba(58,170,58,0.45);
+  box-shadow: 0 0 8px rgba(58,170,58,0.1);
+  line-height: 1;
+}
+
+.name-term-btn:active {
+  background: var(--green-lt);
+  color: var(--bg);
+  text-shadow: none;
+}
+
 /* ── AD PACK canvas glow — active state ──────────── */
 #screen-pack.adpack-active .pack-carousel-stage {
   filter: drop-shadow(0 0 8px rgba(120,30,180,0.35)) drop-shadow(0 0 18px rgba(120,30,180,0.14));

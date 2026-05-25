@@ -373,6 +373,25 @@ const WS_DEBUG = (() => {
 // plain retry (was open, dropped = transient).
 let _wsHadOpenThisAttempt = false;
 
+// ─── Player name ──────────────────────────────────────────────────────────────
+let playerName = '';
+
+function submitPlayerName() {
+  const input = document.getElementById('nameInput');
+  const raw   = input ? input.value.trim() : '';
+  if (!raw) {
+    input && input.classList.add('name-input-shake');
+    setTimeout(() => input && input.classList.remove('name-input-shake'), 400);
+    return;
+  }
+  playerName = raw.slice(0, 16).toUpperCase();
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(`set_name|${CLIENT_ID}|${playerName}`);
+  }
+  document.getElementById('screen-name').classList.add('hidden');
+  document.getElementById('screen-pack').classList.remove('hidden');
+}
+
 function connect() {
   try {
     _wsHadOpenThisAttempt = false;
@@ -385,6 +404,7 @@ function connect() {
       clearTimeout(reconnectTimer);
       sendPackType();
       updatePossessionWS();
+      if (playerName) ws.send(`set_name|${CLIENT_ID}|${playerName}`);
     };
     ws.onclose = () => {
       setStatus(false);
