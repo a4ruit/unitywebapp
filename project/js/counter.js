@@ -72,8 +72,13 @@ function updateCounterDisplay() {
 
 function consumePack() {
   if (packsLeft <= 0) {
-    showGate();
-    return false;
+    if (document.body.classList.contains('pristine-phase')) {
+      // Pristine phase: no gate — just silently refill and continue
+      packsLeft = PACKS_PER_BATCH;
+    } else {
+      showGate();
+      return false;
+    }
   }
   packsLeft--;
   updateCounterDisplay();
