@@ -12,11 +12,16 @@
   <div class="bg-grid"></div>
   <div class="flash-overlay" id="flashOverlay"></div>
 
-  <!-- DEBUG: phase toggle (temporary — remove before production) -->
-  <button class="debug-phase-btn" id="debugPhaseBtn" onclick="debugTogglePhase()">▸ horror</button>
-  <button class="debug-phase-btn debug-boss-btn"        onclick="debugSpawnBoss()">spawn boss</button>
-  <button class="debug-phase-btn debug-fleshling-btn"   onclick="debugSpawnFleshling()">spawn fleshling</button>
-  <button class="debug-phase-btn debug-blindbox-btn"    onclick="debugSpawnBlindBox()">spawn blind box</button>
+  <!-- DEBUG: collapsible dropdown (temporary — remove before production) -->
+  <div id="debug-menu">
+    <button id="debug-menu-trigger" onclick="debugMenuToggle(event)">⚙</button>
+    <div id="debug-menu-items">
+      <button id="debugPhaseBtn" onclick="debugTogglePhase(); debugMenuClose()">▸ horror</button>
+      <button onclick="debugSpawnBoss(); debugMenuClose()">spawn boss</button>
+      <button onclick="debugSpawnFleshling(); debugMenuClose()">spawn fleshling</button>
+      <button onclick="debugSpawnBlindBox(); debugMenuClose()">spawn blind box</button>
+    </div>
+  </div>
   <div class="god-pack-banner hidden" id="godPackBanner">
     <span class="god-banner-star">★</span>
     <span class="god-banner-text">GOD PACK</span>

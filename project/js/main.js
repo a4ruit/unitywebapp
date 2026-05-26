@@ -783,6 +783,25 @@ updatePackCarousel(activePackType);
 setTickerState('idle');
 initCounter();
 
+// ── DEBUG: dropdown menu (temporary) ─────────────────────────────────────
+// All debug actions live under a single ⚙ toggle in the top-left corner so
+// they don't interfere with playtesting. Tap the gear to expand, tap any
+// action to fire + auto-close, tap outside to dismiss.
+// Remove this block + the HTML markup + the CSS rule before production.
+
+function debugMenuToggle(e) {
+  e.stopPropagation();   // prevent the document handler below from immediately closing it
+  document.getElementById('debug-menu').classList.toggle('open');
+}
+function debugMenuClose() {
+  document.getElementById('debug-menu').classList.remove('open');
+}
+// Close when tapping anywhere outside the menu
+document.addEventListener('click', function(e) {
+  const menu = document.getElementById('debug-menu');
+  if (menu && !menu.contains(e.target)) debugMenuClose();
+});
+
 // ── DEBUG: phase toggle (temporary) ───────────────────────────────────────
 // Flips personalPacksOpened between 0 (pristine) and HORROR_THRESHOLD so the
 // transition logic — tab swaps, glitch effect, pack type sync — fires exactly

@@ -2081,45 +2081,63 @@ body.fungi-active #packTypeAdpack:not(.active) .pack-type-icon {
   color: #a07848 !important;
 }
 
-/* ── DEBUG: phase toggle button (temporary) ──────────────────────────────── */
+/* ── DEBUG: collapsible dropdown (temporary) ─────────────────────────────── */
 
-.debug-phase-btn {
+#debug-menu {
   position: fixed;
   top: 8px;
   left: 8px;
   z-index: 9999;
-  background: rgba(10, 10, 10, 0.5);
-  border: 1px solid rgba(200, 200, 200, 0.25);
-  color: rgba(220, 220, 220, 0.6);
+  opacity: 0.35;
+  transition: opacity 0.2s ease;
+}
+#debug-menu:hover,
+#debug-menu.open { opacity: 0.85; }
+
+#debug-menu-trigger {
+  display: block;
+  background: rgba(10, 10, 10, 0.6);
+  border: 1px solid rgba(200, 200, 200, 0.2);
+  color: rgba(200, 200, 200, 0.5);
+  font-family: inherit;
+  font-size: 11px;
+  padding: 3px 7px;
+  cursor: pointer;
+  line-height: 1;
+}
+#debug-menu.open #debug-menu-trigger {
+  border-color: rgba(200, 200, 200, 0.45);
+  color: rgba(220, 220, 220, 0.9);
+}
+
+#debug-menu-items {
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 3px;
+}
+#debug-menu.open #debug-menu-items { display: flex; }
+
+#debug-menu-items button {
+  background: rgba(10, 10, 10, 0.75);
+  border: 1px solid rgba(200, 200, 200, 0.18);
+  color: rgba(210, 210, 210, 0.75);
   font-family: inherit;
   font-size: 9px;
   letter-spacing: 0.08em;
-  padding: 4px 8px;
+  padding: 5px 10px;
   cursor: pointer;
-  opacity: 0.45;
-  transition: opacity 0.2s ease;
+  text-align: left;
+  white-space: nowrap;
+  transition: background 0.1s;
 }
-.debug-phase-btn:active { opacity: 1; }
-.debug-phase-btn[data-phase="horror"] {
+#debug-menu-items button:active {
+  background: rgba(40, 40, 40, 0.9);
+}
+/* Phase-toggle: tint red when horror is active */
+#debugPhaseBtn[data-phase="horror"] {
   border-color: rgba(204, 17, 17, 0.5);
-  color: rgba(220, 80, 80, 0.85);
-}
-
-/* Stack the secondary debug buttons below the phase toggle */
-.debug-boss-btn {
-  top: 36px;
-  border-color: rgba(204, 17, 17, 0.4);
-  color: rgba(220, 80, 80, 0.75);
-}
-.debug-fleshling-btn {
-  top: 64px;
-  border-color: rgba(180, 40, 80, 0.4);
-  color: rgba(220, 100, 140, 0.75);
-}
-.debug-blindbox-btn {
-  top: 92px;
-  border-color: rgba(120, 90, 140, 0.4);
-  color: rgba(180, 150, 200, 0.75);
+  color: rgba(220, 80, 80, 0.9);
 }
 
 /* ── HORROR ROULETTE (Three.js) ──────────────────────────────────────────── */
