@@ -29,7 +29,7 @@
 // ── Version stamp ──────────────────────────────────────────────────────────
 // If you don't see this in the console on page load, your browser is serving
 // cached possession.js — hard refresh (Ctrl+Shift+R) or disable cache in DevTools.
-console.log('%c[possession.js] v2026-05-26b — joystick left + background block + placement row',
+console.log('%c[possession.js] v2026-05-26c — in-screen timer overlay + fox pounce arc',
   'color:#00c8b4; font-weight:bold');
 
 // ── TURN server configuration ──────────────────────────────────────────────
@@ -651,36 +651,47 @@ function _buildUI() {
       z-index: 2;
     }
 
-    /* ── Footer: HP-style stat bars ── */
-    #gb-footer {
-      flex: 0 0 18%;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: 3px;
-      padding: 4px 8px;
-      background: linear-gradient(to top, #3a5e3a 0%, #243e24 100%);
-      border-top: 2px solid #0d1a0d;
-      box-shadow: inset 0 2px 0 #4a7a4a;
-    }
-    .gb-stat {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 9px;
-      letter-spacing: 2px;
-    }
-    .gb-stat-label {
-      color: #ff5050;            /* RPG-stat red, matches reference */
+    /* ── Footer: collapsed — timer moved into the screen as an overlay ── */
+    #gb-footer { display: none; }
+
+    /* ── In-screen countdown timer ────────────────────────────────────────
+       Sits at the bottom-centre of #gb-screen, above the LCD pixel grid
+       (z-index 3 > grid's 2). Large enough to read at a glance.
+       Blinks red when time is low (≤ 9 s).                               */
+    #gb-timer {
+      position: absolute;
+      bottom: 7px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 3;
+      font-family: "Share Tech Mono", "VT323", monospace;
+      font-size: 22px;
       font-weight: bold;
-      text-shadow: 1px 1px 0 #000;
-      min-width: 32px;
+      color: #ffe7a0;
+      /* Dark halo so it pops against any video background */
+      text-shadow:
+        0 0 6px rgba(0,0,0,0.95),
+        1px  1px 0 #000,
+       -1px -1px 0 #000,
+        1px -1px 0 #000,
+       -1px  1px 0 #000;
+      letter-spacing: 3px;
+      pointer-events: none;
+      white-space: nowrap;
     }
-    .gb-stat-value {
-      color: #ffe7a0;            /* warm pale yellow numbers */
-      text-shadow: 1px 1px 0 #000;
-      font-variant-numeric: tabular-nums;   /* prevents jitter as digits change */
+    #gb-timer.timer-low {
+      color: #ff5050;
+      animation: gb-timer-blink 0.65s step-end infinite;
     }
+    @keyframes gb-timer-blink {
+      0%, 100% { opacity: 1;   }
+      50%      { opacity: 0.25; }
+    }
+    /* Horror-theme override during Blind Box possession */
+    #gb-frame.box-mode #gb-timer { color: #ffaaaa; }
+
+    /* Kept for any residual CSS refs (box-mode overrides etc.) — no DOM use */
+    .gb-stat, .gb-stat-label, .gb-stat-value { /* legacy, not rendered */ }
     #poss-video {
       width: 100%;
       height: 100%;
@@ -1260,6 +1271,8 @@ function _buildUI() {
             <!-- LCD pixel grid: thin dark lines every few pixels so the
                  upscaled video reads as a real-LCD pixel matrix.          -->
             <div id="gb-lcd-grid"></div>
+            <!-- Countdown timer — centered at the bottom of the screen -->
+            <div id="gb-timer">0:30</div>
             <div id="poss-video-label">
               <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
               <div id="poss-loading-bar"></div>
@@ -1324,11 +1337,9 @@ function _buildUI() {
     secs:             root.querySelector('#poss-secs'),
     eaten:            root.querySelector('#poss-eaten'),
     eatenCount:       root.querySelector('#poss-eaten-count'),
-    // Game Boy Color in-card stat readouts
+    // Game Boy Color in-card readouts
     gbTitle:          root.querySelector('#gb-title'),
-    gbTime:           root.querySelector('#gb-time'),
-    gbActionLabel:    root.querySelector('#gb-action-label'),
-    gbActionValue:    root.querySelector('#gb-action-value'),
+    gbTimer:          root.querySelector('#gb-timer'),
     vidWrap:          root.querySelector('#poss-video-wrap'),
     video:            root.querySelector('#poss-video'),
     vidLabel:         root.querySelector('#poss-video-label'),
@@ -1498,6 +1509,16 @@ function _flap() {
   send(`duck_flap|${CLIENT_ID}`);
 }
 
+// Writes the countdown into #gb-timer and adds .timer-low when ≤ 9 s.
+function _setGbTimer(secsLeft) {
+  if (!_ui || !_ui.gbTimer) return;
+  const s = Math.max(0, secsLeft | 0);
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  _ui.gbTimer.textContent = mm + ':' + String(ss).padStart(2, '0');
+  _ui.gbTimer.classList.toggle('timer-low', s <= 9);
+}
+
 function _onGranted(duration, creature) {
   _possessed     = true;
   _creatureType  = creature;   // 'sheep' | 'duck' | 'fox'
@@ -1518,16 +1539,9 @@ function _onGranted(duration, creature) {
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
 
   // ── Game Boy Color in-card readouts ──
-  // Wordmark, action-button label, and initial stat values. Format numbers
-  // RPG-style with a leading zero pad ("030/030", "000") so the digit widths
-  // stay constant as values change.
-  const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
-  if (_ui.gbTitle)       _ui.gbTitle.textContent       = creature === 'fox'  ? 'FOX CAM'  :
-                                                         creature === 'duck' ? 'DUCK CAM' : 'SHEEP CAM';
-  if (_ui.gbTime)        _ui.gbTime.textContent        = `${pad3(duration)}/${pad3(duration)}`;
-  if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = creature === 'fox'  ? 'POUNCE' :
-                                                         creature === 'duck' ? 'FLAP'   : 'EAT';
-  if (_ui.gbActionValue) _ui.gbActionValue.textContent = '000';
+  if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'  ? 'FOX CAM'  :
+                                             creature === 'duck' ? 'DUCK CAM' : 'SHEEP CAM';
+  _setGbTimer(duration);
 
   // Show the action button that matches the creature
   if (creature === 'duck') {
@@ -1614,11 +1628,7 @@ function _onDuckSpawned() {
 
 function _onTick(secsLeft) {
   _ui.secs.textContent = secsLeft;
-  // Mirror to the GBC TIME stat in "cur/total" RPG-bar format
-  if (_ui.gbTime) {
-    const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
-    _ui.gbTime.textContent = `${pad3(secsLeft)}/${pad3(_grantDuration)}`;
-  }
+  _setGbTimer(secsLeft);
 }
 
 /**
@@ -1629,10 +1639,6 @@ function _onSheepAte(total) {
   _ui.eatenCount.textContent = total;
   _ui.eaten.classList.add('bump');
   setTimeout(() => _ui.eaten && _ui.eaten.classList.remove('bump'), 150);
-  // Mirror to the GBC EAT counter (zero-padded for that fixed-width RPG feel)
-  if (_ui.gbActionValue) {
-    _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
-  }
 }
 
 /**
@@ -1641,10 +1647,7 @@ function _onSheepAte(total) {
  * stream instead), but the hook is here for future UI feedback.
  */
 function _onDuckFlapped(total) {
-  // Mirror to the GBC FLAP counter — same zero-padded pattern as EAT
-  if (_ui.gbActionValue) {
-    _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
-  }
+  // Hook retained for future UI feedback — currently no counter displayed
 }
 
 /**
@@ -1664,9 +1667,7 @@ function _onFoxSpawned() {
  * Updates the GBC POUNCE counter in the in-card HUD.
  */
 function _onFoxPounced(total) {
-  if (_ui.gbActionValue) {
-    _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
-  }
+  // Hook retained — pounce count could be shown here in future
 }
 
 // ── Placement (user-driven card spawning) ──────────────────────────────────
@@ -1892,12 +1893,9 @@ function _onBoxGranted(duration) {
   const gbFrame = _ui.root.querySelector('#gb-frame');
   if (gbFrame) gbFrame.classList.add('box-mode');
 
-  // GBC stat readouts
-  const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
-  if (_ui.gbTitle)       _ui.gbTitle.textContent       = 'BOX CAM';
-  if (_ui.gbTime)        _ui.gbTime.textContent        = `${pad3(duration)}/${pad3(duration)}`;
-  if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = 'ROLL';
-  if (_ui.gbActionValue) _ui.gbActionValue.textContent = '---';
+  // GBC readouts
+  if (_ui.gbTitle) _ui.gbTitle.textContent = 'BOX CAM';
+  _setGbTimer(duration);
 
   // Joystick + release + OPEN BOX; no EAT or FLAP — boxes don't have mouths or wings
   _ui.joyZone.style.display    = 'flex';
@@ -1935,10 +1933,7 @@ function _onBoxDenied() {
 }
 
 function _onBoxTick(secsLeft) {
-  if (_ui.gbTime) {
-    const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
-    _ui.gbTime.textContent = `${pad3(secsLeft)}/${pad3(_grantDuration)}`;
-  }
+  _setGbTimer(secsLeft);
 }
 
 function _onEnded() {
@@ -2004,6 +1999,8 @@ function _onEnded() {
 
   // Lift the background block — pack carousel is interactive again
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'none';
+  // Reset timer so it never starts the next session in the red-blink state
+  if (_ui.gbTimer) _ui.gbTimer.classList.remove('timer-low');
   _ui.timer.style.display    = 'none';
   _ui.eaten.style.display    = 'none';
   _ui.vidWrap.style.display  = 'none';
