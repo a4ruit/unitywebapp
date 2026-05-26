@@ -29,7 +29,7 @@
 // ── Version stamp ──────────────────────────────────────────────────────────
 // If you don't see this in the console on page load, your browser is serving
 // cached possession.js — hard refresh (Ctrl+Shift+R) or disable cache in DevTools.
-console.log('%c[possession.js] v2026-05-26c — in-screen timer overlay + fox pounce arc',
+console.log('%c[possession.js] v2026-05-26d — boss spawn haptics',
   'color:#00c8b4; font-weight:bold');
 
 // ── TURN server configuration ──────────────────────────────────────────────
@@ -364,6 +364,15 @@ function handlePossessionMessage(data) {
       }
       return true;
     }
+  }
+
+  // ── Horror phase broadcasts (no clientId filter — sent to ALL phones) ────────
+  // Format: boss_spawned|{maxHP}
+  // Unity broadcasts this the moment FleshBoss.Spawn() completes. Every
+  // connected phone receives it, so we vibrate all of them simultaneously.
+  if (msg.startsWith('boss_spawned|') || msg === 'boss_spawned') {
+    _onBossSpawned();
+    return true;
   }
 
   // Unity sends the WebRTC offer once the possession camera is ready.
@@ -1668,6 +1677,23 @@ function _onFoxSpawned() {
  */
 function _onFoxPounced(total) {
   // Hook retained — pounce count could be shown here in future
+}
+
+// ── Horror phase lifecycle ─────────────────────────────────────────────────
+
+/**
+ * FleshBoss has entered the world. Vibrate every connected phone simultaneously
+ * so the arrival is felt, not just seen.
+ *
+ * Pattern: two short warning pulses → one long deep impact.
+ * Reads as "WARNING… WARNING… [THUD]" — unavoidable on Android.
+ * iOS Safari silently ignores navigator.vibrate(), so it degrades gracefully.
+ */
+function _onBossSpawned() {
+  if (navigator.vibrate) {
+    navigator.vibrate([200, 80, 200, 80, 600]);
+  }
+  console.log('[possession.js] Boss spawned — haptic fired');
 }
 
 // ── Placement (user-driven card spawning) ──────────────────────────────────
