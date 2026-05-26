@@ -29,7 +29,7 @@
 // ── Version stamp ──────────────────────────────────────────────────────────
 // If you don't see this in the console on page load, your browser is serving
 // cached possession.js — hard refresh (Ctrl+Shift+R) or disable cache in DevTools.
-console.log('%c[possession.js] v2025-05-23 — fungi spore panel + requestPlacement global',
+console.log('%c[possession.js] v2026-05-26 — red fox possession + pounce UI',
   'color:#00c8b4; font-weight:bold');
 
 // ── TURN server configuration ──────────────────────────────────────────────
@@ -100,10 +100,13 @@ let _grantDuration  = 30;
 // CURRENT page-life. Reload = locked again. No persistence on purpose.
 let _sheepAvailable = false;
 let _duckAvailable  = false;
+let _foxAvailable   = false;
 // Which creature is currently possessed — drives which WS verbs to send for
 // joystick input + action button. Null when nothing is being possessed.
 //   'sheep' → sheep_input / sheep_eat / possess_end
 //   'duck'  → duck_input  / duck_flap / duck_possess_end
+//   'fox'   → fox_input   / fox_pounce / fox_possess_end
+//   'box'   → box_input   / box_open  / box_possess_end
 let _creatureType   = null;
 // Clean up any leftover flag from prior versions that persisted across reloads.
 try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
@@ -136,6 +139,8 @@ function updatePossessionWS() {
     _ui.btn.style.opacity     = '1';
     _ui.duckBtn.textContent   = 'Inhabit a duck';
     _ui.duckBtn.style.opacity = '1';
+    _ui.foxBtn.textContent    = 'Inhabit a fox';
+    _ui.foxBtn.style.opacity  = '1';
     _ui.boxBtn.textContent    = 'Inhabit the Blind Box';
     _ui.boxBtn.style.opacity  = '1';
   }
@@ -238,6 +243,34 @@ function handlePossessionMessage(data) {
     const parts     = msg.split('|');
     const spawnerId = parts[1];
     if (spawnerId === CLIENT_ID) _onDuckSpawned();
+    return true;
+  }
+
+  // ── Fox possession lifecycle ───────────────────────────────────────────────
+  if (msg.startsWith('fox_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'fox'); return true; }
+  }
+  if (msg.startsWith('fox_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('fox'); return true; }
+  }
+  if (msg.startsWith('fox_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded(); return true; }
+  }
+  if (msg.startsWith('fox_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+  if (msg.startsWith('fox_pounced|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onFoxPounced(Number(parts[2])); return true; }
+  }
+  if (msg === 'fox_spawned' || msg.startsWith('fox_spawned|') || msg.startsWith('fox_spawned ')) {
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onFoxSpawned();
     return true;
   }
 
@@ -413,7 +446,7 @@ function _buildUI() {
     #poss-duck-btn {
       pointer-events: all;
       position: absolute;
-      bottom: 184px;   /* stacked above #poss-btn */
+      bottom: 184px;   /* stacked above #poss-btn: sheep=140 duck=184 fox=228 box=272 */
       left: 50%;
       transform: translateX(-50%);
       padding: 12px 28px;
@@ -430,6 +463,62 @@ function _buildUI() {
     }
     #poss-duck-btn:active { background: rgba(255,176,48,0.3); }
     #poss-duck-btn.poss-hidden { display: none; }
+
+    /* ── Fox inhabit button (sits above the duck button) ── */
+    #poss-fox-btn {
+      pointer-events: all;
+      position: absolute;
+      bottom: 228px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 28px;
+      background: rgba(255,100,10,0.12);
+      border: 2px solid rgba(255,100,10,0.6);
+      color: #ff640a;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+    #poss-fox-btn:active { background: rgba(255,100,10,0.3); }
+    #poss-fox-btn.poss-hidden { display: none; }
+
+    /* ── Pounce button (right thumb, replaces EAT/FLAP during FOX possession) ── */
+    #poss-pounce {
+      pointer-events: all;
+      position: absolute;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(255,100,10,0.18);
+      border: 2px solid rgba(255,100,10,0.85);
+      color: #ff640a;
+      font-family: monospace;
+      font-size: 14px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      text-shadow: 0 0 8px rgba(255,100,10,0.7);
+      box-shadow: 0 0 12px rgba(255,100,10,0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-pounce:active {
+      background: rgba(255,100,10,0.45);
+      transform: scale(0.92);
+    }
 
     /* ── Flap button (right thumb, replaces EAT during DUCK possession) ── */
     #poss-flap {
@@ -990,13 +1079,13 @@ function _buildUI() {
     }
 
     /* ── Blind Box inhabit button ──────────────────────────────────────────
-       Horror red — sits above the sheep and duck buttons. Pulses with a
-       slow blood-glow so it reads as "wrong" in the nature phase and
-       "inevitable" in the horror phase.                                    */
+       Horror red — sits above the sheep, duck, and fox buttons. Pulses
+       with a slow blood-glow so it reads as "wrong" in the nature phase
+       and "inevitable" in the horror phase.                               */
     #poss-box-btn {
       pointer-events: all;
       position: absolute;
-      bottom: 228px;
+      bottom: 272px;
       left: 50%;
       transform: translateX(-50%);
       padding: 12px 28px;
@@ -1116,6 +1205,7 @@ function _buildUI() {
   root.id = 'poss-root';
   root.innerHTML = `
     <button id="poss-box-btn">Inhabit the Blind Box</button>
+    <button id="poss-fox-btn">Inhabit a fox</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
@@ -1165,6 +1255,7 @@ function _buildUI() {
     </div>
     <button id="poss-eat">EAT</button>
     <button id="poss-flap">FLAP</button>
+    <button id="poss-pounce">POUNCE</button>
     <button id="poss-place">PLACE</button>
     <button id="poss-open-box">OPEN<br>BOX</button>
     <button id="poss-release">release</button>
@@ -1194,6 +1285,7 @@ function _buildUI() {
     root:             root,
     btn:              root.querySelector('#poss-btn'),
     duckBtn:          root.querySelector('#poss-duck-btn'),
+    foxBtn:           root.querySelector('#poss-fox-btn'),
     boxBtn:           root.querySelector('#poss-box-btn'),
     blindScreen:      root.querySelector('#poss-blind-screen'),
     timer:            root.querySelector('#poss-timer'),
@@ -1215,6 +1307,7 @@ function _buildUI() {
     openBox:          root.querySelector('#poss-open-box'),
     eat:              root.querySelector('#poss-eat'),
     flap:             root.querySelector('#poss-flap'),
+    pounce:           root.querySelector('#poss-pounce'),
     place:            root.querySelector('#poss-place'),
     placeOverlay:     root.querySelector('#poss-place-overlay'),
     placeCardContent: root.querySelector('#poss-place-card-content'),
@@ -1227,22 +1320,25 @@ function _buildUI() {
 
   _ui.btn.addEventListener('click',        _requestPossession);
   _ui.duckBtn.addEventListener('click',    _requestDuckPossession);
+  _ui.foxBtn.addEventListener('click',     _requestFoxPossession);
   _ui.boxBtn.addEventListener('click',     _requestBoxPossession);
   _ui.openBox.addEventListener('click',    _openBox);
   _ui.release.addEventListener('click',    _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
-  _ui.eat.addEventListener('touchstart',   e => { e.preventDefault(); _eat();          }, { passive: false });
-  _ui.eat.addEventListener('click',        _eat);
-  _ui.flap.addEventListener('touchstart',  e => { e.preventDefault(); _flap();         }, { passive: false });
-  _ui.flap.addEventListener('click',       _flap);
-  _ui.place.addEventListener('touchstart', e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
-  _ui.place.addEventListener('click',      _confirmPlace);
+  _ui.eat.addEventListener('touchstart',    e => { e.preventDefault(); _eat();          }, { passive: false });
+  _ui.eat.addEventListener('click',         _eat);
+  _ui.flap.addEventListener('touchstart',   e => { e.preventDefault(); _flap();         }, { passive: false });
+  _ui.flap.addEventListener('click',        _flap);
+  _ui.pounce.addEventListener('touchstart', e => { e.preventDefault(); _pounce();       }, { passive: false });
+  _ui.pounce.addEventListener('click',      _pounce);
+  _ui.place.addEventListener('touchstart',  e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
+  _ui.place.addEventListener('click',       _confirmPlace);
   // Spore button — touchstart for zero-latency on mobile, click as desktop fallback
   _ui.sporeBtn.addEventListener('touchstart', e => { e.preventDefault(); _triggerSpore(); }, { passive: false });
   _ui.sporeBtn.addEventListener('click',      _triggerSpore);
   _setupJoystick();
 
-  // Hide both Inhabit buttons until the matching creature has been pulled.
+  // Hide all Inhabit buttons until the matching creature has been pulled.
   if (!_sheepAvailable) {
     _ui.btn.classList.add('poss-hidden');
     console.log('[possession.js] Sheep button locked — waiting for first sheep_spawned');
@@ -1250,6 +1346,10 @@ function _buildUI() {
   if (!_duckAvailable) {
     _ui.duckBtn.classList.add('poss-hidden');
     console.log('[possession.js] Duck button locked — waiting for first duck_spawned');
+  }
+  if (!_foxAvailable) {
+    _ui.foxBtn.classList.add('poss-hidden');
+    console.log('[possession.js] Fox button locked — waiting for first fox_spawned');
   }
   // Box button is always hidden until blind_box_spawned|clientId arrives
   _ui.boxBtn.classList.add('poss-hidden');
@@ -1331,9 +1431,24 @@ function _requestDuckPossession() {
   send(`duck_possess_request|${CLIENT_ID}`);
 }
 
+function _requestFoxPossession() {
+  _ui.foxBtn.textContent   = 'Requesting…';
+  _ui.foxBtn.style.opacity = '0.5';
+  // iOS Safari autoplay priming — same as sheep/duck
+  _ui.video.muted = true;
+  _ui.video.play().catch(() => {});
+  send(`fox_possess_request|${CLIENT_ID}`);
+}
+
+function _pounce() {
+  if (!_possessed || _creatureType !== 'fox') return;
+  send(`fox_pounce|${CLIENT_ID}`);
+}
+
 function _releasePossession() {
   // Send the verb that matches whichever creature we currently inhabit
   if      (_creatureType === 'duck') send(`duck_possess_end|${CLIENT_ID}`);
+  else if (_creatureType === 'fox')  send(`fox_possess_end|${CLIENT_ID}`);
   else if (_creatureType === 'box')  send(`box_possess_end|${CLIENT_ID}`);
   else                               send(`possess_end|${CLIENT_ID}`);
   _onEnded();   // optimistic — server will confirm with the matching ended message
@@ -1351,14 +1466,14 @@ function _flap() {
 
 function _onGranted(duration, creature) {
   _possessed     = true;
-  _creatureType  = creature;   // 'sheep' or 'duck'
+  _creatureType  = creature;   // 'sheep' | 'duck' | 'fox'
   _grantDuration = duration;
 
-  // Hide BOTH inhabit buttons during a possession (regardless of which one
-  // was just granted). The other one comes back via _onEnded if its credit
-  // is still available.
+  // Hide ALL inhabit buttons during a possession (regardless of which one
+  // was just granted). They come back via _onEnded if credits are still live.
   _ui.btn.classList.add('poss-hidden');
   _ui.duckBtn.classList.add('poss-hidden');
+  _ui.foxBtn.classList.add('poss-hidden');
 
   _ui.vidWrap.style.display  = 'block';
   _ui.vidLabel.style.display = 'flex';   // show "CONNECTING…" until first frame
@@ -1371,19 +1486,27 @@ function _onGranted(duration, creature) {
   // RPG-style with a leading zero pad ("030/030", "000") so the digit widths
   // stay constant as values change.
   const pad3 = n => String(Math.max(0, n | 0)).padStart(3, '0');
-  if (_ui.gbTitle)       _ui.gbTitle.textContent       = creature === 'duck' ? 'DUCK CAM' : 'SHEEP CAM';
+  if (_ui.gbTitle)       _ui.gbTitle.textContent       = creature === 'fox'  ? 'FOX CAM'  :
+                                                         creature === 'duck' ? 'DUCK CAM' : 'SHEEP CAM';
   if (_ui.gbTime)        _ui.gbTime.textContent        = `${pad3(duration)}/${pad3(duration)}`;
-  if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = creature === 'duck' ? 'FLAP' : 'EAT';
+  if (_ui.gbActionLabel) _ui.gbActionLabel.textContent = creature === 'fox'  ? 'POUNCE' :
+                                                         creature === 'duck' ? 'FLAP'   : 'EAT';
   if (_ui.gbActionValue) _ui.gbActionValue.textContent = '000';
 
-  // Show the action button that matches the creature: EAT for sheep, FLAP for duck
+  // Show the action button that matches the creature
   if (creature === 'duck') {
-    _ui.flap.style.display  = 'flex';
-    _ui.eat.style.display   = 'none';
+    _ui.flap.style.display   = 'flex';
+    _ui.eat.style.display    = 'none';
+    _ui.pounce.style.display = 'none';
+  } else if (creature === 'fox') {
+    _ui.pounce.style.display = 'flex';
+    _ui.eat.style.display    = 'none';
+    _ui.flap.style.display   = 'none';
   } else {
-    _ui.eat.style.display       = 'flex';
-    _ui.flap.style.display      = 'none';
-    _ui.eatenCount.textContent  = '0';
+    _ui.eat.style.display        = 'flex';
+    _ui.flap.style.display       = 'none';
+    _ui.pounce.style.display     = 'none';
+    _ui.eatenCount.textContent   = '0';
   }
 
   // Restart the 10s loading-bar animation by toggling the class with a reflow
@@ -1396,7 +1519,8 @@ function _onGranted(duration, creature) {
   // connected even while idle. Drops the per-player message rate from a
   // constant 20/s to ~1–2/s when the stick is centred. Verb depends on
   // what's being possessed.
-  const inputVerb = creature === 'duck' ? 'duck_input' : 'sheep_input';
+  const inputVerb = creature === 'fox'  ? 'fox_input'  :
+                    creature === 'duck' ? 'duck_input' : 'sheep_input';
   _resetInputSendTracking();  // first tick always fires
   _inputInterval = setInterval(() => {
     if (_shouldSendInput()) {
@@ -1413,8 +1537,10 @@ function _onDenied(creature) {
   // Denial can mean (a) someone else grabbed this creature, (b) the manager
   // is at its concurrent-stream cap, or (c) no spawned creatures remain.
   // Flash a short "STREAMS FULL" label, then restore the normal button text.
-  const btn = creature === 'duck' ? _ui.duckBtn : _ui.btn;
-  const restore = creature === 'duck' ? 'Inhabit a duck' : 'Inhabit a sheep';
+  const btn     = creature === 'fox'  ? _ui.foxBtn  :
+                  creature === 'duck' ? _ui.duckBtn : _ui.btn;
+  const restore = creature === 'fox'  ? 'Inhabit a fox'  :
+                  creature === 'duck' ? 'Inhabit a duck' : 'Inhabit a sheep';
   btn.textContent   = 'Streams full — wait';
   btn.style.opacity = '0.6';
   setTimeout(() => {
@@ -1480,6 +1606,28 @@ function _onSheepAte(total) {
  */
 function _onDuckFlapped(total) {
   // Mirror to the GBC FLAP counter — same zero-padded pattern as EAT
+  if (_ui.gbActionValue) {
+    _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
+  }
+}
+
+/**
+ * Called when Unity broadcasts that a fox has spawned (rare critter pack).
+ * Unlocks the fox inhabit button. Each fox card grants one possession.
+ */
+function _onFoxSpawned() {
+  _foxAvailable = true;
+  if (_ui && !_possessed) {
+    _ui.foxBtn.classList.remove('poss-hidden');
+    console.log('[possession.js] Fox card pulled — fox Inhabit button unlocked');
+  }
+}
+
+/**
+ * Called when Unity confirms the fox successfully pounced.
+ * Updates the GBC POUNCE counter in the in-card HUD.
+ */
+function _onFoxPounced(total) {
   if (_ui.gbActionValue) {
     _ui.gbActionValue.textContent = String(Math.max(0, total | 0)).padStart(3, '0');
   }
@@ -1684,6 +1832,7 @@ function _onBoxGranted(duration) {
   // Hide all inhabit buttons while inside the box
   _ui.btn.classList.add('poss-hidden');
   _ui.duckBtn.classList.add('poss-hidden');
+  _ui.foxBtn.classList.add('poss-hidden');
   _ui.boxBtn.classList.add('poss-hidden');
 
   // Show GBC card. The video element receives a blurry WebRTC overhead feed —
@@ -1754,6 +1903,7 @@ function _onBoxTick(secsLeft) {
 
 function _onEnded() {
   const wasDuck = _creatureType === 'duck';
+  const wasFox  = _creatureType === 'fox';
   const wasBox  = _creatureType === 'box';
   _possessed    = false;
   clearInterval(_inputInterval);
@@ -1790,6 +1940,11 @@ function _onEnded() {
       _ui.openBox.disabled      = false;
       _ui.openBox.innerHTML     = 'OPEN<br>BOX';
     }
+  } else if (wasFox) {
+    // Each fox card pull = one possession. Lock the button until next fox card.
+    _foxAvailable = false;
+    _ui.foxBtn.textContent   = 'Inhabit a fox';
+    _ui.foxBtn.style.opacity = '1';
   } else if (wasDuck) {
     // Each duck card pull = one possession. Lock the button until next duck card.
     _duckAvailable = false;
@@ -1805,14 +1960,16 @@ function _onEnded() {
   // Restore buttons whose credits are still live
   if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
   if (_duckAvailable)  _ui.duckBtn.classList.remove('poss-hidden');
+  if (_foxAvailable)   _ui.foxBtn.classList.remove('poss-hidden');
 
-  _ui.timer.style.display   = 'none';
-  _ui.eaten.style.display   = 'none';
-  _ui.vidWrap.style.display = 'none';
-  _ui.joyZone.style.display = 'none';
-  _ui.release.style.display = 'none';
-  _ui.eat.style.display     = 'none';
-  _ui.flap.style.display    = 'none';
+  _ui.timer.style.display    = 'none';
+  _ui.eaten.style.display    = 'none';
+  _ui.vidWrap.style.display  = 'none';
+  _ui.joyZone.style.display  = 'none';
+  _ui.release.style.display  = 'none';
+  _ui.eat.style.display      = 'none';
+  _ui.flap.style.display     = 'none';
+  _ui.pounce.style.display   = 'none';
   _ui.joyKnob.style.transform = 'translate(-50%,-50%)';
 
   _creatureType = null;
