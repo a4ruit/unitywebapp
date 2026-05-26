@@ -80,6 +80,7 @@ const CardTextures = (() => {
   // its respective card. Add new symbols here as they're made.
   _loadSkin('symbol-leaf',       'assets/leaf-symbol.png');
   _loadSkin('symbol-critter',    'assets/critter-symbol.png');
+  _loadSkin('symbol-duck',       'assets/duck-card.png');
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
@@ -1303,6 +1304,16 @@ const CardTextures = (() => {
         const targetH = LAYOUT.symbolHeight;
         const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
         ctx.drawImage(sym, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+        return;
+      }
+    }
+    if (rarity === 'uncommon') {
+      const duck = _cardSkins['symbol-duck'];
+      if (duck && duck.complete && duck.naturalWidth > 0) {
+        ctx.imageSmoothingEnabled = false;
+        const targetH = LAYOUT.symbolHeight;
+        const targetW = targetH * (duck.naturalWidth / duck.naturalHeight);
+        ctx.drawImage(duck, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
         return;
       }
     }
