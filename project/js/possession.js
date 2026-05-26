@@ -29,7 +29,7 @@
 // ── Version stamp ──────────────────────────────────────────────────────────
 // If you don't see this in the console on page load, your browser is serving
 // cached possession.js — hard refresh (Ctrl+Shift+R) or disable cache in DevTools.
-console.log('%c[possession.js] v2026-05-26 — red fox possession + pounce UI',
+console.log('%c[possession.js] v2026-05-26b — joystick left + background block + placement row',
   'color:#00c8b4; font-weight:bold');
 
 // ── TURN server configuration ──────────────────────────────────────────────
@@ -763,13 +763,13 @@ function _buildUI() {
       to   { width: 100%; }
     }
 
-    /* ── Virtual joystick ── */
+    /* ── Virtual joystick — Game Boy layout: LEFT side ── */
     #poss-joy-zone {
       pointer-events: all;
       position: absolute;
       bottom: 28px;
-      left: 50%;
-      transform: translateX(-50%);
+      left: 24px;
+      transform: none;
       width: 156px;
       height: 156px;
       display: none;
@@ -864,15 +864,43 @@ function _buildUI() {
       padding-top: 4%;
     }
 
-    /* When joystick + PLACE button are children of the card, override their
-       fixed bottom/right positioning so they flow inside the card content. */
-    #poss-place-card-content #poss-joy-zone {
+    /* ── Block overlay — transparent full-screen div that eats all pointer
+       events while a creature is possessed, preventing accidental pack-
+       opening behind the possession cam window. Sits as the first child of
+       #poss-root so every button and joystick (later in DOM, higher in
+       stacking order) remains fully clickable on top of it.
+       z-index is irrelevant inside poss-root's stacking context; DOM order
+       is what matters — first = lowest = beneath all interactive children. */
+    #poss-block-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: all;
+      display: none;
+      background: transparent;
+    }
+
+    /* ── Placement controls row — Game Boy layout: joystick LEFT, PLACE RIGHT.
+       Fills the bottom portion of the placement card, below the header text.  */
+    #poss-place-controls {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    /* When joystick + PLACE button are children of the controls row, override
+       their fixed absolute positioning so they flow inside the flex row.
+       Joystick is scaled down slightly (120 → fits beside the 86px button). */
+    #poss-place-controls #poss-joy-zone {
       position: relative !important;
       top: auto !important; bottom: auto !important;
       left: auto !important; right: auto !important;
       transform: none !important;
+      width: 120px !important;
+      height: 120px !important;
     }
-    #poss-place-card-content #poss-place {
+    #poss-place-controls #poss-place {
       position: relative !important;
       top: auto !important; bottom: auto !important;
       left: auto !important; right: auto !important;
@@ -1204,6 +1232,9 @@ function _buildUI() {
   const root = document.createElement('div');
   root.id = 'poss-root';
   root.innerHTML = `
+    <!-- Block overlay — first in DOM = lowest stacking order within poss-root.
+         All buttons/joystick rendered on top; background page blocked below. -->
+    <div id="poss-block-overlay"></div>
     <button id="poss-box-btn">Inhabit the Blind Box</button>
     <button id="poss-fox-btn">Inhabit a fox</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
@@ -1266,7 +1297,8 @@ function _buildUI() {
         <div id="poss-place-card-backdrop"></div>
         <div id="poss-place-card-content">
           <div id="poss-place-card-header">WILDFLOWER<br>PLACEMENT</div>
-          <!-- joystick and PLACE button are moved here when placement starts -->
+          <!-- controls row: joystick appended LEFT, PLACE button appended RIGHT -->
+          <div id="poss-place-controls"></div>
         </div>
         <img id="poss-place-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
       </div>
@@ -1312,6 +1344,8 @@ function _buildUI() {
     placeOverlay:     root.querySelector('#poss-place-overlay'),
     placeCardContent: root.querySelector('#poss-place-card-content'),
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
+    placeControls:    root.querySelector('#poss-place-controls'),
+    blockOverlay:     root.querySelector('#poss-block-overlay'),
     // Fungi spore panel
     sporePanel:       root.querySelector('#poss-spore-panel'),
     sporeBtn:         root.querySelector('#poss-spore-btn'),
@@ -1480,6 +1514,8 @@ function _onGranted(duration, creature) {
   _ui.joyZone.style.display  = 'flex';
   _ui.release.style.display  = 'block';
   _ui.secs.textContent       = duration;
+  // Block the background (pack carousel, shop) — see #poss-block-overlay CSS
+  if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
 
   // ── Game Boy Color in-card readouts ──
   // Wordmark, action-button label, and initial stat values. Format numbers
@@ -1644,10 +1680,12 @@ function _onPlacementGranted(cardName) {
     _ui.placeCardHeader.innerHTML = label + '<br>PLACEMENT';
   }
 
-  // Move joystick + PLACE button INTO the placement card so they live
-  // inside the framed modal. They retain their event listeners.
-  _ui.placeCardContent.appendChild(_ui.joyZone);
-  _ui.placeCardContent.appendChild(_ui.place);
+  // Move joystick (left) + PLACE button (right) into the controls row so
+  // they sit side-by-side Game Boy-style inside the framed placement modal.
+  // They retain all existing event listeners after the DOM move.
+  const _placeTarget = _ui.placeControls || _ui.placeCardContent;
+  _placeTarget.appendChild(_ui.joyZone);
+  _placeTarget.appendChild(_ui.place);
   _ui.joyZone.style.display = 'flex';
   _ui.place.style.display   = 'flex';
 
@@ -1864,6 +1902,8 @@ function _onBoxGranted(duration) {
   // Joystick + release + OPEN BOX; no EAT or FLAP — boxes don't have mouths or wings
   _ui.joyZone.style.display    = 'flex';
   _ui.release.style.display    = 'block';
+  // Block background — same guard as critter possession
+  if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
   _ui.eat.style.display        = 'none';
   _ui.flap.style.display       = 'none';
   // OPEN BOX button — starts enabled; consumed once the lings are released
@@ -1962,6 +2002,8 @@ function _onEnded() {
   if (_duckAvailable)  _ui.duckBtn.classList.remove('poss-hidden');
   if (_foxAvailable)   _ui.foxBtn.classList.remove('poss-hidden');
 
+  // Lift the background block — pack carousel is interactive again
+  if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'none';
   _ui.timer.style.display    = 'none';
   _ui.eaten.style.display    = 'none';
   _ui.vidWrap.style.display  = 'none';
