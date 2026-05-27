@@ -308,15 +308,18 @@ let isGodPack = false;
 function rollPack() {
   const cards = [];
 
-  if (Math.random() < 0.0333) {
-    isGodPack = true;
-    cards.push(pick('mythical'));
-    cards.push(pick('luck-maxxing'));
-    cards.push(pick('legendary-alpha'));
-    cards.push(pick('legendary-alpha'));
-    cards.sort((a, b) => a.rarityRank - b.rarityRank);
-    return cards;
-  }
+  // TODO: God Pack disabled — concept not consolidated yet.
+  // Re-enable when the god-pack flow (flash → claim grid → Unity spawn_godpack)
+  // is fully designed. Original roll: Math.random() < 0.0333.
+  // if (Math.random() < 0.0333) {
+  //   isGodPack = true;
+  //   cards.push(pick('mythical'));
+  //   cards.push(pick('luck-maxxing'));
+  //   cards.push(pick('legendary-alpha'));
+  //   cards.push(pick('legendary-alpha'));
+  //   cards.sort((a, b) => a.rarityRank - b.rarityRank);
+  //   return cards;
+  // }
 
   isGodPack = false;
   const roll = Math.random();
