@@ -1930,8 +1930,8 @@ const Pack3D = (() => {
     const W = wrap.clientWidth  || 240;
     const H = wrap.clientHeight || 320;
 
-    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'low-power' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(W, H);
     renderer.setClearColor(0x000000, 0);
     wrap.appendChild(renderer.domElement);
