@@ -2250,29 +2250,45 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   width: 100%;
   box-sizing: border-box;
   padding: 0 8px;
-  margin: 2px 0 0;
+  margin: 3px 0 0;
   z-index: 20;
 }
+
+/* ── Trigger bar ── */
 .task-panel-trigger {
   width: 100%;
-  background: rgba(0, 0, 0, 0.42);
-  border: 1px solid rgba(200, 200, 180, 0.13);
-  color: rgba(200, 200, 170, 0.6);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(4, 10, 4, 0.85);
+  border: 1px solid rgba(90, 140, 90, 0.22);
+  color: rgba(140, 190, 130, 0.6);
   font-family: 'VT323', monospace;
-  font-size: 13px;
-  letter-spacing: 0.14em;
-  padding: 5px 10px;
-  text-align: left;
+  font-size: 15px;
+  letter-spacing: 0.1em;
+  padding: 6px 10px;
   cursor: pointer;
-  display: block;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  box-sizing: border-box;
+}
+.task-panel-trigger:active {
+  background: rgba(8, 20, 8, 0.95);
 }
 .task-panel--open .task-panel-trigger {
-  border-color: rgba(200, 200, 180, 0.28);
-  color: rgba(220, 220, 190, 0.85);
-  border-bottom-color: transparent;
+  border-color: rgba(90, 160, 90, 0.38);
+  color: rgba(160, 220, 150, 0.88);
+  border-bottom-color: rgba(90, 140, 90, 0.1);
+  background: rgba(4, 14, 4, 0.92);
 }
-/* Dropdown body — absolute, overlays carousel */
+.task-trigger-label { letter-spacing: 0.12em; }
+.task-trigger-count {
+  color: rgba(100, 160, 100, 0.5);
+  font-size: 13px;
+  letter-spacing: 0;
+}
+.task-panel--open .task-trigger-count { color: rgba(130, 190, 120, 0.75); }
+
+/* ── Dropdown body — absolute, overlays carousel ── */
 .task-panel-body-wrap {
   position: absolute;
   top: 100%;
@@ -2280,61 +2296,92 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   right: 8px;
   max-height: 0;
   overflow: hidden;
-  transition: max-height 0.22s ease;
-  background: rgba(6, 8, 6, 0.96);
-  border: 1px solid rgba(200, 200, 180, 0.13);
+  transition: max-height 0.2s ease;
+  background: rgba(3, 7, 3, 0.97);
+  /* Subtle scanline pattern */
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(0, 0, 0, 0.18) 3px,
+    rgba(0, 0, 0, 0.18) 4px
+  );
+  border: 1px solid rgba(90, 140, 90, 0.22);
   border-top: none;
   z-index: 20;
 }
 .task-panel--open .task-panel-body-wrap {
-  max-height: 220px;
+  max-height: 240px;
   overflow-y: auto;
 }
-/* Section headers */
+/* Pixel-thin scrollbar */
+.task-panel-body-wrap::-webkit-scrollbar       { width: 3px; }
+.task-panel-body-wrap::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.4); }
+.task-panel-body-wrap::-webkit-scrollbar-thumb { background: rgba(80, 140, 80, 0.35); }
+
+/* ── Section headers ── */
 .task-section-hdr {
   font-family: 'VT323', monospace;
-  font-size: 10px;
-  letter-spacing: 0.25em;
-  color: rgba(150, 150, 130, 0.55);
-  padding: 7px 10px 3px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  color: rgba(80, 130, 80, 0.7);
+  padding: 8px 10px 4px;
+  border-bottom: 1px solid rgba(80, 130, 80, 0.12);
 }
-.task-section-hdr--community { color: rgba(130, 160, 150, 0.55); }
-/* Task rows */
+.task-section-hdr--community { color: rgba(70, 130, 120, 0.7); }
+
+/* ── Task rows ── */
 .task-row {
   display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
+  align-items: baseline;
+  gap: 4px;
+  padding: 6px 10px 5px;
   font-family: 'VT323', monospace;
-  font-size: 13px;
-  color: rgba(195, 195, 175, 0.72);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 16px;
+  color: rgba(175, 210, 165, 0.72);
+  border-bottom: 1px solid rgba(80, 130, 80, 0.08);
+  line-height: 1;
 }
 .task-row--done {
-  color: rgba(80, 200, 100, 0.65);
+  color: rgba(70, 190, 90, 0.58);
 }
 .task-icon {
-  font-size: 11px;
-  min-width: 26px;
-  color: rgba(155, 155, 135, 0.65);
+  font-size: 14px;
+  min-width: 30px;
+  color: rgba(100, 150, 100, 0.6);
   flex-shrink: 0;
+  letter-spacing: 0;
 }
-.task-row--done .task-icon { color: rgba(80, 200, 100, 0.75); }
-.task-lbl  { flex: 1; font-size: 13px; }
+.task-row--done .task-icon { color: rgba(70, 190, 90, 0.75); }
+.task-lbl {
+  flex: 1;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+/* Block-character progress bar */
+.task-bar {
+  font-size: 13px;
+  letter-spacing: -1px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.task-bar-fill  { color: rgba(90, 190, 90, 0.75); }
+.task-bar-empty { color: rgba(30, 55, 30, 1); }
 .task-prog {
-  font-size: 11px;
-  color: rgba(170, 170, 150, 0.5);
+  font-size: 12px;
+  color: rgba(110, 150, 110, 0.5);
+  min-width: 30px;
+  text-align: right;
+  flex-shrink: 0;
+  letter-spacing: 0;
+}
+.task-rwd {
+  font-size: 14px;
+  color: #b8a060;
   min-width: 36px;
   text-align: right;
   flex-shrink: 0;
-}
-.task-rwd  {
-  font-size: 13px;
-  color: #ffe7a0;
-  min-width: 34px;
-  text-align: right;
-  flex-shrink: 0;
+  letter-spacing: 0;
 }
 
 /* ── QUEST REWARD TOAST ─────────────────────────────────────────────────────── */

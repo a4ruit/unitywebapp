@@ -133,6 +133,15 @@ const TaskTracker = (() => {
   function _i(id) { return _ind.find(t => t.id === id); }
   function _c(id) { return _com.find(t => t.id === id); }
 
+  // Block-character progress bar — e.g. ████░░░ (W chars wide)
+  function _bar(count, goal) {
+    const W = 7;
+    const f = goal > 0 ? Math.round((Math.min(count, goal) / goal) * W) : 0;
+    const fill  = '█'.repeat(f);
+    const empty = '░'.repeat(W - f);
+    return `<span class="task-bar"><span class="task-bar-fill">${fill}</span><span class="task-bar-empty">${empty}</span></span>`;
+  }
+
   function _maybeComplete(task) {
     if (task.done || task.count < task.goal) return;
     task.done = true;
@@ -167,26 +176,31 @@ const TaskTracker = (() => {
 
     const rows = [];
 
-    rows.push('<div class="task-section-hdr">MY TASKS</div>');
-    _ind.forEach(t => {
-      const icon  = t.done ? '[✓]' : '[ ]';
-      const cls   = t.done ? ' task-row--done' : '';
-      const prog  = (!t.done && t.goal > 1)
-        ? `<span class="task-prog">${t.count}/${t.goal}</span>` : '';
-      const rwd   = t.done ? '' : `<span class="task-rwd">+${t.reward}★</span>`;
-      rows.push(`<div class="task-row${cls}"><span class="task-icon">${icon}</span><span class="task-lbl">${t.label}</span>${prog}${rwd}</div>`);
-    });
+    rows.push('<div class="task-section-hdr">── MY TASKS</div>');
+    _ind.forEach(t => rows.push(_row(t)));
 
-    rows.push('<div class="task-section-hdr task-section-hdr--community">COMMUNITY</div>');
-    _com.forEach(t => {
-      const icon  = t.done ? '[✓]' : '[ ]';
-      const cls   = t.done ? ' task-row--done' : '';
-      const prog  = !t.done ? `<span class="task-prog">${t.count}/${t.goal}</span>` : '';
-      const rwd   = t.done ? '' : `<span class="task-rwd">+${t.reward}★</span>`;
-      rows.push(`<div class="task-row${cls}"><span class="task-icon">${icon}</span><span class="task-lbl">${t.label}</span>${prog}${rwd}</div>`);
-    });
+    rows.push('<div class="task-section-hdr task-section-hdr--community">── COMMUNITY</div>');
+    _com.forEach(t => rows.push(_comRow(t)));
 
     body.innerHTML = rows.join('');
+  }
+
+  function _row(t) {
+    const icon = t.done ? '[✓]' : '[ ]';
+    const cls  = t.done ? ' task-row--done' : '';
+    const bar  = (!t.done && t.goal > 1) ? _bar(t.count, t.goal) : '';
+    const prog = (!t.done && t.goal > 1) ? `<span class="task-prog">${t.count}/${t.goal}</span>` : '';
+    const rwd  = t.done ? '' : `<span class="task-rwd">+${t.reward}★</span>`;
+    return `<div class="task-row${cls}"><span class="task-icon">${icon}</span><span class="task-lbl">${t.label}</span>${bar}${prog}${rwd}</div>`;
+  }
+
+  function _comRow(t) {
+    const icon = t.done ? '[✓]' : '[ ]';
+    const cls  = t.done ? ' task-row--done' : '';
+    const bar  = !t.done ? _bar(t.count, t.goal) : '';
+    const prog = !t.done ? `<span class="task-prog">${t.count}/${t.goal}</span>` : '';
+    const rwd  = t.done ? '' : `<span class="task-rwd">+${t.reward}★</span>`;
+    return `<div class="task-row${cls}"><span class="task-icon">${icon}</span><span class="task-lbl">${t.label}</span>${bar}${prog}${rwd}</div>`;
   }
 
   function _updateTrigger() {
@@ -194,7 +208,8 @@ const TaskTracker = (() => {
     if (!btn) return;
     const done  = _ind.filter(t => t.done).length + _com.filter(t => t.done).length;
     const total = _ind.length + _com.length;
-    btn.textContent = `${_open ? '▾' : '▸'} TASKS   ${done}/${total}`;
+    const arrow = _open ? '▾' : '▸';
+    btn.innerHTML = `<span class="task-trigger-label">${arrow} TASKS</span><span class="task-trigger-count">${done}/${total}</span>`;
   }
 
   return { recordEvent, recordQuestProgress, recordQuestComplete, togglePanel };
