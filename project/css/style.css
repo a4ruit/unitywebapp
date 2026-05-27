@@ -2246,12 +2246,14 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 /* Sits between pack-type-row and carousel. Body is position:absolute so it
    overlays the carousel when open — layout doesn't shift. */
 .task-panel {
-  position: relative;
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 8px;
-  margin: 3px 0 0;
+  position: fixed;
+  top: 100px;   /* sits flush below the pack-type-row (37px top + 62px min-height + 1px) */
+  left: 8px;
+  right: 8px;
+  padding: 0;
+  margin: 0;
   z-index: 20;
+  box-sizing: border-box;
 }
 
 /* ── Trigger bar ── */
