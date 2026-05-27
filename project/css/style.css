@@ -2242,80 +2242,103 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 }
 .stars-shake { animation: stars-shake 0.4s ease; }
 
-/* ── TASK PANEL ─────────────────────────────────────────────────────────────── */
-/* Sits between pack-type-row and carousel. Body is position:absolute so it
-   overlays the carousel when open — layout doesn't shift. */
+/* ── TASK PANEL (right-side slide-out) ──────────────────────────────────── */
+/* Panel hugs the right edge. flex row-reverse keeps the 40px tab always
+   visible at the screen edge; the 220px body slides in via a stepped
+   transform — giving a chunky pixel-art feel.
+   Closed: translateX(220px)  — only the 40px tab peeks out.
+   Open:   translateX(0)      — full 260px panel visible.               */
 .task-panel {
   position: fixed;
-  top: 100px;   /* sits flush below the star-counter-row (34px top + 62px min-height + 4px) */
-  left: 8px;
-  right: 8px;
-  padding: 0;
-  margin: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%) translateX(220px);
+  width: 260px;   /* 40px tab + 220px body */
+  height: 290px;
+  display: flex;
+  flex-direction: row-reverse;  /* trigger(tab) on right, body on left */
   z-index: 20;
-  box-sizing: border-box;
+  transition: transform 0.22s steps(6);
+}
+.task-panel--open {
+  transform: translateY(-50%) translateX(0);
 }
 
-/* ── Trigger bar ── */
+/* ── Tab — 40px vertical handle, always visible at right screen edge ── */
 .task-panel-trigger {
-  width: 100%;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 100%;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   align-items: center;
-  background: rgba(4, 10, 4, 0.85);
-  border: 1px solid rgba(90, 140, 90, 0.22);
-  color: rgba(140, 190, 130, 0.6);
+  justify-content: center;
+  gap: 10px;
+  background: rgba(4, 14, 4, 0.94);
+  /* Pixel-art raised-edge: lighter top/left = highlight, darker bottom/right = shadow */
+  border-top:    2px solid rgba(90, 180, 80, 0.55);
+  border-left:   2px solid rgba(90, 180, 80, 0.55);
+  border-bottom: 2px solid rgba(20, 55, 20, 0.75);
+  border-right:  2px solid rgba(10, 30, 10, 0.5);
+  color: rgba(130, 200, 120, 0.82);
   font-family: 'VT323', monospace;
-  font-size: 15px;
-  letter-spacing: 0.1em;
-  padding: 6px 10px;
   cursor: pointer;
-  transition: color 0.12s, border-color 0.12s, background 0.12s;
+  padding: 14px 0;
   box-sizing: border-box;
 }
 .task-panel-trigger:active {
-  background: rgba(8, 20, 8, 0.95);
+  /* Pressed: invert highlight edges to simulate click-down */
+  border-top-color:    rgba(20, 55, 20, 0.75);
+  border-left-color:   rgba(20, 55, 20, 0.75);
+  border-bottom-color: rgba(90, 180, 80, 0.55);
+  border-right-color:  rgba(90, 180, 80, 0.55);
+  background: rgba(6, 22, 6, 0.98);
 }
 .task-panel--open .task-panel-trigger {
-  border-color: rgba(90, 160, 90, 0.38);
-  color: rgba(160, 220, 150, 0.88);
-  border-bottom-color: rgba(90, 140, 90, 0.1);
-  background: rgba(4, 14, 4, 0.92);
+  border-top-color:  rgba(70, 210, 70, 0.65);
+  border-left-color: rgba(70, 210, 70, 0.65);
+  background: rgba(4, 18, 4, 0.97);
+  color: rgba(155, 235, 140, 0.95);
 }
-.task-trigger-label { letter-spacing: 0.12em; }
-.task-trigger-count {
-  color: rgba(100, 160, 100, 0.5);
+
+/* Vertical label — upright char stack, reads top→bottom */
+.task-trigger-label {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
   font-size: 13px;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+/* Count badge below label */
+.task-trigger-count {
+  font-size: 11px;
+  color: rgba(100, 160, 90, 0.55);
+  line-height: 1;
   letter-spacing: 0;
 }
-.task-panel--open .task-trigger-count { color: rgba(130, 190, 120, 0.75); }
+.task-panel--open .task-trigger-count { color: rgba(120, 200, 110, 0.82); }
 
-/* ── Dropdown body — absolute, overlays carousel ── */
+/* ── Panel body — full height, revealed when panel transforms in ── */
 .task-panel-body-wrap {
-  position: absolute;
-  top: 100%;
-  left: 8px;
-  right: 8px;
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.2s ease;
-  background: rgba(3, 7, 3, 0.97);
-  /* Subtle scanline pattern */
+  flex: 0 0 220px;
+  width: 220px;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: rgba(3, 8, 3, 0.97);
   background-image: repeating-linear-gradient(
     0deg,
-    transparent,
-    transparent 3px,
-    rgba(0, 0, 0, 0.18) 3px,
-    rgba(0, 0, 0, 0.18) 4px
+    transparent, transparent 3px,
+    rgba(0, 0, 0, 0.18) 3px, rgba(0, 0, 0, 0.18) 4px
   );
-  border: 1px solid rgba(90, 140, 90, 0.22);
-  border-top: none;
-  z-index: 20;
+  border-top:    2px solid rgba(90, 160, 90, 0.45);
+  border-left:   2px solid rgba(90, 160, 90, 0.45);
+  border-bottom: 2px solid rgba(20, 50, 20, 0.7);
+  border-right:  none;   /* flush join with tab — no double-border seam */
+  box-sizing: border-box;
 }
-.task-panel--open .task-panel-body-wrap {
-  max-height: 240px;
-  overflow-y: auto;
-}
+
 /* Pixel-thin scrollbar */
 .task-panel-body-wrap::-webkit-scrollbar       { width: 3px; }
 .task-panel-body-wrap::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.4); }
@@ -2359,6 +2382,10 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   flex: 1;
   font-size: 16px;
   letter-spacing: 0.02em;
+  min-width: 0;           /* allow flex item to shrink below content size */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 /* Block-character progress bar */
 .task-bar {

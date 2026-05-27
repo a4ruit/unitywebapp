@@ -208,8 +208,9 @@ const TaskTracker = (() => {
     if (!btn) return;
     const done  = _ind.filter(t => t.done).length + _com.filter(t => t.done).length;
     const total = _ind.length + _com.length;
-    const arrow = _open ? '▾' : '▸';
-    btn.innerHTML = `<span class="task-trigger-label">${arrow} TASKS</span><span class="task-trigger-count">${done}/${total}</span>`;
+    // No arrow — label is vertical (text-orientation: upright) so arrows look odd;
+    // open/closed state is conveyed by border-color / color change in CSS.
+    btn.innerHTML = `<span class="task-trigger-label">TASKS</span><span class="task-trigger-count">${done}/${total}</span>`;
   }
 
   return { recordEvent, recordQuestProgress, recordQuestComplete, togglePanel };
