@@ -10,7 +10,7 @@
 // we retry the same URL (= transient blip, not a server outage).
 //
 // Manual override for testing:  ?server=do  or  ?server=render  in the URL.
-const WS_PRIMARY = 'wss://packmentality.duckdns.org';
+const WS_PRIMARY = 'wss://packmentality.cc';
 const WS_BACKUP  = 'wss://unitywebapp.onrender.com';
 
 const _wsOverride = (() => {
