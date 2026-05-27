@@ -1,12 +1,21 @@
 // ─── STARS CURRENCY + PACK COUNTER ────────────────────────────────────────────
 
-let stars           = 100;
+let stars           = 0;   // earned through quests and ad-watching — start at zero
 let packsLeft      = 6;   // 6 free packs on load
 
 const PACKS_PER_BATCH = 3;
 const STARS_PER_AD     = 10;  // earned by watching full ad
 const STARS_SKIP_AD    = 10;  // cost to skip an ad
 const STARS_PER_BATCH  = 50;  // cost to buy 3 packs
+
+// Stars earned when a collective quest objective is completed by the room.
+// Unity broadcasts quest_reward|{quest}|{n} → server relays → handled in main.js.
+const QUEST_STAR_REWARDS = {
+  flowers: 15,
+  sheep:   10,
+  ducks:   10,
+  all:     20,
+};
 
 // ─── Stars ─────────────────────────────────────────────────────────────────────
 
@@ -138,6 +147,9 @@ function initCounter() {
   updateCounterDisplay();
   updateStarsDisplay();
 }
+
+// Exposed so choiceGrid3d.js can check affordability without importing stars directly.
+window.getStarBalance = () => stars;
 
 // ─── SHOP ─────────────────────────────────────────────────────────────────────
 

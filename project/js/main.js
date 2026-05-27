@@ -94,6 +94,21 @@ const RITUAL_CARDS = [
   { id:'star',       name:'The Entity',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was the ritual all along.' },
 ];
 
+// ─── Placement star costs ──────────────────────────────────────────────────────
+// Common and uncommon are always free — lower rarities must remain accessible
+// so players can contribute to the collective quests without needing currency.
+// Higher rarities require stars earned through those quests.
+// Numbers are intentionally tunable; keep in sync with QUEST_STAR_REWARDS in counter.js.
+const PLACEMENT_COSTS = {
+  'common':          0,
+  'uncommon':        0,
+  'rare':            3,
+  'legendary':       8,
+  'mythical':        15,
+  'luck-maxxing':    15,
+  'legendary-alpha': 25,
+};
+
 // ─── Active pack type ──────────────────────────────────────────────────────────
 let activePackType = 'garbage';
 const PACK_TYPE_ORDER = ['garbage', 'ewaste', 'adpack'];
@@ -428,6 +443,7 @@ function connect() {
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
+      if (handleQuestMessage(e.data)) return;
       handlePossessionMessage(e.data);
     };
   } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
@@ -440,6 +456,51 @@ function send(msg) {
   } else {
     console.warn('[WS] Not connected:', msg);
   }
+}
+
+// ─── Quest rewards ────────────────────────────────────────────────────────────
+// Unity broadcasts "quest_reward|{quest}|{packCount}" when a collective
+// objective completes. Server relays it to all phones. We convert it to a
+// star reward and show a brief banner so the player knows they earned something.
+
+function handleQuestMessage(msg) {
+  if (!msg.startsWith('quest_reward|')) return false;
+  const parts  = msg.split('|');
+  const quest  = parts[1];
+  const reward = QUEST_STAR_REWARDS[quest];
+  if (reward) {
+    addStars(reward);
+    showQuestToast(quest, reward);
+  }
+  return true;
+}
+
+function showQuestToast(quest, starsEarned) {
+  const labels = { flowers: 'FLOWERS', sheep: 'SHEEP', ducks: 'DUCKS', all: 'ALL DONE' };
+  const label  = labels[quest] || quest.toUpperCase();
+  const el = document.getElementById('questToast');
+  if (!el) return;
+  el.textContent = `QUEST: ${label}  +${starsEarned} ★`;
+  el.style.display    = 'block';
+  el.style.opacity    = '0';
+  el.style.transition = 'none';
+  void el.offsetWidth;
+  el.style.transition = 'opacity 0.35s ease';
+  el.style.opacity    = '1';
+  clearTimeout(el._hideTimer);
+  el._hideTimer = setTimeout(() => {
+    el.style.opacity = '0';
+    setTimeout(() => { el.style.display = 'none'; }, 400);
+  }, 3000);
+}
+
+function shakeStarDisplay() {
+  const el = document.getElementById('starsDisplay');
+  if (!el) return;
+  el.classList.remove('stars-shake');
+  void el.offsetWidth;
+  el.classList.add('stars-shake');
+  setTimeout(() => el.classList.remove('stars-shake'), 500);
 }
 
 // ─── Unity pack type sync ─────────────────────────────────────────────────────
@@ -698,7 +759,11 @@ function showChoiceGrid() {
   const cs = document.querySelector('.choose-sub');
   if (ct) ct.textContent = activePackType === 'adpack' ? 'CHOOSE YOUR AD' : 'CHOOSE YOUR WASTE';
   if (cs) cs.textContent = activePackType === 'adpack' ? 'pollution is the point' : 'one drop per pack';
-  ChoiceGrid3D.show(packCards, 'choiceGrid', (chosenCard) => {
+  const cardsWithCost = packCards.map(c => ({
+    ...c,
+    starCost: PLACEMENT_COSTS[c.rarity] ?? 0,
+  }));
+  ChoiceGrid3D.show(cardsWithCost, 'choiceGrid', (chosenCard) => {
     setTimeout(() => dropCard(chosenCard), 400);
   });
 }
@@ -734,6 +799,16 @@ function showGodPackComplete() {
 // ─── Normal drop ──────────────────────────────────────────────────────────────
 
 function dropCard(card) {
+  // Star cost gate — deduct here (grid already pre-checked affordability visually,
+  // but spendStars is the authoritative source of truth).
+  const cost = PLACEMENT_COSTS[card.rarity] ?? 0;
+  if (cost > 0 && !spendStars(cost)) {
+    // Shouldn't normally reach here — the choice grid blocks the tap.
+    // Defensively: shake the display and leave the player on the choose screen.
+    shakeStarDisplay();
+    return;
+  }
+
   // Placement cards get their own modal regardless of phase
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
     send(`placement_request|${CLIENT_ID}|${card.placement}|${card.rarity}|${card.name}`);

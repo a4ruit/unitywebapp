@@ -84,6 +84,7 @@ const ChoiceGrid3D = (() => {
       opacity: 1,
       pulseT: 0,
       claimVY: 0,
+      el: document.getElementById(containerId),  // DOM ref for shake feedback
     };
 
     renderer.domElement.addEventListener('click', () => onCellClick(cell));
@@ -209,8 +210,26 @@ const ChoiceGrid3D = (() => {
 
   function lerp(a,b,t) { return a+(b-a)*t; }
 
+  function _shakeCell(cell) {
+    if (!cell.el) return;
+    cell.el.classList.remove('choice-cell-shake');
+    void cell.el.offsetWidth;
+    cell.el.classList.add('choice-cell-shake');
+    setTimeout(() => cell.el.classList.remove('choice-cell-shake'), 500);
+  }
+
   function onCellClick(chosenCell) {
     if (chosenCell.state !== 'idle') return;
+
+    // Star affordability gate — god-pack claim mode bypasses cost entirely.
+    if (!godMode) {
+      const cost    = chosenCell.card.starCost ?? 0;
+      const balance = typeof window.getStarBalance === 'function' ? window.getStarBalance() : Infinity;
+      if (cost > 0 && balance < cost) {
+        _shakeCell(chosenCell);
+        return;
+      }
+    }
 
     if (godMode) {
       chosenCell.state  = 'claim-pulse';
@@ -263,6 +282,22 @@ const ChoiceGrid3D = (() => {
 
     cells = cards.map((card,i) => createCell(`choiceCell${i}`, card));
     cells.forEach(cell => { if (cell) startCellLoop(cell); });
+
+    // ── Star cost badges ────────────────────────────────────────────────────
+    // Added after createCell so they layer on top of the WebGL canvas.
+    // Snapshot balance at build-time; locked state is purely visual — the
+    // click handler re-checks live balance before allowing selection.
+    const _bal = typeof window.getStarBalance === 'function' ? window.getStarBalance() : Infinity;
+    cards.forEach((card, i) => {
+      const cost = card.starCost ?? 0;
+      if (cost === 0) return;
+      const cellEl = document.getElementById(`choiceCell${i}`);
+      if (!cellEl) return;
+      const badge = document.createElement('div');
+      badge.className = 'choice-cost-badge' + (_bal < cost ? ' choice-cost-badge--locked' : '');
+      badge.textContent = `★ ${cost}`;
+      cellEl.appendChild(badge);
+    });
 
     sortedIndices.forEach((cardIndex, staggerPos) => {
       const cell = cells[cardIndex];

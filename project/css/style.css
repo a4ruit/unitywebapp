@@ -2198,3 +2198,64 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .roulette-btn:not(:disabled):active {
   background: rgba(232,224,200,0.12);
 }
+
+/* ── STAR COST BADGES on choice cards ──────────────────────────────────────── */
+/* .choice-cell-3d already has position:relative — badge positions over canvas  */
+.choice-cost-badge {
+  position: absolute;
+  bottom: 7px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(255, 215, 0, 0.45);
+  color: #ffe7a0;
+  font-family: 'VT323', monospace;
+  font-size: 15px;
+  letter-spacing: 1px;
+  padding: 1px 8px;
+  pointer-events: none;
+  z-index: 10;
+  white-space: nowrap;
+}
+.choice-cost-badge--locked {
+  border-color: rgba(255, 80, 80, 0.5);
+  color: #ff8888;
+  background: rgba(50, 0, 0, 0.82);
+}
+
+/* ── SHAKE animations ────────────────────────────────────────────────────────── */
+@keyframes choice-cell-shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-7px); }
+  40%     { transform: translateX(7px); }
+  60%     { transform: translateX(-4px); }
+  80%     { transform: translateX(4px); }
+}
+.choice-cell-shake { animation: choice-cell-shake 0.4s ease; }
+
+@keyframes stars-shake {
+  0%,100% { transform: translateX(0); }
+  20%     { transform: translateX(-5px); }
+  40%     { transform: translateX(5px); }
+  60%     { transform: translateX(-3px); }
+  80%     { transform: translateX(3px); }
+}
+.stars-shake { animation: stars-shake 0.4s ease; }
+
+/* ── QUEST REWARD TOAST ─────────────────────────────────────────────────────── */
+.quest-toast {
+  position: fixed;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.88);
+  border: 1px solid rgba(255, 215, 0, 0.4);
+  color: #ffe7a0;
+  font-family: 'VT323', monospace;
+  font-size: 19px;
+  letter-spacing: 2px;
+  padding: 8px 22px;
+  z-index: 9998;
+  pointer-events: none;
+  white-space: nowrap;
+}
