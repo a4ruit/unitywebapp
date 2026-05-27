@@ -303,10 +303,10 @@ body::after {
   flex: 1;
 }
 
-/* Pack type buttons pinned to top zone */
+/* Pack type buttons pinned to bottom zone (near thumbs) */
 #screen-pack .pack-type-row {
   position: fixed;
-  top: 37px;
+  bottom: 34px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
@@ -1155,10 +1155,10 @@ body.glitch-active .star-counter-row {
   white-space: nowrap;
 }
 
-/* Bottom row: pack counter + stars + shop */
+/* Top row: pack counter + stars + shop */
 #screen-pack .star-counter-row {
   position: fixed;
-  bottom: 34px;
+  top: 34px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
@@ -1457,7 +1457,7 @@ body.glitch-active .star-counter-row {
 /* ── PACK TYPE ROW — 4 buttons ───────────────────── */
 .pack-type-row {
   position: fixed;
-  top: 34px;
+  bottom: 34px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 3;
@@ -2247,7 +2247,7 @@ body:has(#screen-horror-spin:not(.hidden))::before {
    overlays the carousel when open — layout doesn't shift. */
 .task-panel {
   position: fixed;
-  top: 100px;   /* sits flush below the pack-type-row (37px top + 62px min-height + 1px) */
+  top: 100px;   /* sits flush below the star-counter-row (34px top + 62px min-height + 4px) */
   left: 8px;
   right: 8px;
   padding: 0;
