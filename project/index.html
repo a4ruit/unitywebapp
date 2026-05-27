@@ -77,6 +77,14 @@
           </button>
         </div>
 
+        <!-- Task panel — collapsible dropdown between pack buttons and carousel -->
+        <div class="task-panel" id="taskPanel">
+          <button class="task-panel-trigger" id="taskPanelTrigger" onclick="TaskTracker.togglePanel()">▸ TASKS   0/7</button>
+          <div class="task-panel-body-wrap">
+            <div id="taskPanelBody"></div>
+          </div>
+        </div>
+
         <!-- Pack carousel stage -->
         <div class="pack-carousel-stage" id="packCarouselStage">
           <div class="pack-carousel-bg" id="packCarouselBg">
@@ -327,6 +335,7 @@
   <script src="js/choiceGrid3d.js"></script>
   <script src="js/bloodDrip.js"></script>
   <script src="js/possession.js"></script><!-- must be before main.js -->
+  <script src="js/tasks.js"></script><!-- must be before main.js -->
   <!-- corruption-bar.js shelved — bar removed for now
   <script src="js/corruption-bar.js"></script> -->
   <script src="js/main.js"></script>

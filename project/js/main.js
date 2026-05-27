@@ -464,6 +464,16 @@ function send(msg) {
 // star reward and show a brief banner so the player knows they earned something.
 
 function handleQuestMessage(msg) {
+  // Live progress broadcast from Unity's QuestManager: quest_progress|quest|count|goal
+  if (msg.startsWith('quest_progress|')) {
+    const parts = msg.split('|');
+    if (typeof TaskTracker !== 'undefined') {
+      TaskTracker.recordQuestProgress(parts[1], parseInt(parts[2]), parseInt(parts[3]));
+    }
+    return true;
+  }
+
+  // Quest completion from Unity's QuestManager: quest_reward|quest|packCount
   if (!msg.startsWith('quest_reward|')) return false;
   const parts  = msg.split('|');
   const quest  = parts[1];
@@ -471,6 +481,9 @@ function handleQuestMessage(msg) {
   if (reward) {
     addStars(reward);
     showQuestToast(quest, reward);
+    if (typeof TaskTracker !== 'undefined') {
+      TaskTracker.recordQuestComplete(quest);
+    }
   }
   return true;
 }
@@ -669,6 +682,11 @@ function doPackOpen(dir) {
   personalPacksOpened++;
   updatePersonalPhase();
 
+  // Individual task: "Open all pack types"
+  if (typeof TaskTracker !== 'undefined') {
+    TaskTracker.recordEvent('pack_opened', { packType: activePackType });
+  }
+
   // ── Collective corruption (rarity-scaled) ──
   // Unity is the source of truth. It increments the shared level by an amount
   // that scales with rarity, then broadcasts back to every connected phone.
@@ -807,6 +825,11 @@ function dropCard(card) {
     // Defensively: shake the display and leave the player on the choose screen.
     shakeStarDisplay();
     return;
+  }
+
+  // Individual tasks: "Place 5 things" + "First legendary"
+  if (typeof TaskTracker !== 'undefined') {
+    TaskTracker.recordEvent('placement', { rarity: card.rarity });
   }
 
   // Placement cards get their own modal regardless of phase

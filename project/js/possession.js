@@ -108,6 +108,9 @@ let _foxAvailable   = false;
 //   'fox'   → fox_input   / fox_pounce / fox_possess_end
 //   'box'   → box_input   / box_open  / box_possess_end
 let _creatureType   = null;
+// Set true when the possession timer reaches ≤1s so _onEnded can award the
+// "full creature session" individual task only when the timer ran out naturally.
+let _possessionCompletedFull = false;
 // Clean up any leftover flag from prior versions that persisted across reloads.
 try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 
@@ -1638,6 +1641,7 @@ function _onDuckSpawned() {
 function _onTick(secsLeft) {
   _ui.secs.textContent = secsLeft;
   _setGbTimer(secsLeft);
+  if (secsLeft <= 1) _possessionCompletedFull = true;
 }
 
 /**
@@ -1963,6 +1967,12 @@ function _onBoxTick(secsLeft) {
 }
 
 function _onEnded() {
+  // Fire the "full creature session" individual task if the timer ran to zero
+  if (_possessionCompletedFull && typeof TaskTracker !== 'undefined') {
+    TaskTracker.recordEvent('creature_full_duration');
+  }
+  _possessionCompletedFull = false;
+
   const wasDuck = _creatureType === 'duck';
   const wasFox  = _creatureType === 'fox';
   const wasBox  = _creatureType === 'box';
