@@ -1,8 +1,13 @@
 // choiceGrid3d.js — 2x2 grid of 3D choice cards
-// Uses ONE shared WebGLRenderer with scissor/viewport so only 1 WebGL context
-// is consumed regardless of how many cards are shown. Older/budget Android
-// phones cap WebGL at 4-8 contexts; the previous per-card approach (5 contexts)
-// would trip that limit when combined with Pack3D, causing white patches.
+//
+// Architecture: ONE shared off-screen WebGLRenderer renders each card scene
+// individually, then copies the result to per-cell 2D canvases via drawImage.
+//
+// Why not per-cell renderers: budget Android phones cap WebGL at ~4-8 contexts;
+//   5 cards + Pack3D = 6 contexts → browser silently kills them → white patches.
+// Why not scissor/overlay: iOS Safari incorrectly places an absolutely-positioned
+//   canvas inside a CSS grid, breaking cell layout; Safari scissor test is also buggy.
+// This approach uses 1 WebGL context total and no scissor — works everywhere.
 //
 // Exposes: ChoiceGrid3D.show(cards, containerId, onPick)
 //           ChoiceGrid3D.showGodPack(cards, containerId, onClaim)
@@ -19,7 +24,10 @@ const ChoiceGrid3D = (() => {
   let picking   = false;
   let godMode   = false;
 
-  // ── Single shared WebGL renderer (lazy-created, never disposed) ────────────
+  // ── Shared off-screen WebGL renderer ──────────────────────────────────────
+  // Not appended to the DOM — used as a render-then-copy offscreen buffer.
+  // preserveDrawingBuffer:true is required so drawImage can read the pixels.
+
   let _renderer  = null;
   let _animFrame = null;
 
@@ -27,31 +35,40 @@ const ChoiceGrid3D = (() => {
     if (_renderer) return;
     try {
       _renderer = new THREE.WebGLRenderer({
-        antialias: false,
-        alpha: true,
-        powerPreference: 'low-power',
+        antialias:           false,
+        alpha:               true,
+        powerPreference:     'low-power',
+        preserveDrawingBuffer: true,
       });
       _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       _renderer.setClearColor(0x000000, 0);
-      _renderer.autoClear = false;   // we clear manually with scissor
-      // Absolutely covers the whole grid; pointer-events:none so clicks reach cell divs
-      _renderer.domElement.style.cssText =
-        'position:absolute;top:0;left:0;width:100%;height:100%;' +
-        'pointer-events:none;display:block;image-rendering:pixelated;z-index:1;';
+      // Canvas is intentionally NOT appended to the DOM
     } catch (e) {
       console.warn('ChoiceGrid3D: WebGL init failed', e);
       _renderer = null;
     }
   }
 
-  // ── Cell factory — scene/camera/mesh only, no per-cell renderer ───────────
+  // ── Cell factory ──────────────────────────────────────────────────────────
+  // Each cell has its own 2D <canvas> (display surface) + a Three.js scene.
+  // The shared renderer renders the 3D scene off-screen, then copies pixels
+  // into the cell's 2D canvas via drawImage.
 
   function createCell(containerId, card) {
     const cellEl = document.getElementById(containerId);
     if (!cellEl) return null;
 
+    // Visible display canvas — lives inside the cell div, sized by CSS
+    const displayCanvas = document.createElement('canvas');
+    displayCanvas.style.cssText =
+      'display:block;width:100%!important;height:100%!important;' +
+      'image-rendering:pixelated;cursor:pointer;';
+    cellEl.appendChild(displayCanvas);
+    const displayCtx = displayCanvas.getContext('2d');
+
+    // 3D scene (no per-cell WebGL renderer)
     const scene  = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(38, 2 / 3, 0.1, 100);
     camera.position.set(0, 0, 3.8);
 
     scene.add(new THREE.AmbientLight(0x1a2a1a, 0.9));
@@ -97,6 +114,7 @@ const ChoiceGrid3D = (() => {
     const cell = {
       scene, camera, mesh, rarityLight, card,
       faceCanvas, faceTex, frontMat, animated, startTime,
+      displayCanvas, displayCtx,
       el: cellEl,
       state: 'waiting',
       flipProgress: 0,
@@ -106,15 +124,17 @@ const ChoiceGrid3D = (() => {
       claimVY: 0,
     };
 
-    // Cell divs handle clicks — the shared canvas above them is pointer-events:none
-    cellEl.style.cursor = 'pointer';
-    cellEl.addEventListener('click', () => onCellClick(cell));
-    cellEl.addEventListener('touchend', (e) => { e.preventDefault(); onCellClick(cell); }, { passive: false });
+    // Click/touch listeners on the visible 2D canvas
+    displayCanvas.addEventListener('click', () => onCellClick(cell));
+    displayCanvas.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      onCellClick(cell);
+    }, { passive: false });
 
     return cell;
   }
 
-  // ── Per-cell state machine update (called each frame from shared loop) ─────
+  // ── Per-cell state machine update ──────────────────────────────────────────
 
   function _updateCell(cell) {
     cell.idleT += 0.014;
@@ -180,7 +200,10 @@ const ChoiceGrid3D = (() => {
       });
       if (cell.opacity < 0.02) {
         cell.state = 'gone';
-        if (cell.el) { cell.el.style.opacity = '0'; cell.el.style.pointerEvents = 'none'; }
+        if (cell.displayCanvas) {
+          cell.displayCanvas.style.opacity = '0';
+          cell.displayCanvas.style.pointerEvents = 'none';
+        }
       }
 
     } else if (cell.state === 'flipping-back') {
@@ -197,21 +220,23 @@ const ChoiceGrid3D = (() => {
       });
       if (cell.opacity < 0.01) {
         cell.state = 'gone';
-        if (cell.el) { cell.el.style.opacity = '0'; cell.el.style.pointerEvents = 'none'; }
+        if (cell.displayCanvas) {
+          cell.displayCanvas.style.opacity = '0';
+          cell.displayCanvas.style.pointerEvents = 'none';
+        }
       }
     }
 
     if (rarityLight && (cell.state === 'idle' || cell.state === 'claim-pulse')) {
       const rarity = card.rarity;
       const base   = cfgIntensity(rarity);
-      const t2     = performance.now() / 1000 - cell.startTime;
       if (rarity === 'legendary-alpha') {
-        rarityLight.intensity = base + Math.sin(t2 * 3) * 1.5;
-        rarityLight.color.setHSL((t2 * 0.1) % 1, 1, 0.7);
+        rarityLight.intensity = base + Math.sin(t * 3) * 1.5;
+        rarityLight.color.setHSL((t * 0.1) % 1, 1, 0.7);
       } else if (rarity === 'luck-maxxing') {
-        rarityLight.intensity = base + Math.sin(t2 * 2.5) * 1.0;
+        rarityLight.intensity = base + Math.sin(t * 2.5) * 1.0;
       } else if (rarity === 'mythical') {
-        rarityLight.intensity = base + Math.sin(t2 * 3.5) * 1.2;
+        rarityLight.intensity = base + Math.sin(t * 3.5) * 1.2;
       } else if (rarity === 'legendary') {
         rarityLight.intensity = base + Math.sin(cell.idleT * 2) * 0.8;
       } else if (rarity === 'rare') {
@@ -220,9 +245,11 @@ const ChoiceGrid3D = (() => {
     }
   }
 
-  // ── Single shared render loop ──────────────────────────────────────────────
+  // ── Shared render loop ─────────────────────────────────────────────────────
+  // Renders each cell's 3D scene into the shared off-screen renderer, then
+  // copies the result into the cell's visible 2D canvas via drawImage.
 
-  function _startLoop(grid) {
+  function _startLoop() {
     if (_animFrame) cancelAnimationFrame(_animFrame);
     if (!_renderer) return;
 
@@ -230,46 +257,41 @@ const ChoiceGrid3D = (() => {
       _animFrame = requestAnimationFrame(loop);
       if (!cells.length || !_renderer) return;
 
-      // Sync canvas size to live grid dimensions
-      const gW = grid.clientWidth  || 300;
-      const gH = grid.clientHeight || 400;
       const PR = _renderer.getPixelRatio();
-      const targetW = Math.round(gW * PR);
-      const targetH = Math.round(gH * PR);
-      if (_renderer.domElement.width !== targetW || _renderer.domElement.height !== targetH) {
-        _renderer.setSize(gW, gH, false);
-      }
-
-      // Clear whole canvas once at the top of the frame
-      _renderer.setScissorTest(false);
-      _renderer.setViewport(0, 0, gW, gH);
-      _renderer.clear(true, true, true);
-      _renderer.setScissorTest(true);
-
-      const gridRect = grid.getBoundingClientRect();
 
       cells.forEach(cell => {
-        if (!cell || cell.state === 'gone' || !cell.el) return;
+        if (!cell || cell.state === 'gone' || !cell.displayCanvas) return;
 
         _updateCell(cell);
 
-        // Map this cell's screen rect into canvas pixel coords
-        const rect = cell.el.getBoundingClientRect();
-        const x = Math.round((rect.left   - gridRect.left)   * PR);
-        const y = Math.round((gridRect.bottom - rect.bottom) * PR); // WebGL Y is flipped
-        const w = Math.round(rect.width  * PR);
-        const h = Math.round(rect.height * PR);
+        const cssW = cell.displayCanvas.offsetWidth;
+        const cssH = cell.displayCanvas.offsetHeight;
+        if (cssW <= 0 || cssH <= 0) return;
 
-        if (w <= 0 || h <= 0) return;
+        const rW = Math.round(cssW * PR);
+        const rH = Math.round(cssH * PR);
 
-        _renderer.setScissor(x, y, w, h);
-        _renderer.setViewport(x, y, w, h);
-        // Clear depth per card so scenes don't bleed into each other
-        _renderer.clearDepth();
+        // Keep display canvas buffer in sync with physical pixels
+        if (cell.displayCanvas.width !== rW || cell.displayCanvas.height !== rH) {
+          cell.displayCanvas.width  = rW;
+          cell.displayCanvas.height = rH;
+        }
 
-        cell.camera.aspect = rect.width / rect.height;
+        // Resize shared renderer only when dimensions change (usually just once)
+        if (_renderer.domElement.width !== rW || _renderer.domElement.height !== rH) {
+          _renderer.setSize(cssW, cssH, false);
+        }
+
+        cell.camera.aspect = cssW / cssH;
         cell.camera.updateProjectionMatrix();
+
+        // Render scene into off-screen WebGL buffer
+        _renderer.clear();
         _renderer.render(cell.scene, cell.camera);
+
+        // Blit the WebGL result into the visible 2D canvas
+        cell.displayCtx.clearRect(0, 0, rW, rH);
+        cell.displayCtx.drawImage(_renderer.domElement, 0, 0, rW, rH);
       });
     }
     loop();
@@ -347,21 +369,10 @@ const ChoiceGrid3D = (() => {
     const grid = document.getElementById(containerId);
     if (!grid) return;
     grid.innerHTML = '';
-    grid.style.position = 'relative'; // anchors the absolutely-positioned shared canvas
 
     _ensureRenderer();
 
-    if (_renderer) {
-      _renderer.setSize(grid.clientWidth || 300, grid.clientHeight || 400, false);
-      // Re-append canvas if it was removed by a previous grid.innerHTML = ''
-      if (!grid.contains(_renderer.domElement)) {
-        grid.appendChild(_renderer.domElement);
-      }
-    }
-
-    // Cell placeholder divs — CSS grid handles 2-column layout.
-    // The shared canvas (pointer-events:none) sits above them at z-index:1.
-    // Click events fall through the canvas to these divs.
+    // Build cell divs — CSS grid handles the 2-column layout
     cards.forEach((card, i) => {
       const cellEl = document.createElement('div');
       cellEl.className = 'choice-cell-3d';
@@ -370,11 +381,11 @@ const ChoiceGrid3D = (() => {
     });
 
     cells = cards.map((card, i) => createCell(`choiceCell${i}`, card));
-    if (_renderer) _startLoop(grid);
+    if (_renderer) _startLoop();
 
-    // ── Star cost badges ─────────────────────────────────────────────────────
-    // Appended after createCell so they layer on top of the WebGL canvas
-    // (.choice-cost-badge is position:absolute z-index:10 inside position:relative cell).
+    // ── Star cost badges ──────────────────────────────────────────────────────
+    // Appended after createCell — the badge sits inside the cell div, on top of
+    // the 2D display canvas (.choice-cost-badge is position:absolute z-index:10).
     const _bal = typeof window.getStarBalance === 'function' ? window.getStarBalance() : Infinity;
     cards.forEach((card, i) => {
       const cost = card.starCost ?? 0;
@@ -409,15 +420,9 @@ const ChoiceGrid3D = (() => {
       cell.mesh?.material?.forEach?.(m => m.dispose());
       cell.faceTex?.dispose();
       if (cell.rarityLight) cell.scene?.remove(cell.rarityLight);
-      // Remove listeners by detaching the DOM element (grid.innerHTML='' handles this)
     });
     cells = []; onPickCb = null; onClaimCb = null; picking = false; godMode = false;
-
-    // Detach shared canvas from whichever grid it's currently in
-    if (_renderer?.domElement?.parentNode) {
-      _renderer.domElement.parentNode.removeChild(_renderer.domElement);
-    }
-    // _renderer itself is kept alive — recreating a WebGL context is expensive
+    // _renderer stays alive — WebGL context creation is expensive
   }
 
   return { show, showGodPack, destroy };
