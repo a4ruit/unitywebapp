@@ -334,6 +334,17 @@ const ChoiceGrid3D = (() => {
     if (godMode) {
       chosenCell.state  = 'claim-pulse';
       chosenCell.pulseT = 0;
+      // Safety net: if the render loop isn't advancing (WebGL down OR tab
+      // throttled), fire onClaimCb after the natural animation duration so
+      // the game still proceeds. Re-checks state so the normal animation
+      // path doesn't double-fire.
+      const claimedCard = chosenCell.card;
+      setTimeout(() => {
+        if (chosenCell.state === 'claim-pulse' && onClaimCb) {
+          chosenCell.state = 'claimed';
+          onClaimCb(claimedCard);
+        }
+      }, 800);
     } else {
       if (picking) return;
       picking = true;
@@ -346,6 +357,17 @@ const ChoiceGrid3D = (() => {
           }, 40 + Math.random() * 60);
         }
       });
+      // Same safety net for the standard pick flow: even without the WebGL
+      // render loop driving pulseT, the chosen card MUST be handed back so
+      // dropCard()/placement_request fires. Without this, Android phones with
+      // a saturated WebGL context budget tap the card and nothing happens.
+      const pickedCard = chosenCell.card;
+      setTimeout(() => {
+        if (picking && onPickCb) {
+          onPickCb(pickedCard);
+          onPickCb = null;
+        }
+      }, 900);
     }
   }
 
@@ -407,7 +429,16 @@ const ChoiceGrid3D = (() => {
     sortedIndices.forEach((cardIndex, staggerPos) => {
       const cell = cells[cardIndex];
       if (!cell) return;
-      setTimeout(() => { cell.state = 'flipping'; cell.flipProgress = 0; }, staggerPos * STAGGER_MS);
+      setTimeout(() => {
+        // If WebGL didn't initialise (budget Android phone with no spare GPU
+        // context budget once Pack3D claimed its own), the render loop never
+        // runs — flipProgress never increments — cells never reach 'idle' —
+        // onCellClick early-returns and the player can't tap anything.
+        // Skip straight to 'idle' so taps still work; visuals will be a flat
+        // placeholder cell but the game flow is preserved.
+        cell.state = _renderer ? 'flipping' : 'idle';
+        cell.flipProgress = 0;
+      }, staggerPos * STAGGER_MS);
     });
   }
 
