@@ -409,8 +409,6 @@ function selectPlayerColor(el) {
   document.querySelectorAll('.name-color-swatch').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
   playerColor = hex;
-  const hint = document.getElementById('nameColorHint');
-  if (hint) hint.textContent = `(${hex})`;
 }
 
 function submitPlayerName() {
