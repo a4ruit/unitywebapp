@@ -210,7 +210,15 @@ const TaskTracker = (() => {
     if (!btn) return;
     const done  = _ind.filter(t => t.done).length + _com.filter(t => t.done).length;
     const total = _ind.length + _com.length;
-    btn.innerHTML = `<span class="task-trigger-label">TASK</span><span class="task-trigger-count">${done}/${total}</span>`;
+    // Mini 5-char progress bar showing overall completion at a glance
+    const W = 5;
+    const f = total > 0 ? Math.round((done / total) * W) : 0;
+    const fill  = '█'.repeat(f);
+    const empty = '░'.repeat(W - f);
+    btn.innerHTML =
+      `<span class="task-trigger-label">TASKS</span>` +
+      `<span class="task-trigger-count">${done}/${total}</span>` +
+      `<span class="task-trigger-bar"><span class="task-trigger-bar-fill">${fill}</span><span class="task-trigger-bar-empty">${empty}</span></span>`;
   }
 
   // Brief pixel-blink on the tab whenever a task progresses

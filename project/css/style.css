@@ -2252,8 +2252,8 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .task-panel {
   position: fixed;
   right: 0;
-  top: 104px;   /* just below star-counter-row (34px + 62px min-height + 8px) */
-  width: 260px; /* 40px trigger + 220px body */
+  top: 148px;   /* moved down — clear of star-counter row + a breathing gap */
+  width: 280px; /* 60px trigger + 220px body */
   display: flex;
   flex-direction: row-reverse; /* trigger(first in DOM) → rightmost → right edge */
   align-items: flex-start;     /* trigger stays compact; body can be taller */
@@ -2261,70 +2261,124 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   pointer-events: none;        /* re-enabled individually on trigger + open body */
 }
 
-/* ── Trigger — compact square button, locked to right screen edge ── */
+/* ── Trigger — chunky pixel-art button, locked to right screen edge ── */
+/* ~60x70px button. Cyan + gold bloom border for whimsy. Always-on idle
+   pulse glow keeps it feeling alive.                                   */
 .task-panel-trigger {
-  pointer-events: auto;  /* always tappable */
-  flex: 0 0 40px;
-  width: 40px;
-  /* height: natural (~50px) — two stacked lines of horizontal text */
+  pointer-events: auto;
+  flex: 0 0 60px;
+  width: 60px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  background: rgba(4, 14, 4, 0.94);
-  /* Pixel-art raised-edge: lighter top/left = highlight, darker bottom/right = shadow */
-  border-top:    2px solid rgba(90, 180, 80, 0.55);
-  border-left:   2px solid rgba(90, 180, 80, 0.55);
-  border-bottom: 2px solid rgba(20, 55, 20, 0.75);
-  border-right:  2px solid rgba(10, 30, 10, 0.5);
-  color: rgba(130, 200, 120, 0.82);
+  gap: 3px;
+  background: rgba(8, 18, 22, 0.95);
+  /* Cyan pixel-art raised-edge: bright cyan top/left, deep teal bottom/right */
+  border-top:    2px solid rgba(140, 230, 255, 0.7);
+  border-left:   2px solid rgba(140, 230, 255, 0.7);
+  border-bottom: 2px solid rgba(20, 65, 80, 0.85);
+  border-right:  2px solid rgba(15, 45, 60, 0.7);
+  /* Bloom: layered cyan + gold halo */
+  box-shadow:
+    0 0 8px 1px rgba(120, 230, 255, 0.45),
+    0 0 4px rgba(255, 215, 100, 0.3),
+    inset 0 0 6px rgba(120, 240, 220, 0.15);
+  color: rgba(220, 245, 255, 0.95);
   font-family: 'VT323', monospace;
   cursor: pointer;
-  padding: 10px 4px;
+  padding: 8px 4px;
   box-sizing: border-box;
+  animation: task-tab-idle 2.8s ease-in-out infinite;
 }
 .task-panel-trigger:active {
-  border-top-color:    rgba(20, 55, 20, 0.75);
-  border-left-color:   rgba(20, 55, 20, 0.75);
-  border-bottom-color: rgba(90, 180, 80, 0.55);
-  border-right-color:  rgba(90, 180, 80, 0.55);
-  background: rgba(6, 22, 6, 0.98);
+  /* Pressed: invert pixel-edges + dim glow */
+  border-top-color:    rgba(20, 65, 80, 0.85);
+  border-left-color:   rgba(20, 65, 80, 0.85);
+  border-bottom-color: rgba(140, 230, 255, 0.7);
+  border-right-color:  rgba(140, 230, 255, 0.7);
+  background: rgba(12, 28, 32, 0.98);
 }
 .task-panel--open .task-panel-trigger {
-  border-top-color:  rgba(70, 210, 70, 0.65);
-  border-left-color: rgba(70, 210, 70, 0.65);
-  background: rgba(4, 18, 4, 0.97);
-  color: rgba(155, 235, 140, 0.95);
+  /* Open: warmer, brighter — gold dominant */
+  border-top-color:    rgba(255, 230, 130, 0.8);
+  border-left-color:   rgba(255, 230, 130, 0.8);
+  background: rgba(14, 24, 28, 0.97);
+  color: rgba(255, 245, 220, 1);
+  box-shadow:
+    0 0 12px 2px rgba(255, 215, 100, 0.5),
+    0 0 6px rgba(120, 230, 255, 0.35),
+    inset 0 0 8px rgba(255, 220, 130, 0.2);
 }
 
-/* Label: small horizontal text above the count */
+/* Label: top line — small cream text */
 .task-trigger-label {
-  font-size: 10px;
-  letter-spacing: 0.1em;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   line-height: 1;
   text-align: center;
   width: 100%;
-  opacity: 0.7;
+  color: rgba(255, 240, 200, 0.85);
+  text-shadow: 0 0 4px rgba(255, 220, 130, 0.4);
 }
 
-/* Count: prominent number, the main read at a glance */
+/* Count: prominent middle line — bright cyan */
 .task-trigger-count {
-  font-size: 16px;
-  color: rgba(130, 200, 110, 0.82);
+  font-size: 20px;
+  color: rgba(150, 240, 255, 1);
   line-height: 1;
   letter-spacing: 0;
   text-align: center;
+  text-shadow:
+    0 0 6px rgba(120, 230, 255, 0.75),
+    0 0 12px rgba(120, 200, 255, 0.35);
 }
-.task-panel--open .task-trigger-count { color: rgba(160, 240, 130, 0.95); }
+.task-panel--open .task-trigger-count {
+  color: rgba(255, 235, 150, 1);
+  text-shadow:
+    0 0 6px rgba(255, 215, 100, 0.75),
+    0 0 12px rgba(255, 200, 120, 0.4);
+}
 
-/* ── Progress ping — pixel-art blink when a task updates ── */
+/* Mini progress bar: bottom line — block characters with glow */
+.task-trigger-bar {
+  font-size: 10px;
+  letter-spacing: -1px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.task-trigger-bar-fill {
+  color: rgba(120, 240, 160, 0.95);
+  text-shadow: 0 0 4px rgba(120, 255, 160, 0.7), 0 0 8px rgba(100, 240, 140, 0.4);
+}
+.task-trigger-bar-empty {
+  color: rgba(40, 70, 55, 0.85);
+}
+
+/* ── Idle glow: always-on gentle breathing pulse for whimsy ── */
+@keyframes task-tab-idle {
+  0%, 100% {
+    box-shadow:
+      0 0 8px 1px rgba(120, 230, 255, 0.40),
+      0 0 4px rgba(255, 215, 100, 0.28),
+      inset 0 0 6px rgba(120, 240, 220, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 14px 2px rgba(120, 230, 255, 0.6),
+      0 0 8px rgba(255, 215, 100, 0.45),
+      inset 0 0 10px rgba(160, 245, 230, 0.22);
+  }
+}
+
+/* ── Progress ping — bright pixel blink when a task actually updates ── */
 @keyframes task-tab-ping {
-  0%,  50%, 100% { background: rgba(4, 14, 4, 0.94);   color: rgba(130, 200, 120, 0.82); }
-  25%, 75%        { background: rgba(22, 90, 16, 0.98); color: rgba(215, 255, 155, 1); }
+  0%, 50%, 100% { filter: none; transform: scale(1); }
+  25%, 75%      { filter: brightness(1.6) saturate(1.4); transform: scale(1.06); }
 }
 .task-panel-trigger--ping {
-  animation: task-tab-ping 0.55s steps(1) 1;
+  animation: task-tab-idle 2.8s ease-in-out infinite, task-tab-ping 0.55s steps(1) 1;
 }
 
 /* ── Panel body — slides in/out independently of trigger ── */
@@ -2348,7 +2402,7 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   border-bottom: 2px solid rgba(20, 50, 20, 0.7);
   border-right:  none;
   box-sizing: border-box;
-  transform: translateX(260px);          /* closed state */
+  transform: translateX(280px);          /* closed: 60px trigger + 220px body */
   transition: transform 0.22s steps(6); /* chunky pixel-art slide */
 }
 .task-panel--open .task-panel-body-wrap {
@@ -2404,30 +2458,44 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-/* Block-character progress bar */
+/* Block-character progress bar — fill glows green for whimsy */
 .task-bar {
   font-size: 13px;
   letter-spacing: -1px;
   flex-shrink: 0;
   line-height: 1;
 }
-.task-bar-fill  { color: rgba(90, 190, 90, 0.75); }
+.task-bar-fill  {
+  color: rgba(120, 240, 150, 1);
+  text-shadow:
+    0 0 4px rgba(120, 255, 160, 0.7),
+    0 0 8px rgba(100, 240, 140, 0.4);
+}
 .task-bar-empty { color: rgba(30, 55, 30, 1); }
 .task-prog {
   font-size: 12px;
-  color: rgba(110, 150, 110, 0.5);
+  color: rgba(150, 200, 140, 0.7);
   min-width: 30px;
   text-align: right;
   flex-shrink: 0;
   letter-spacing: 0;
 }
+/* Reward stars — bloom gold for whimsy */
 .task-rwd {
   font-size: 14px;
-  color: #b8a060;
+  color: #ffd96b;
   min-width: 36px;
   text-align: right;
   flex-shrink: 0;
   letter-spacing: 0;
+  text-shadow:
+    0 0 4px rgba(255, 215, 80, 0.8),
+    0 0 8px rgba(255, 200, 100, 0.5),
+    0 0 12px rgba(255, 180, 80, 0.25);
+}
+.task-row--done .task-rwd {
+  color: rgba(120, 240, 150, 0.9);
+  text-shadow: 0 0 4px rgba(120, 255, 160, 0.6);
 }
 
 /* ── QUEST REWARD TOAST ─────────────────────────────────────────────────────── */
