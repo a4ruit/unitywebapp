@@ -2265,16 +2265,16 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   transform: translateX(0);
 }
 
-/* ── Tab — compact button, always visible at right screen edge ── */
+/* ── Tab — compact square button, always visible at right screen edge ── */
 .task-panel-trigger {
   flex: 0 0 40px;
   width: 40px;
-  /* height: natural — wraps TASKS label + count, no stretching */
+  /* height: natural (~50px) — two stacked lines of horizontal text */
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 4px;
   background: rgba(4, 14, 4, 0.94);
   /* Pixel-art raised-edge: lighter top/left = highlight, darker bottom/right = shadow */
   border-top:    2px solid rgba(90, 180, 80, 0.55);
@@ -2284,11 +2284,10 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   color: rgba(130, 200, 120, 0.82);
   font-family: 'VT323', monospace;
   cursor: pointer;
-  padding: 14px 0;
+  padding: 10px 4px;
   box-sizing: border-box;
 }
 .task-panel-trigger:active {
-  /* Pressed: invert highlight edges to simulate click-down */
   border-top-color:    rgba(20, 55, 20, 0.75);
   border-left-color:   rgba(20, 55, 20, 0.75);
   border-bottom-color: rgba(90, 180, 80, 0.55);
@@ -2302,23 +2301,34 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   color: rgba(155, 235, 140, 0.95);
 }
 
-/* Vertical label — upright char stack, reads top→bottom */
+/* Label: small horizontal text above the count */
 .task-trigger-label {
-  writing-mode: vertical-rl;
-  text-orientation: upright;
-  font-size: 13px;
-  letter-spacing: 0.06em;
+  font-size: 10px;
+  letter-spacing: 0.1em;
   line-height: 1;
+  text-align: center;
+  width: 100%;
+  opacity: 0.7;
 }
 
-/* Count badge below label */
+/* Count: prominent number, the main read at a glance */
 .task-trigger-count {
-  font-size: 11px;
-  color: rgba(100, 160, 90, 0.55);
+  font-size: 16px;
+  color: rgba(130, 200, 110, 0.82);
   line-height: 1;
   letter-spacing: 0;
+  text-align: center;
 }
-.task-panel--open .task-trigger-count { color: rgba(120, 200, 110, 0.82); }
+.task-panel--open .task-trigger-count { color: rgba(160, 240, 130, 0.95); }
+
+/* ── Progress ping — pixel-art blink when a task updates ── */
+@keyframes task-tab-ping {
+  0%,  50%, 100% { background: rgba(4, 14, 4, 0.94);   color: rgba(130, 200, 120, 0.82); }
+  25%, 75%        { background: rgba(22, 90, 16, 0.98); color: rgba(215, 255, 155, 1); }
+}
+.task-panel-trigger--ping {
+  animation: task-tab-ping 0.55s steps(1) 1;
+}
 
 /* ── Panel body — fixed height for scrollable content ── */
 .task-panel-body-wrap {

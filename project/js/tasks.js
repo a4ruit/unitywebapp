@@ -98,7 +98,7 @@ const TaskTracker = (() => {
       if (t && !t.done) { t.count = 1; dirty = true; _maybeComplete(t); }
     }
 
-    if (dirty) _render();
+    if (dirty) { _render(); _pulseTab(); }
   }
 
   // ── Public: community quest updates (called from main.js handleQuestMessage) ─
@@ -109,6 +109,7 @@ const TaskTracker = (() => {
     t.count = count;
     if (goal) t.goal = goal;
     _render();
+    _pulseTab();
   }
 
   function recordQuestComplete(quest) {
@@ -117,6 +118,7 @@ const TaskTracker = (() => {
     t.done  = true;
     t.count = t.goal;
     _render();
+    _pulseTab();
   }
 
   // ── Public: panel toggle (called from onclick in index.html) ─────────────────
@@ -208,9 +210,17 @@ const TaskTracker = (() => {
     if (!btn) return;
     const done  = _ind.filter(t => t.done).length + _com.filter(t => t.done).length;
     const total = _ind.length + _com.length;
-    // No arrow — label is vertical (text-orientation: upright) so arrows look odd;
-    // open/closed state is conveyed by border-color / color change in CSS.
-    btn.innerHTML = `<span class="task-trigger-label">TASKS</span><span class="task-trigger-count">${done}/${total}</span>`;
+    btn.innerHTML = `<span class="task-trigger-label">TASK</span><span class="task-trigger-count">${done}/${total}</span>`;
+  }
+
+  // Brief pixel-blink on the tab whenever a task progresses
+  function _pulseTab() {
+    const btn = document.getElementById('taskPanelTrigger');
+    if (!btn) return;
+    btn.classList.remove('task-panel-trigger--ping');
+    void btn.offsetWidth;  // force reflow so animation restarts if called rapidly
+    btn.classList.add('task-panel-trigger--ping');
+    btn.addEventListener('animationend', () => btn.classList.remove('task-panel-trigger--ping'), { once: true });
   }
 
   return { recordEvent, recordQuestProgress, recordQuestComplete, togglePanel };
