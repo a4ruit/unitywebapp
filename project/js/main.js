@@ -391,8 +391,27 @@ const WS_DEBUG = (() => {
 // plain retry (was open, dropped = transient).
 let _wsHadOpenThisAttempt = false;
 
-// ─── Player name ──────────────────────────────────────────────────────────────
-let playerName = '';
+// ─── Player identity (name + tag colour) ─────────────────────────────────────
+// The chosen colour is shown by Unity on:
+//   - the player's placement labels in the world
+//   - the floating tag when they inhabit a critter
+//   - (future) chat-log entries
+// Wire protocol:  set_name|<CLIENT_ID>|<NAME>|<#RRGGBB>
+let playerName  = '';
+let playerColor = '';   // set by selectPlayerColor() or randomly on submit
+
+// Must match the swatches in index.html (and ideally Unity's palette).
+const PLAYER_COLORS = ['#7BE3FF', '#FFD96B', '#FF9BC9', '#6FE886', '#C28BFF', '#FFB070'];
+
+function selectPlayerColor(el) {
+  const hex = el && el.dataset ? el.dataset.color : '';
+  if (!hex) return;
+  document.querySelectorAll('.name-color-swatch').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  playerColor = hex;
+  const hint = document.getElementById('nameColorHint');
+  if (hint) hint.textContent = `(${hex})`;
+}
 
 function submitPlayerName() {
   const input = document.getElementById('nameInput');
@@ -403,8 +422,12 @@ function submitPlayerName() {
     return;
   }
   playerName = raw.slice(0, 16).toUpperCase();
+  // Random fallback if player didn't pick a colour
+  if (!playerColor) {
+    playerColor = PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
+  }
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(`set_name|${CLIENT_ID}|${playerName}`);
+    ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}`);
   }
   document.getElementById('screen-name').classList.add('hidden');
   document.getElementById('screen-pack').classList.remove('hidden');
@@ -422,7 +445,7 @@ function connect() {
       clearTimeout(reconnectTimer);
       sendPackType();
       updatePossessionWS();
-      if (playerName) ws.send(`set_name|${CLIENT_ID}|${playerName}`);
+      if (playerName) ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}`);
     };
     ws.onclose = () => {
       setStatus(false);

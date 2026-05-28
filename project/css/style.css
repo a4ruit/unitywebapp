@@ -1769,6 +1769,48 @@ body.glitch-active .star-counter-row {
   text-shadow: none;
 }
 
+/* ── Tag colour swatches on the username screen ───────────────────────── */
+.name-color-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
+}
+.name-color-swatch {
+  width: 30px;
+  height: 30px;
+  background: var(--c);
+  border: 2px solid rgba(8, 18, 8, 0.8);
+  cursor: pointer;
+  padding: 0;
+  image-rendering: pixelated;
+  /* Pixel-art raised look: bright top/left, dark bottom/right */
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.32),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.32),
+    0 0 6px 1px rgba(255, 255, 255, 0.18);
+  transition: transform 0.08s steps(2), box-shadow 0.12s;
+}
+.name-color-swatch:active {
+  transform: scale(0.9);
+}
+.name-color-swatch.selected {
+  border-color: var(--cream);
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.55),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.35),
+    0 0 12px 3px var(--c),
+    0 0 0 2px rgba(255, 255, 230, 0.85);
+}
+.name-term-hint {
+  font-family: 'VT323', 'Courier New', monospace;
+  font-size: 14px;
+  color: rgba(180, 200, 170, 0.5);
+  letter-spacing: 0.05em;
+  margin-top: 4px;
+}
+
 /* ── AD PACK canvas glow — active state ──────────── */
 #screen-pack.adpack-active .pack-carousel-stage {
   filter: drop-shadow(0 0 8px rgba(120,30,180,0.35)) drop-shadow(0 0 18px rgba(120,30,180,0.14));
@@ -2429,14 +2471,14 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 /* ── Task rows ── */
 .task-row {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;   /* items hug top — works with multi-line labels */
   gap: 4px;
   padding: 6px 10px 5px;
   font-family: 'VT323', monospace;
   font-size: 16px;
   color: rgba(175, 210, 165, 0.72);
   border-bottom: 1px solid rgba(80, 130, 80, 0.08);
-  line-height: 1;
+  line-height: 1.1;
 }
 .task-row--done {
   color: rgba(70, 190, 90, 0.58);
@@ -2453,10 +2495,12 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   flex: 1;
   font-size: 16px;
   letter-spacing: 0.02em;
-  min-width: 0;           /* allow flex item to shrink below content size */
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  min-width: 0;
+  /* Full sentence visible — wrap onto multiple lines as needed */
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  line-height: 1.1;
 }
 /* Block-character progress bar — fill glows green for whimsy */
 .task-bar {

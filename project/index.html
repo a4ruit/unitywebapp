@@ -53,6 +53,18 @@
                    autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
                    onkeydown="if(event.key==='Enter') submitPlayerName()">
           </div>
+          <div class="name-term-field">
+            <span class="name-term-label">tag colour:</span>
+            <div class="name-color-swatches" id="nameColorSwatches">
+              <button type="button" class="name-color-swatch" style="--c:#7BE3FF" data-color="#7BE3FF" onclick="selectPlayerColor(this)" aria-label="cyan"></button>
+              <button type="button" class="name-color-swatch" style="--c:#FFD96B" data-color="#FFD96B" onclick="selectPlayerColor(this)" aria-label="gold"></button>
+              <button type="button" class="name-color-swatch" style="--c:#FF9BC9" data-color="#FF9BC9" onclick="selectPlayerColor(this)" aria-label="pink"></button>
+              <button type="button" class="name-color-swatch" style="--c:#6FE886" data-color="#6FE886" onclick="selectPlayerColor(this)" aria-label="green"></button>
+              <button type="button" class="name-color-swatch" style="--c:#C28BFF" data-color="#C28BFF" onclick="selectPlayerColor(this)" aria-label="purple"></button>
+              <button type="button" class="name-color-swatch" style="--c:#FFB070" data-color="#FFB070" onclick="selectPlayerColor(this)" aria-label="orange"></button>
+            </div>
+            <span class="name-term-hint" id="nameColorHint">(random if you skip)</span>
+          </div>
           <button class="name-term-btn" onclick="submitPlayerName()">[ enter world ]</button>
         </div>
       </div>

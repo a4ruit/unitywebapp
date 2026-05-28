@@ -123,11 +123,29 @@ const TaskTracker = (() => {
 
   // ── Public: panel toggle (called from onclick in index.html) ─────────────────
 
-  function togglePanel() {
-    _open = !_open;
+  function togglePanel() { _setOpen(!_open); }
+
+  function _setOpen(state) {
+    if (_open === state) return;
+    _open = state;
     const panel = document.getElementById('taskPanel');
     if (panel) panel.classList.toggle('task-panel--open', _open);
     _render();
+    if (_open) {
+      // Delay one tick so the click that opened doesn't immediately close
+      setTimeout(() => document.addEventListener('pointerdown', _onOutsideClick, true), 0);
+    } else {
+      document.removeEventListener('pointerdown', _onOutsideClick, true);
+    }
+  }
+
+  // Close when player taps anywhere outside the panel (a card, the carousel,
+  // pack-type buttons, the background, etc.). Taps inside the panel (trigger
+  // or body) are ignored so the panel doesn't dismiss itself.
+  function _onOutsideClick(e) {
+    const panel = document.getElementById('taskPanel');
+    if (!panel || panel.contains(e.target)) return;
+    _setOpen(false);
   }
 
   // ── Internal helpers ─────────────────────────────────────────────────────────
