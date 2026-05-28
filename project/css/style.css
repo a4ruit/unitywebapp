@@ -2243,30 +2243,27 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .stars-shake { animation: stars-shake 0.4s ease; }
 
 /* ── TASK PANEL (right-side slide-out) ──────────────────────────────────── */
-/* Panel hugs the right edge. flex row-reverse keeps the 40px tab always
-   visible at the screen edge; the 220px body slides in via a stepped
-   transform — giving a chunky pixel-art feel.
-   Closed: translateX(220px)  — only the 40px tab peeks out.
-   Open:   translateX(0)      — full 260px panel visible.               */
+/* The TRIGGER never moves — it sits permanently at the right screen edge.
+   Only the BODY-WRAP is translated:
+     Closed: body translateX(+260px) → completely off-screen right.
+     Open:   body translateX(0)      → slides left into natural position.
+   pointer-events:none on the container so the off-screen body doesn't
+   eat taps on the carousel behind it.                                    */
 .task-panel {
   position: fixed;
   right: 0;
   top: 104px;   /* just below star-counter-row (34px + 62px min-height + 8px) */
-  transform: translateX(220px);  /* closed: only 40px tab visible */
-  width: 260px;   /* 40px tab + 220px body */
-  /* No fixed height — let tab shrink to its content size */
+  width: 260px; /* 40px trigger + 220px body */
   display: flex;
-  flex-direction: row-reverse;  /* trigger(tab) on right, body on left */
-  align-items: flex-start;      /* tab stays compact; body can be taller */
+  flex-direction: row-reverse; /* trigger(first in DOM) → rightmost → right edge */
+  align-items: flex-start;     /* trigger stays compact; body can be taller */
   z-index: 20;
-  transition: transform 0.22s steps(6);
-}
-.task-panel--open {
-  transform: translateX(0);
+  pointer-events: none;        /* re-enabled individually on trigger + open body */
 }
 
-/* ── Tab — compact square button, always visible at right screen edge ── */
+/* ── Trigger — compact square button, locked to right screen edge ── */
 .task-panel-trigger {
+  pointer-events: auto;  /* always tappable */
   flex: 0 0 40px;
   width: 40px;
   /* height: natural (~50px) — two stacked lines of horizontal text */
@@ -2330,8 +2327,11 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   animation: task-tab-ping 0.55s steps(1) 1;
 }
 
-/* ── Panel body — fixed height for scrollable content ── */
+/* ── Panel body — slides in/out independently of trigger ── */
+/* Closed: translateX(+260px) = body width(220) + trigger width(40) → off-screen right.
+   Open:   translateX(0)      = natural flex position (left of trigger).  */
 .task-panel-body-wrap {
+  pointer-events: none;  /* disabled while off-screen */
   flex: 0 0 220px;
   width: 220px;
   height: 270px;
@@ -2346,8 +2346,14 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   border-top:    2px solid rgba(90, 160, 90, 0.45);
   border-left:   2px solid rgba(90, 160, 90, 0.45);
   border-bottom: 2px solid rgba(20, 50, 20, 0.7);
-  border-right:  none;   /* flush join with tab — no double-border seam */
+  border-right:  none;
   box-sizing: border-box;
+  transform: translateX(260px);          /* closed state */
+  transition: transform 0.22s steps(6); /* chunky pixel-art slide */
+}
+.task-panel--open .task-panel-body-wrap {
+  pointer-events: auto;
+  transform: translateX(0);             /* open state */
 }
 
 /* Pixel-thin scrollbar */
