@@ -25,7 +25,7 @@ const CardTextures = (() => {
 
     // Rarity label (small text below the symbol)
     rarityY:          312,
-    rarityFontSize:   11,
+    rarityFontSize:   12,
 
     // Separator line between rarity and description
     separatorY:       322,
@@ -33,9 +33,9 @@ const CardTextures = (() => {
 
     // Description / flavour text (bottom of card)
     descStartY:       340,
-    descLineHeight:   16,
-    descFontSize:     14,
-    descMaxWidth:     210,
+    descLineHeight:   17,
+    descFontSize:     15,
+    descMaxWidth:     208,
   };
 
   const RARITY_CFG = {
@@ -128,25 +128,67 @@ const CardTextures = (() => {
       ctx.beginPath(); ctx.ellipse(-6,-10,10,6,-0.4,0,Math.PI*2); ctx.fill();
 
     } else if (rarity === 'uncommon') {
-      // Pale Growth — pallid tumour with surface nodules and feeding veins
-      ctx.strokeStyle = '#4a8aaa'; ctx.lineWidth = 1.5;
-      // Main mass
-      ctx.fillStyle = 'rgba(175,175,165,0.52)';
-      ctx.beginPath(); ctx.ellipse(0,4,24,20,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-      // Surface nodules — lumpy bumps
-      [[14,-10,6],[18,10,5],[-16,8,7],[-10,-14,5],[4,18,5],[-4,-4,4]].forEach(([x,y,r]) => {
-        ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
-        ctx.fillStyle = 'rgba(188,185,174,0.62)'; ctx.fill();
-        ctx.strokeStyle = '#4a8aaa'; ctx.lineWidth = 0.8; ctx.stroke();
-      });
-      // Feeding veins branching across surface
-      ctx.strokeStyle = 'rgba(74,100,130,0.4)'; ctx.lineWidth = 0.8;
-      [[0,4,-18,8],[0,4,16,-10],[0,4,-10,-14],[0,4,4,18],[-18,8,-24,0],[16,-10,22,-18]].forEach(([x1,y1,x2,y2]) => {
+      // Fleshling — dark fleshy blob with a single glowing eye and red emission.
+      // Mirrors the creature this card spawns on the Unity side (dark body,
+      // red emissive glow, one HDR eye). See Fleshling.cs → BuildVisual().
+      const breathe = 1 + Math.sin(t * 2.2) * 0.04;   // subtle; static cards ignore t
+      ctx.save();
+      ctx.scale(breathe, breathe);
+
+      // Outer emissive halo — the red glow bleeding off the body
+      const halo = ctx.createRadialGradient(0, 2, 6, 0, 2, 46);
+      halo.addColorStop(0,   'rgba(220,60,40,0.35)');
+      halo.addColorStop(0.5, 'rgba(180,30,24,0.14)');
+      halo.addColorStop(1,   'rgba(120,20,18,0)');
+      ctx.fillStyle = halo;
+      ctx.beginPath(); ctx.arc(0, 2, 46, 0, Math.PI*2); ctx.fill();
+
+      // Body — irregular fleshy sphere, dark maroon with a red-lit top
+      const bodyPts = [[0,-26],[16,-20],[25,-4],[24,12],[14,24],[-2,27],[-16,22],[-25,8],[-24,-10],[-13,-22]];
+      const bodyGrad = ctx.createRadialGradient(-6,-10,4, 0,4,30);
+      bodyGrad.addColorStop(0,    'rgba(122,34,30,0.96)');
+      bodyGrad.addColorStop(0.55, 'rgba(64,16,20,0.97)');
+      bodyGrad.addColorStop(1,    'rgba(26,7,11,0.98)');
+      ctx.beginPath();
+      ctx.moveTo((bodyPts[0][0]+bodyPts[bodyPts.length-1][0])/2,(bodyPts[0][1]+bodyPts[bodyPts.length-1][1])/2);
+      for (let i = 0; i < bodyPts.length; i++) {
+        const c = bodyPts[i], n = bodyPts[(i+1)%bodyPts.length];
+        ctx.quadraticCurveTo(c[0],c[1],(c[0]+n[0])/2,(c[1]+n[1])/2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = bodyGrad;
+      // Emissive rim glow
+      ctx.shadowColor = 'rgba(240,70,50,0.9)'; ctx.shadowBlur = 10;
+      ctx.strokeStyle = 'rgba(235,80,56,0.85)'; ctx.lineWidth = 1.8;
+      ctx.fill(); ctx.stroke();
+      ctx.shadowBlur = 0;
+
+      // Fleshy seams / surface veins
+      ctx.strokeStyle = 'rgba(190,46,38,0.5)'; ctx.lineWidth = 0.9;
+      [[-10,-14,-2,2],[6,-12,12,4],[-14,6,-4,12],[2,8,10,18],[-2,2,-2,20]].forEach(([x1,y1,x2,y2]) => {
         ctx.beginPath(); ctx.moveTo(x1,y1); ctx.quadraticCurveTo((x1+x2)/2+3,(y1+y2)/2,x2,y2); ctx.stroke();
       });
-      // Pale sheen
-      ctx.fillStyle = 'rgba(220,218,210,0.2)';
-      ctx.beginPath(); ctx.ellipse(-6,-4,12,8,-0.4,0,Math.PI*2); ctx.fill();
+
+      // Dark fleshy lumps
+      [[-12,10,5],[12,12,4],[16,-8,3]].forEach(([x,y,r]) => {
+        ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+        ctx.fillStyle = 'rgba(30,8,12,0.55)'; ctx.fill();
+      });
+
+      // Single glowing eye — upper-front, the hint of intent
+      const ex = 0, ey = -4;
+      ctx.shadowColor = 'rgba(255,150,110,0.95)'; ctx.shadowBlur = 12;
+      ctx.fillStyle = 'rgba(255,140,110,0.5)';                 // glow ring
+      ctx.beginPath(); ctx.arc(ex,ey,9,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,205,170,1)';                   // eye body
+      ctx.beginPath(); ctx.arc(ex,ey,6,0,Math.PI*2); ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = 'rgba(255,250,240,1)';                   // hot core highlight
+      ctx.beginPath(); ctx.arc(ex-1,ey-1,2.4,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(40,6,10,0.9)';                     // vertical slit pupil
+      ctx.beginPath(); ctx.ellipse(ex,ey,1.1,4,0,0,Math.PI*2); ctx.fill();
+
+      ctx.restore();
 
     } else if (rarity === 'rare') {
       // Wet Membrane — translucent stretched skin, drooping and dripping
@@ -1954,17 +1996,37 @@ const CardTextures = (() => {
     ctx.stroke();
 
     // ── DESCRIPTION (bottom of card) ────────────────────────────────────────
-    ctx.font = `${LAYOUT.descFontSize}px "Share Tech Mono", monospace`;
-    ctx.fillStyle = 'rgba(232,224,200,0.5)';
+    const descSize = LAYOUT.descFontSize;
+    const lh       = LAYOUT.descLineHeight;
+    ctx.font = `${descSize}px "Share Tech Mono", monospace`;
+
+    // Wrap into lines first so we can size a backing plate behind the text.
     const words = card.desc.split(' ');
-    let line = '', lineY = LAYOUT.descStartY;
+    const lines = [];
+    let line = '';
     words.forEach(w => {
       const test = line ? line + ' ' + w : w;
       if (ctx.measureText(test).width > LAYOUT.descMaxWidth && line) {
-        ctx.fillText(line, 128, lineY); line = w; lineY += LAYOUT.descLineHeight;
+        lines.push(line); line = w;
       } else { line = test; }
     });
-    if (line) ctx.fillText(line, 128, lineY);
+    if (line) lines.push(line);
+
+    // Dark backing plate so the flavour text reads over the busy card art.
+    const plateX   = LAYOUT.separatorPad - 4;
+    const plateW   = 256 - plateX * 2;
+    const plateTop = LAYOUT.descStartY - descSize + 1;
+    const plateBot = LAYOUT.descStartY + (lines.length - 1) * lh + 7;
+    ctx.fillStyle = 'rgba(6,10,8,0.74)';
+    ctx.fillRect(plateX, plateTop, plateW, plateBot - plateTop);
+
+    // Brighter, larger flavour text with a soft shadow for extra contrast.
+    ctx.fillStyle   = 'rgba(240,236,222,0.95)';
+    ctx.shadowColor = 'rgba(0,0,0,0.85)';
+    ctx.shadowBlur  = 3;
+    let lineY = LAYOUT.descStartY;
+    lines.forEach(l => { ctx.fillText(l, 128, lineY); lineY += lh; });
+    ctx.shadowBlur = 0;
   }
 
   // â”€â”€â”€ Public: buildFace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€

@@ -40,7 +40,7 @@ const NATURE_CARDS = [
 // ─── FLESH (garbage / horror) ─────────────────────────────────────────────────
 const FLESH_CARDS = [
   { id:'small_cube', name:'Unidentified Tissue', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
-  { id:'large_cube', name:'Pale Growth',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Found attached to nothing. Still warm.' },
+  { id:'large_cube', name:'Fleshling',           rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Small. Hungry. It found you first.' },
   { id:'sphere',     name:'Blind Box',            rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It has eyes. They do not work. But it knows you are here.' },
   { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. Pre-dates the colony.' },
   { id:'octagon',    name:'Unnamed Organ',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'It has a function. You do not want to know what it is.' },
@@ -164,6 +164,12 @@ function updatePersonalPhase() {
     }
   }
   _prevPersonalLevel = level;
+  // Drive the screen bleed off THIS phone's horror phase too (reversible: when a
+  // future revert-to-pristine drops `level`, this drops below threshold and the
+  // blood fades out). Maps pulls into 0..1 where HORROR_THRESHOLD = 0.60.
+  if (typeof BloodDrip !== 'undefined' && BloodDrip.setPersonalLevel) {
+    BloodDrip.setPersonalLevel(Math.min(1, (level / HORROR_THRESHOLD) * 0.60));
+  }
   // Tell Unity THIS player's current pack type so per-spawn routing is correct
   sendPackType();
 }
@@ -345,6 +351,13 @@ function rollPack() {
   else if (roll < 0.257) topCard = pick('legendary');
   else if (roll < 0.457) topCard = pick('rare');
   else                   topCard = pick('uncommon');
+
+  // Guaranteed Legendary voucher (bought in the pristine shop). Forces the top
+  // card to legendary-or-better, then consumes the voucher. Pierces the gacha.
+  if (window._guaranteedLegendary) {
+    if (topCard.rarityRank < 3) topCard = pick('legendary');
+    window._guaranteedLegendary = false;
+  }
 
   cards.push(pick('common'));
   cards.push(pick('common'));
@@ -798,6 +811,8 @@ function showChoiceGrid() {
   const cs = document.querySelector('.choose-sub');
   if (ct) ct.textContent = activePackType === 'adpack' ? 'CHOOSE YOUR AD' : 'CHOOSE YOUR WASTE';
   if (cs) cs.textContent = activePackType === 'adpack' ? 'pollution is the point' : 'one drop per pack';
+  const csb = document.getElementById('choiceStarBalance');
+  if (csb) csb.textContent = (typeof stars !== 'undefined') ? stars : (window.getStarBalance ? window.getStarBalance() : 0);
   const cardsWithCost = packCards.map(c => ({
     ...c,
     starCost: PLACEMENT_COSTS[c.rarity] ?? 0,

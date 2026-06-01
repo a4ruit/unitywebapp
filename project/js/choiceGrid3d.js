@@ -411,11 +411,14 @@ const ChoiceGrid3D = (() => {
     const _bal = typeof window.getStarBalance === 'function' ? window.getStarBalance() : Infinity;
     cards.forEach((card, i) => {
       const cost = card.starCost ?? 0;
-      if (cost === 0) return;
       const cellEl = document.getElementById(`choiceCell${i}`);
       if (!cellEl) return;
+      // Dim cards the player can't afford; affordable cards keep full colour + bloom.
+      const affordable = _bal >= cost;
+      cellEl.classList.toggle('choice-cell-3d--locked', !affordable);
+      if (cost === 0) return;
       const badge = document.createElement('div');
-      badge.className = 'choice-cost-badge' + (_bal < cost ? ' choice-cost-badge--locked' : '');
+      badge.className = 'choice-cost-badge' + (affordable ? '' : ' choice-cost-badge--locked');
       badge.textContent = `★ ${cost}`;
       cellEl.appendChild(badge);
     });
@@ -456,5 +459,21 @@ const ChoiceGrid3D = (() => {
     // _renderer stays alive — WebGL context creation is expensive
   }
 
-  return { show, showGodPack, destroy };
+  // Re-evaluate affordability on the live grid (call when the star balance
+  // changes mid-reveal — e.g. a quest reward lands). Re-lights cards the player
+  // can now afford and dims any they no longer can.
+  function refreshAffordability() {
+    if (!cells || !cells.length) return;
+    const bal = typeof window.getStarBalance === 'function' ? window.getStarBalance() : Infinity;
+    cells.forEach(cell => {
+      if (!cell || !cell.el) return;
+      const cost = (cell.card && cell.card.starCost) ?? 0;
+      const affordable = bal >= cost;
+      cell.el.classList.toggle('choice-cell-3d--locked', !affordable);
+      const badge = cell.el.querySelector('.choice-cost-badge');
+      if (badge) badge.classList.toggle('choice-cost-badge--locked', !affordable);
+    });
+  }
+
+  return { show, showGodPack, destroy, refreshAffordability };
 })();

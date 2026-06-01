@@ -92,6 +92,7 @@ let _ui             = null;   // DOM refs, built once on load
 let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
 let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
 let _placing        = false;  // true while user is moving a placement preview
+let _placePos       = null;   // {x,y} 0..1 normalized preview pos for the mini-map
 let _placementInputInterval = null;
 // Duration of the current possession session — captured at _onGranted time so
 // the GBC "TIME" stat can render as "cur/total" (e.g. 023/030) like an RPG HP bar.
@@ -296,6 +297,15 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('placement_done|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onPlacementDone(); return true; }
+  }
+  // Live preview position for the placement mini-map: placement_pos|clientId|nx|nz
+  if (msg.startsWith('placement_pos|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) {
+      _placePos = { x: parseFloat(parts[2]), y: parseFloat(parts[3]) };
+      _drawPlaceMinimap();
+      return true;
+    }
   }
 
   // Unity announces this every time a critter-pack common card spawns a sheep.
@@ -816,6 +826,19 @@ function _buildUI() {
       left: 50%;
       transform: translate(-50%,-50%);
     }
+    /* Directional arrows around the joystick — show which way the stick moves */
+    .poss-joy-arrow {
+      position: absolute;
+      color: rgba(0,200,180,0.55);
+      font-size: 15px;
+      line-height: 1;
+      pointer-events: none;
+      text-shadow: 0 0 4px rgba(0,200,180,0.5);
+    }
+    .poss-joy-arrow.up    { top: 5px;    left: 50%; transform: translateX(-50%); }
+    .poss-joy-arrow.down  { bottom: 5px; left: 50%; transform: translateX(-50%); }
+    .poss-joy-arrow.left  { left: 6px;   top: 50%;  transform: translateY(-50%); }
+    .poss-joy-arrow.right { right: 6px;  top: 50%;  transform: translateY(-50%); }
 
     /* ── Placement modal — fullscreen overlay + card housing the joystick ── */
     #poss-place-overlay {
@@ -877,14 +900,40 @@ function _buildUI() {
     }
     #poss-place-card-header {
       color: #ffb030;
-      font-family: monospace;
-      font-size: 11px;
-      letter-spacing: 3px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 15px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       text-shadow: 0 0 8px rgba(255,176,48,0.7);
       text-align: center;
-      line-height: 1.5;
+      line-height: 1.4;
       padding-top: 4%;
+    }
+    /* ── Placement mini-map — live top-down with an X tracking the preview ── */
+    #poss-place-minimap {
+      width: auto;
+      height: 40%;
+      max-height: 168px;
+      aspect-ratio: 108 / 148;   /* portrait rectangle — matches the vertical map */
+      image-rendering: pixelated;
+      border: 2px solid rgba(120,200,140,0.5);
+      box-shadow: 0 0 8px rgba(120,200,140,0.22), inset 0 0 10px rgba(0,0,0,0.5);
+      background: #0a160e;
+    }
+    /* Hint nudging the player to look up at the projection while steering */
+    #poss-place-hint {
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      text-align: center;
+      color: rgba(180,230,255,0.8);
+      text-shadow: 0 0 6px rgba(120,200,255,0.5);
+      animation: possHintPulse 1.6s ease-in-out infinite;
+    }
+    @keyframes possHintPulse {
+      0%, 100% { opacity: 0.5; transform: translateY(0); }
+      50%      { opacity: 1;   transform: translateY(-1px); }
     }
 
     /* ── Block overlay — transparent full-screen div that eats all pointer
@@ -941,9 +990,9 @@ function _buildUI() {
       background: rgba(80,220,140,0.18);
       border: 2px solid rgba(80,220,140,0.85);
       color: #50dc8c;
-      font-family: monospace;
-      font-size: 16px;
-      letter-spacing: 3px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 17px;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       cursor: pointer;
       display: none;
@@ -1306,7 +1355,12 @@ function _buildUI() {
       <img id="poss-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
     </div>
     <div id="poss-joy-zone">
-      <div id="poss-joy-bg"></div>
+      <div id="poss-joy-bg">
+        <span class="poss-joy-arrow up">▲</span>
+        <span class="poss-joy-arrow down">▼</span>
+        <span class="poss-joy-arrow left">◀</span>
+        <span class="poss-joy-arrow right">▶</span>
+      </div>
       <div id="poss-joy-knob"></div>
     </div>
     <button id="poss-eat">EAT</button>
@@ -1322,6 +1376,10 @@ function _buildUI() {
         <div id="poss-place-card-backdrop"></div>
         <div id="poss-place-card-content">
           <div id="poss-place-card-header">WILDFLOWER<br>PLACEMENT</div>
+          <!-- live mini-map of the Unity world; X tracks the preview in real time -->
+          <canvas id="poss-place-minimap" width="108" height="148"></canvas>
+          <!-- nudge the player to look up at the projection while they steer -->
+          <div id="poss-place-hint">▲ look up at installation screen</div>
           <!-- controls row: joystick appended LEFT, PLACE button appended RIGHT -->
           <div id="poss-place-controls"></div>
         </div>
@@ -1367,6 +1425,7 @@ function _buildUI() {
     placeOverlay:     root.querySelector('#poss-place-overlay'),
     placeCardContent: root.querySelector('#poss-place-card-content'),
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
+    placeMinimap:     root.querySelector('#poss-place-minimap'),
     placeControls:    root.querySelector('#poss-place-controls'),
     blockOverlay:     root.querySelector('#poss-block-overlay'),
     // Fungi spore panel
@@ -1702,8 +1761,105 @@ function _onBossSpawned() {
 
 // ── Placement (user-driven card spawning) ──────────────────────────────────
 
+// ── Placement mini-map orientation — CALIBRATE HERE ──────────────────────────
+// Tune these so the X travels the SAME direction as the joystick / matches the
+// projector. Flip one axis at a time until it lines up.
+//   flipX  — mirror left/right
+//   flipY  — mirror up/down
+//   swapXY — rotate the axes 90° (combine with flips for 180°/270°)
+// Reference combos:  0°{f,f,f}  90°{swap,f,flipY}  180°{flipX,flipY,f}  270°{swap,flipX,f}
+const MINIMAP_ORIENT = { flipX: true, flipY: false, swapXY: false };
+
+// Landmark shapes (normalized 0..1) roughing out the Unity scene as a site-plan:
+// a diagonal lake outline and a few stone outcrops. Drawn to match the projector
+// view — tweak the coordinates freely to taste.
+// Lake = a wavy water band spanning the full width across the middle, with
+// grass above and below. Points run clockwise: top shore L→R, then bottom R→L.
+const _MAP_LAKE = [
+  [0.00,0.34],[0.25,0.30],[0.50,0.34],[0.75,0.33],[1.00,0.39],   // top shore
+  [1.00,0.70],[0.75,0.66],[0.50,0.60],[0.25,0.58],[0.00,0.60]    // bottom shore
+];
+const _MAP_ROCKS = [
+  { x:0.14, y:0.33, rx:0.10, ry:0.07 },   // big rock at lake's top-left shore
+  { x:0.25, y:0.44, rx:0.05, ry:0.04 },   // small rock in the water
+  { x:0.69, y:0.47, rx:0.05, ry:0.085 },  // tall rock on the right of the lake
+];
+
+function _mapPoly(ctx, pts, W, H) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0] * W, pts[0][1] * H);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0] * W, pts[i][1] * H);
+  ctx.closePath();
+}
+
+// Draw the grid mini-map with a minimal site-plan rough-out + the live X marker.
+function _drawPlaceMinimap() {
+  const cv = _ui && _ui.placeMinimap;
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  ctx.imageSmoothingEnabled = false;
+
+  // Dark ground
+  ctx.fillStyle = '#0a160e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Faint pixel grid (schematic base)
+  ctx.strokeStyle = 'rgba(90,170,110,0.12)';
+  ctx.lineWidth = 1;
+  for (let x = 12; x < W; x += 12) { ctx.beginPath(); ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, H); ctx.stroke(); }
+  for (let y = 12; y < H; y += 12) { ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke(); }
+
+  // Lake — outline only, with faint inner "water" hatch lines (plan symbol)
+  ctx.strokeStyle = 'rgba(90,180,205,0.65)';
+  ctx.lineWidth = 1;
+  _mapPoly(ctx, _MAP_LAKE, W, H);
+  ctx.stroke();
+  ctx.save();
+  _mapPoly(ctx, _MAP_LAKE, W, H);
+  ctx.clip();
+  ctx.strokeStyle = 'rgba(90,180,205,0.22)';
+  for (let y = H * 0.30; y < H * 0.72; y += 7) {
+    ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke();
+  }
+  ctx.restore();
+
+  // Rocks — simple outlined blobs
+  ctx.strokeStyle = 'rgba(170,175,180,0.5)';
+  _MAP_ROCKS.forEach(r => {
+    ctx.beginPath();
+    ctx.ellipse(r.x * W, r.y * H, r.rx * W, r.ry * H, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  });
+
+  // Border
+  ctx.strokeStyle = 'rgba(120,200,140,0.4)';
+  ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+
+  // ── Live X marker — teal, glowing. Orientation via MINIMAP_ORIENT. ──
+  if (_placePos) {
+    let u = _placePos.x, v = _placePos.y;
+    if (MINIMAP_ORIENT.swapXY) { const t = u; u = v; v = t; }
+    if (MINIMAP_ORIENT.flipX)  u = 1 - u;
+    if (MINIMAP_ORIENT.flipY)  v = 1 - v;
+    const px = Math.round(u * (W - 10)) + 5;
+    const py = Math.round(v * (H - 10)) + 5;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,224,200,0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#3effe0';
+    for (let i = -3; i <= 3; i++) {
+      ctx.fillRect(px + i, py + i, 2, 2);
+      ctx.fillRect(px + i, py - i, 2, 2);
+    }
+    ctx.restore();
+  }
+}
+
 function _onPlacementGranted(cardName) {
   _placing = true;
+  _placePos = { x: 0.5, y: 0.5 };   // start centred until Unity sends the first pos
+  _drawPlaceMinimap();
 
   // Update the card header dynamically — e.g. "WILDFLOWER PLACEMENT" vs "FLOWER BUSH PLACEMENT"
   if (_ui.placeCardHeader) {
@@ -1748,6 +1904,7 @@ function _onPlacementDenied() {
 
 function _onPlacementDone() {
   _placing = false;
+  _placePos = null;
   clearInterval(_placementInputInterval);
   _placementInputInterval = null;
   _joyX = 0; _joyY = 0;

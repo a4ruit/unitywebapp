@@ -6,7 +6,7 @@
   <title>PACK MENTALITY</title>
   <link rel="stylesheet" href="https://use.typekit.net/yki8oca.css">
   <link rel="stylesheet" href="css/style.css">
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=VT323&family=Pixelify+Sans:wght@400..700&display=swap">
 </head>
 <body>
   <div class="bg-grid"></div>
@@ -134,6 +134,11 @@
       <!-- CHOOSE SCREEN -->
       <div class="screen hidden" id="screen-choose">
         <div class="choose-header">
+          <div class="choice-stars">
+            <span class="choice-stars-icon">★</span>
+            <span class="choice-stars-value" id="choiceStarBalance">0</span>
+            <span class="choice-stars-label">stars</span>
+          </div>
         </div>
         <div class="choice-grid" id="choiceGrid"></div>
       </div>
@@ -143,8 +148,7 @@
         <div class="shop-wrapper">
 
           <div class="shop-header">
-            <span class="shop-title">★ STAR SHOP ★</span>
-            <span class="shop-sub">invest in your experience</span>
+            <span class="shop-title">★ SHOP ★</span>
             <div class="shop-balance">
               <span class="shop-balance-icon">★</span>
               <span class="shop-balance-value" id="shopStarBalance">0</span>
@@ -153,6 +157,50 @@
           </div>
 
           <div class="shop-items">
+
+            <!-- ── PRISTINE PHASE — generous, non-predatory (shown when pristine) ── -->
+            <div class="shop-items-pristine">
+
+              <div class="shop-item shop-item--gift">
+                <span class="shop-item-icon">🎁</span>
+                <div class="shop-item-info">
+                  <div class="shop-item-name">A GIFT</div>
+                  <div class="shop-item-stars shop-item-stars--free">FREE</div>
+                </div>
+                <button class="shop-btn shop-btn--affordable" id="shopGiftBtn" onclick="shopGiftPacks(3, this)">RECEIVE</button>
+              </div>
+
+              <div class="shop-item">
+                <span class="shop-item-icon">📦</span>
+                <div class="shop-item-info">
+                  <div class="shop-item-name">6 PACKS</div>
+                  <div class="shop-item-stars">★ 3</div>
+                </div>
+                <button class="shop-btn" onclick="shopBuyPacks(3, 6, this)">BUY</button>
+              </div>
+
+              <div class="shop-item">
+                <span class="shop-item-icon">🔄</span>
+                <div class="shop-item-info">
+                  <div class="shop-item-name">REFRESH TASKS</div>
+                  <div class="shop-item-stars">★ 1</div>
+                </div>
+                <button class="shop-btn" onclick="shopRefreshTasks(this)">REFRESH</button>
+              </div>
+
+              <div class="shop-item shop-item--legendary">
+                <span class="shop-item-icon">⭐</span>
+                <div class="shop-item-info">
+                  <div class="shop-item-name">GUARANTEED LEGENDARY</div>
+                  <div class="shop-item-stars">★ 25</div>
+                </div>
+                <button class="shop-btn" onclick="shopBuyLegendary(25, this)">BUY</button>
+              </div>
+
+            </div>
+
+            <!-- ── HORROR PHASE — predatory ad-hell (shown when corrupted) ──────── -->
+            <div class="shop-items-horror">
 
             <div class="shop-item">
               <div class="shop-item-stars">★ 10</div>
@@ -216,6 +264,8 @@
               <div class="shop-item-fine">* assuming 15-second ads, watched continuously, 24 hours a day, without sleeping</div>
               <button class="shop-btn shop-btn--whale" onclick="shopBuy(2000000)">BUY</button>
             </div>
+
+            </div><!-- end .shop-items-horror -->
 
           </div>
 
@@ -340,6 +390,7 @@
   <script src="js/Pack3d.js"></script>
   <script src="js/cardTextures.js"></script>
   <script src="js/cards3d.js"></script>
+  <script src="js/starFx.js"></script>
   <script src="js/counter.js"></script>
   <script src="js/adLED.js"></script>
   <script src="js/ad.js"></script>

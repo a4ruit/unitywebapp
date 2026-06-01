@@ -121,6 +121,20 @@ const TaskTracker = (() => {
     _pulseTab();
   }
 
+  // ── Public: refresh individual tasks (called from the pristine shop) ─────────
+  // Resets the client-side individual tasks so the player can complete and
+  // re-earn them — the generous "keep earning" loop. Community tasks are
+  // server-driven and left untouched.
+  function refreshIndividual() {
+    _ind.forEach(t => {
+      t.count = 0;
+      t.done  = false;
+      if (t._seen) t._seen.clear();
+    });
+    _render();
+    _pulseTab();
+  }
+
   // ── Public: panel toggle (called from onclick in index.html) ─────────────────
 
   function togglePanel() { _setOpen(!_open); }
@@ -172,7 +186,7 @@ const TaskTracker = (() => {
   function _toast(label, reward) {
     const el = document.getElementById('questToast');
     if (!el) return;
-    el.textContent     = `TASK: ${label.toUpperCase()}  +${reward} ★`;
+    el.textContent     = `Task: ${label}  +${reward} ★`;
     el.style.display    = 'block';
     el.style.opacity    = '0';
     el.style.transition = 'none';
@@ -196,31 +210,34 @@ const TaskTracker = (() => {
 
     const rows = [];
 
-    rows.push('<div class="task-section-hdr">── MY TASKS</div>');
+    rows.push('<div class="task-section-hdr">── My Tasks</div>');
     _ind.forEach(t => rows.push(_row(t)));
 
-    rows.push('<div class="task-section-hdr task-section-hdr--community">── COMMUNITY</div>');
+    rows.push('<div class="task-section-hdr task-section-hdr--community">── Community</div>');
     _com.forEach(t => rows.push(_comRow(t)));
 
     body.innerHTML = rows.join('');
   }
 
-  function _row(t) {
-    const icon = t.done ? '[✓]' : '[ ]';
-    const cls  = t.done ? ' task-row--done' : '';
-    const bar  = (!t.done && t.goal > 1) ? _bar(t.count, t.goal) : '';
-    const prog = (!t.done && t.goal > 1) ? `<span class="task-prog">${t.count}/${t.goal}</span>` : '';
-    const rwd  = t.done ? '' : `<span class="task-rwd">+${t.reward}★</span>`;
-    return `<div class="task-row${cls}"><span class="task-icon">${icon}</span><span class="task-lbl">${t.label}</span>${bar}${prog}${rwd}</div>`;
-  }
+  function _row(t)    { return _rowHtml(t, !t.done && t.goal > 1); }
+  function _comRow(t) { return _rowHtml(t, !t.done); }
 
-  function _comRow(t) {
+  // Shared row markup. Label + reward sit on the top line; the progress bar
+  // drops to its own line beneath so the label never gets squished.
+  function _rowHtml(t, showBar) {
     const icon = t.done ? '[✓]' : '[ ]';
     const cls  = t.done ? ' task-row--done' : '';
-    const bar  = !t.done ? _bar(t.count, t.goal) : '';
-    const prog = !t.done ? `<span class="task-prog">${t.count}/${t.goal}</span>` : '';
     const rwd  = t.done ? '' : `<span class="task-rwd">+${t.reward}★</span>`;
-    return `<div class="task-row${cls}"><span class="task-icon">${icon}</span><span class="task-lbl">${t.label}</span>${bar}${prog}${rwd}</div>`;
+    const progRow = showBar
+      ? `<div class="task-progrow">${_bar(t.count, t.goal)}<span class="task-prog">${t.count}/${t.goal}</span></div>`
+      : '';
+    return `<div class="task-row${cls}">` +
+             `<span class="task-icon">${icon}</span>` +
+             `<div class="task-main">` +
+               `<div class="task-toprow"><span class="task-lbl">${t.label}</span>${rwd}</div>` +
+               progRow +
+             `</div>` +
+           `</div>`;
   }
 
   function _updateTrigger() {
@@ -234,7 +251,7 @@ const TaskTracker = (() => {
     const fill  = '█'.repeat(f);
     const empty = '░'.repeat(W - f);
     btn.innerHTML =
-      `<span class="task-trigger-label">TASKS</span>` +
+      `<span class="task-trigger-label">Tasks</span>` +
       `<span class="task-trigger-count">${done}/${total}</span>` +
       `<span class="task-trigger-bar"><span class="task-trigger-bar-fill">${fill}</span><span class="task-trigger-bar-empty">${empty}</span></span>`;
   }
@@ -249,6 +266,6 @@ const TaskTracker = (() => {
     btn.addEventListener('animationend', () => btn.classList.remove('task-panel-trigger--ping'), { once: true });
   }
 
-  return { recordEvent, recordQuestProgress, recordQuestComplete, togglePanel };
+  return { recordEvent, recordQuestProgress, recordQuestComplete, refreshIndividual, togglePanel };
 
 })();

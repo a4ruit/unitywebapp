@@ -28,7 +28,9 @@ const BloodDrip = (() => {
   let GW, GH;                // grid dimensions
 
   let drips           = [];
-  let corruptionLevel = 0;       // 0..1, authoritative from Unity
+  let corruptionLevel = 0;       // 0..1, EFFECTIVE level = max(collective, personal)
+  let _collectiveLevel = 0;      // 0..1, room-wide (from Unity via corruption-bar.js)
+  let _personalLevel   = 0;      // 0..1, THIS phone's own horror phase (from main.js)
   let initialized     = false;   // canvases + loop exist
   let running         = false;   // active when corruptionLevel >= HORROR_LEVEL_THRESHOLD
   let stainAlpha      = 1.0;     // multiplier for stain layer opacity — drops during heal
@@ -408,7 +410,22 @@ const BloodDrip = (() => {
   //   horror → nature   (level crosses down): stop new drips, fade stains to 0
   //   horror → horror   (level changes):     intensity() picks up new value automatically
   function setCorruptionLevel(level) {
-    const next = Math.max(0, Math.min(1, level));
+    _collectiveLevel = Math.max(0, Math.min(1, level));
+    _applyEffectiveLevel();
+  }
+
+  // Called by main.js when THIS phone's personal phase changes. Maps personal
+  // pulls into the same 0..1 scale (see main.js). Kept reversible: drop the
+  // personal level back below the threshold (e.g. on a future revert-to-pristine)
+  // and the bleed fades out via the same heal path as the collective.
+  function setPersonalLevel(level) {
+    _personalLevel = Math.max(0, Math.min(1, level));
+    _applyEffectiveLevel();
+  }
+
+  // Bleed is driven by whichever is higher — room-wide OR personal horror.
+  function _applyEffectiveLevel() {
+    const next = Math.max(_collectiveLevel, _personalLevel);
     const wasRunning = running;
     corruptionLevel = next;
 
@@ -467,5 +484,5 @@ const BloodDrip = (() => {
     schedulePackDrips();
   }
 
-  return { onPackOpened, startPackDrips, setCorruptionLevel };
+  return { onPackOpened, startPackDrips, setCorruptionLevel, setPersonalLevel };
 })();
