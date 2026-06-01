@@ -15,6 +15,7 @@ const QUEST_STAR_REWARDS = {
   sheep:   10,
   ducks:   10,
   all:     20,
+  boss:    50,   // defeat-the-boss event quest (keep in sync with QuestManager.bossStarReward)
 };
 
 // ─── Stars ─────────────────────────────────────────────────────────────────────

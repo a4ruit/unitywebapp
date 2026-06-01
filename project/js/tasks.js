@@ -55,6 +55,8 @@ const TaskTracker = (() => {
     { id:'flowers', label:'Plant flowers', count:0, goal:50, reward:15, done:false },
     { id:'sheep',   label:'Inhabit sheep', count:0, goal:10, reward:10, done:false },
     { id:'ducks',   label:'Control ducks', count:0, goal:15, reward:10, done:false },
+    // Event quest — only shown once Unity says a boss has spawned (active=true).
+    { id:'boss',    label:'Defeat the boss', count:0, goal:1, reward:50, done:false, active:false },
   ];
 
   const _LEGENDARY = new Set(['legendary','mythical','luck-maxxing','legendary-alpha']);
@@ -106,8 +108,10 @@ const TaskTracker = (() => {
   function recordQuestProgress(quest, count, goal) {
     const t = _c(quest);
     if (!t) return;
-    t.count = count;
+    t.active = true;                       // reveal event quests (e.g. boss) on first progress
+    t.count  = count;
     if (goal) t.goal = goal;
+    if (count < t.goal) t.done = false;    // re-arm if a fresh round started (boss respawn)
     _render();
     _pulseTab();
   }
@@ -214,7 +218,7 @@ const TaskTracker = (() => {
     _ind.forEach(t => rows.push(_row(t)));
 
     rows.push('<div class="task-section-hdr task-section-hdr--community">── Community</div>');
-    _com.forEach(t => rows.push(_comRow(t)));
+    _com.filter(t => t.active !== false).forEach(t => rows.push(_comRow(t)));
 
     body.innerHTML = rows.join('');
   }

@@ -523,7 +523,7 @@ function handleQuestMessage(msg) {
 }
 
 function showQuestToast(quest, starsEarned) {
-  const labels = { flowers: 'FLOWERS', sheep: 'SHEEP', ducks: 'DUCKS', all: 'ALL DONE' };
+  const labels = { flowers: 'FLOWERS', sheep: 'SHEEP', ducks: 'DUCKS', all: 'ALL DONE', boss: 'BOSS SLAIN' };
   const label  = labels[quest] || quest.toUpperCase();
   const el = document.getElementById('questToast');
   if (!el) return;
