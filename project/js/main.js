@@ -459,6 +459,8 @@ function applyPrismaticNametag() {
   if (tag) {
     tag.classList.add('prismatic');
     tag.style.color = '';  // let CSS gradient take over
+     
+ 
   }
 }
 

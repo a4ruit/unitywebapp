@@ -1450,6 +1450,7 @@ body:not(.pristine-phase) .shop-items-pristine { display: none; }
 .shop-item-name--prismatic {
   background: linear-gradient(90deg,#ff9fd9,#a78bfa,#67e8f9,#86efac,#fcd34d,#fb923c,#ff9fd9);
   background-size: 200% auto;
+  
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -1466,8 +1467,8 @@ body:not(.pristine-phase) .shop-items-pristine { display: none; }
   background-size: 200% auto;
   -webkit-background-clip: text;
   background-clip: text;
-  border-color: transparent;
-  border-image: linear-gradient(90deg,#ff9fd9,#a78bfa,#67e8f9,#86efac,#fcd34d) 1;
+  border: 1px solid transparent;
+  border-radius: 10px;
   animation: prismaticText 2.5s linear infinite, prismaticGlow 2.5s linear infinite;
 }
 @keyframes prismaticText {
@@ -1475,10 +1476,11 @@ body:not(.pristine-phase) .shop-items-pristine { display: none; }
   100% { background-position: 200% center; }
 }
 @keyframes prismaticGlow {
-  0%   { box-shadow: 0 0 10px rgba(255,159,217,0.6), 0 0 20px rgba(255,159,217,0.2); }
-  33%  { box-shadow: 0 0 10px rgba(103,232,249,0.6),  0 0 20px rgba(103,232,249,0.2); }
-  66%  { box-shadow: 0 0 10px rgba(167,139,250,0.6),  0 0 20px rgba(167,139,250,0.2); }
-  100% { box-shadow: 0 0 10px rgba(255,159,217,0.6),  0 0 20px rgba(255,159,217,0.2); }
+  0%   { box-shadow: 0 0 0 1px rgba(255,159,217,0.9), 0 0 10px rgba(255,159,217,0.6), 0 0 20px rgba(255,159,217,0.2); }
+  25%  { box-shadow: 0 0 0 1px rgba(103,232,249,0.9),  0 0 10px rgba(103,232,249,0.6),  0 0 20px rgba(103,232,249,0.2); }
+  50%  { box-shadow: 0 0 0 1px rgba(167,139,250,0.9),  0 0 10px rgba(167,139,250,0.6),  0 0 20px rgba(167,139,250,0.2); }
+  75%  { box-shadow: 0 0 0 1px rgba(134,239,172,0.9),  0 0 10px rgba(134,239,172,0.6),  0 0 20px rgba(134,239,172,0.2); }
+  100% { box-shadow: 0 0 0 1px rgba(255,159,217,0.9),  0 0 10px rgba(255,159,217,0.6),  0 0 20px rgba(255,159,217,0.2); }
 }
 
 /* ── Pristine shop — cozy & friendly (Animal-Crossing-ish), nature palette ───
