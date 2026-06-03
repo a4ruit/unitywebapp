@@ -439,10 +439,34 @@ function submitPlayerName() {
     playerColor = PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
   }
   if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}`);
+    const prismatic = (typeof _prismaticOwned !== 'undefined' && _prismaticOwned) ? '|1' : '';
+    ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}${prismatic}`);
+  }
+  // Show the player's persistent name tag on the pack screen, in their colour.
+  const tag = document.getElementById('playerNametag');
+  if (tag) {
+    tag.textContent     = `<${playerName}>`;
+    tag.style.color     = playerColor;
+    tag.style.display   = 'block';
   }
   document.getElementById('screen-name').classList.add('hidden');
   document.getElementById('screen-pack').classList.remove('hidden');
+}
+
+// Apply the prismatic CSS to the web name tag immediately when purchased.
+function applyPrismaticNametag() {
+  const tag = document.getElementById('playerNametag');
+  if (tag) {
+    tag.classList.add('prismatic');
+    tag.style.color = '';  // let CSS gradient take over
+  }
+}
+
+// Re-broadcast set_name including the new prismatic flag so Unity updates live.
+function reSendSetName() {
+  if (ws && ws.readyState === WebSocket.OPEN && playerName) {
+    ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}|1`);
+  }
 }
 
 function connect() {

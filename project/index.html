@@ -71,6 +71,8 @@
 
       <!-- PACK SCREEN -->
       <div class="screen hidden" id="screen-pack">
+        <!-- player's persistent name tag (set on the username screen) -->
+        <div id="playerNametag"></div>
         <div id="packStack" class="pack-stack-behind"></div>
 
         <!-- Pack type selector -->
@@ -196,6 +198,15 @@
                   <div class="shop-item-stars">★ 1</div>
                 </div>
                 <button class="shop-btn" id="shopRefreshBtn" onclick="shopRefreshTasks(this)">REFRESH</button>
+              </div>
+
+              <div class="shop-item shop-item--prismatic" id="shopPrismaticItem">
+                <span class="shop-item-icon">✦</span>
+                <div class="shop-item-info">
+                  <div class="shop-item-name shop-item-name--prismatic">PRISMATIC NAME TAG</div>
+                  <div class="shop-item-stars">★ 30</div>
+                </div>
+                <button class="shop-btn" id="shopPrismaticBtn" onclick="shopBuyPrismatic(30, this)">UNLOCK</button>
               </div>
 
               <div class="shop-item shop-item--legendary">

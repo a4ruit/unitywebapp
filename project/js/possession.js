@@ -1998,6 +1998,7 @@ function _refreshCamPreview() {
   if (_ui.gbTitle) _ui.gbTitle.textContent = title;
   _ui.vidWrap.style.display = 'block';
   _ui.vidWrap.classList.add('cam-preview');
+  _showNametag(true);
 }
 
 function _onSheepSpawned() {

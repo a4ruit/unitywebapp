@@ -304,6 +304,30 @@ body::after {
   flex: 1;
 }
 
+/* Player's persistent name tag — top of the pack screen, in their tag colour.
+   Lives inside #screen-pack so it only shows here (display:none hides it on
+   other screens). Set + revealed in submitPlayerName(). */
+#playerNametag {
+  position: fixed;
+  top: 193.5px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: none;                /* shown once a name is entered */
+  pointer-events: none;
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  color: #cfeefb;               /* recoloured to the player's tag colour in JS */
+  padding: 3px 14px;
+  background: rgba(6, 14, 18, 0.75);
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  text-shadow: 0 0 6px rgba(0,0,0,0.85);
+  box-shadow: 0 0 8px -2px currentColor;
+}
+
 /* Pack type buttons pinned to bottom zone (near thumbs) */
 #screen-pack .pack-type-row {
   position: fixed;
@@ -1412,6 +1436,49 @@ body:not(.pristine-phase) .shop-items-pristine { display: none; }
 .shop-item--legendary .shop-item-stars {
   color: var(--legendary);
   text-shadow: 0 0 10px rgba(200,144,48,0.6);
+}
+
+/* ── Prismatic name-tag shop item ─────────────────────────────────────────── */
+.shop-item--prismatic {
+  border-color: rgba(200,160,255,0.55);
+  background: rgba(28,14,44,0.55);
+}
+.shop-item--prismatic .shop-item-icon {
+  background: rgba(200,160,255,0.14);
+  border-color: rgba(200,160,255,0.5);
+}
+.shop-item-name--prismatic {
+  background: linear-gradient(90deg,#ff9fd9,#a78bfa,#67e8f9,#86efac,#fcd34d,#fb923c,#ff9fd9);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: prismaticText 3s linear infinite;
+}
+.shop-items-pristine .shop-item--prismatic .shop-btn {
+  background: linear-gradient(90deg,#a78bfa,#67e8f9,#86efac);
+  color: #0a100a;
+}
+/* ── Prismatic name tag on the pack screen ────────────────────────────────── */
+#playerNametag.prismatic {
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(90deg,#ff9fd9,#a78bfa,#67e8f9,#86efac,#fcd34d,#fb923c,#ff9fd9);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  border-color: transparent;
+  border-image: linear-gradient(90deg,#ff9fd9,#a78bfa,#67e8f9,#86efac,#fcd34d) 1;
+  animation: prismaticText 2.5s linear infinite, prismaticGlow 2.5s linear infinite;
+}
+@keyframes prismaticText {
+  0%   { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+@keyframes prismaticGlow {
+  0%   { box-shadow: 0 0 10px rgba(255,159,217,0.6), 0 0 20px rgba(255,159,217,0.2); }
+  33%  { box-shadow: 0 0 10px rgba(103,232,249,0.6),  0 0 20px rgba(103,232,249,0.2); }
+  66%  { box-shadow: 0 0 10px rgba(167,139,250,0.6),  0 0 20px rgba(167,139,250,0.2); }
+  100% { box-shadow: 0 0 10px rgba(255,159,217,0.6),  0 0 20px rgba(255,159,217,0.2); }
 }
 
 /* ── Pristine shop — cozy & friendly (Animal-Crossing-ish), nature palette ───

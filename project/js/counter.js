@@ -257,6 +257,7 @@ function openShop() {
   updateShopButtons();
   _syncGiftButton();      // keep the gift CLAIMED if already taken this session
   _syncRefreshButton();   // keep the refresh cooldown countdown showing
+  _syncPrismaticButton(); // keep the prismatic ACTIVE if already purchased
 }
 
 function closeShop() {
@@ -397,6 +398,34 @@ function _syncRefreshButton() {
     btn.textContent  = 'REFRESH';
     btn.disabled     = false;
     btn.style.opacity = '';
+  }
+}
+
+// Prismatic name tag — cosmetic upgrade, persists for the session.
+let _prismaticOwned = false;
+function shopBuyPrismatic(cost, btn) {
+  if (_prismaticOwned) { _shopConfirm(btn, 'ACTIVE'); return; }  // already owned
+  if (!spendStars(cost)) { _shopDenied(); return; }
+  _prismaticOwned = true;
+  syncShopBalance();
+  updateShopButtons();
+  _syncPrismaticButton();
+  // Apply to the web name tag immediately
+  if (typeof applyPrismaticNametag === 'function') applyPrismaticNametag();
+  // Re-broadcast set_name with the prismatic flag so Unity picks it up
+  if (typeof reSendSetName === 'function') reSendSetName();
+  _shopConfirm(btn, '✦ ACTIVE');
+}
+
+function _syncPrismaticButton() {
+  const btn  = document.getElementById('shopPrismaticBtn');
+  const item = document.getElementById('shopPrismaticItem');
+  if (!btn) return;
+  if (_prismaticOwned) {
+    btn.textContent   = '✦ ACTIVE';
+    btn.disabled      = true;
+    btn.style.opacity = '0.6';
+    if (item) item.style.opacity = '0.7';
   }
 }
 
