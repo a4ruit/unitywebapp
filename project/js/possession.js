@@ -99,9 +99,11 @@ let _placementInputInterval = null;
 let _grantDuration  = 30;
 // Session-only: button only unlocks after the user clicks a sheep card in the
 // CURRENT page-life. Reload = locked again. No persistence on purpose.
-let _sheepAvailable = false;
-let _duckAvailable  = false;
-let _foxAvailable   = false;
+let _sheepAvailable   = false;
+let _duckAvailable    = false;
+let _foxAvailable     = false;
+let _seagullAvailable = false;
+let _serpentAvailable = false;
 // Which creature is currently possessed — drives which WS verbs to send for
 // joystick input + action button. Null when nothing is being possessed.
 //   'sheep' → sheep_input / sheep_eat / possess_end
@@ -275,6 +277,60 @@ function handlePossessionMessage(data) {
     const parts     = msg.split('|');
     const spawnerId = parts[1];
     if (spawnerId === CLIENT_ID) _onFoxSpawned();
+    return true;
+  }
+
+  // ── Seagull possession lifecycle (flying critter) ──────────────────────────
+  if (msg.startsWith('seagull_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'seagull'); return true; }
+  }
+  if (msg.startsWith('seagull_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('seagull'); return true; }
+  }
+  if (msg.startsWith('seagull_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded(); return true; }
+  }
+  if (msg.startsWith('seagull_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+  if (msg.startsWith('seagull_dived|')) {
+    return true;   // ack only — the dive feedback lives in the Unity stream
+  }
+  if (msg === 'seagull_spawned' || msg.startsWith('seagull_spawned|') || msg.startsWith('seagull_spawned ')) {
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onSeagullSpawned();
+    return true;
+  }
+
+  // ── Emerald Serpent possession lifecycle (legendary-alpha) ─────────────────
+  if (msg.startsWith('serpent_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'serpent'); return true; }
+  }
+  if (msg.startsWith('serpent_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('serpent'); return true; }
+  }
+  if (msg.startsWith('serpent_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded(); return true; }
+  }
+  if (msg.startsWith('serpent_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+  if (msg.startsWith('serpent_bloomed|')) {
+    return true;   // ack only
+  }
+  if (msg === 'serpent_spawned' || msg.startsWith('serpent_spawned|') || msg.startsWith('serpent_spawned ')) {
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onSerpentSpawned();
     return true;
   }
 
@@ -508,6 +564,84 @@ function _buildUI() {
     #poss-fox-btn:active { background: rgba(255,100,10,0.3); }
     #poss-fox-btn.poss-hidden { display: none; }
 
+    /* ── Seagull inhabit button — sky blue, the flying critter ── */
+    #poss-seagull-btn {
+      pointer-events: all;
+      position: absolute;
+      bottom: 272px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 28px;
+      background: rgba(120,200,255,0.12);
+      border: 2px solid rgba(120,200,255,0.6);
+      color: #78c8ff;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+    #poss-seagull-btn:active { background: rgba(120,200,255,0.3); }
+    #poss-seagull-btn.poss-hidden { display: none; }
+
+    /* ── Emerald Serpent inhabit button — legendary emerald glow ── */
+    #poss-serpent-btn {
+      pointer-events: all;
+      position: absolute;
+      bottom: 316px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 28px;
+      background: rgba(40,220,130,0.14);
+      border: 2px solid rgba(40,220,130,0.7);
+      color: #4cf09a;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+    #poss-serpent-btn:active { background: rgba(40,220,130,0.35); }
+    #poss-serpent-btn.poss-hidden { display: none; }
+
+    /* ── Inhabit buttons overlay the CAM WINDOW (shown before the camera
+       activates) so players can't miss them on the pack screen. They centre
+       on the cam window; multiple stack vertically if several creatures are
+       available at once. A gentle glow-pulse draws the eye. ── */
+    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn, #poss-serpent-btn, #poss-box-btn {
+      bottom: auto;
+      top: 50%;
+      z-index: 12;                       /* above the cam window + card frame */
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 17px;
+      letter-spacing: 0.04em;
+      padding: 13px 26px;
+      border-radius: 12px;               /* smoothed corners */
+      background-color: rgba(6, 16, 12, 0.82);
+      animation: poss-inhabit-pulse 1.5s ease-in-out infinite;
+    }
+    #poss-btn         { transform: translate(-50%, calc(-50% + 30px)); }  /* sheep   — lowest */
+    #poss-duck-btn    { transform: translate(-50%, -50%); }               /* duck    — centre */
+    #poss-fox-btn     { transform: translate(-50%, calc(-50% - 30px)); }  /* fox     — upper  */
+    #poss-seagull-btn { transform: translate(-50%, calc(-50% - 60px)); }  /* seagull — upper  */
+    #poss-serpent-btn { transform: translate(-50%, calc(-50% - 90px)); }  /* serpent — upper  */
+    #poss-box-btn     { transform: translate(-50%, calc(-50% - 120px)); } /* box     — top    */
+    @keyframes poss-inhabit-pulse {
+      0%, 100% { box-shadow: 0 0 10px rgba(0,0,0,0.55); }
+      50%      { box-shadow: 0 0 18px 2px rgba(255,255,255,0.22), 0 0 10px rgba(0,0,0,0.55); }
+    }
+
+    /* ── Cam window "preview" state: window is up but the camera hasn't been
+       activated yet. Hide the connecting loader + timer; the overlaid Inhabit
+       button is the call-to-action. ── */
+    #poss-video-wrap.cam-preview #poss-video-label,
+    #poss-video-wrap.cam-preview #gb-timer { display: none !important; }
+    #poss-video-wrap.cam-preview #gb-screen { background: #06120a; }
+
     /* ── Pounce button (right thumb, replaces EAT/FLAP during FOX possession) ── */
     #poss-pounce {
       pointer-events: all;
@@ -520,9 +654,9 @@ function _buildUI() {
       background: rgba(255,100,10,0.18);
       border: 2px solid rgba(255,100,10,0.85);
       color: #ff640a;
-      font-family: monospace;
-      font-size: 14px;
-      letter-spacing: 2px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 15px;
+      letter-spacing: 1px;
       text-transform: uppercase;
       cursor: pointer;
       display: none;
@@ -542,6 +676,75 @@ function _buildUI() {
       transform: scale(0.92);
     }
 
+    /* ── Dive button "STEAL CHIPS" (right thumb, during SEAGULL possession) ── */
+    #poss-dive {
+      pointer-events: all;
+      position: absolute;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(120,200,255,0.18);
+      border: 2px solid rgba(120,200,255,0.85);
+      color: #78c8ff;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 15px;
+      line-height: 1.05;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      text-shadow: 0 0 8px rgba(120,200,255,0.7);
+      box-shadow: 0 0 12px rgba(120,200,255,0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-dive:active {
+      background: rgba(120,200,255,0.45);
+      transform: scale(0.92);
+    }
+
+    /* ── Bloom button (right thumb, during SERPENT possession) ── */
+    #poss-bloom {
+      pointer-events: all;
+      position: absolute;
+      bottom: 56px;
+      right: 24px;
+      width: 86px;
+      height: 86px;
+      border-radius: 50%;
+      background: rgba(40,220,130,0.18);
+      border: 2px solid rgba(40,220,130,0.85);
+      color: #4cf09a;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 16px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      text-shadow: 0 0 8px rgba(40,220,130,0.7);
+      box-shadow: 0 0 12px rgba(40,220,130,0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-bloom:active {
+      background: rgba(40,220,130,0.45);
+      transform: scale(0.92);
+    }
+
     /* ── Flap button (right thumb, replaces EAT during DUCK possession) ── */
     #poss-flap {
       pointer-events: all;
@@ -554,9 +757,9 @@ function _buildUI() {
       background: rgba(255,210,90,0.18);
       border: 2px solid rgba(255,210,90,0.85);
       color: #ffd25a;
-      font-family: monospace;
-      font-size: 16px;
-      letter-spacing: 3px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 17px;
+      letter-spacing: 1px;
       text-transform: uppercase;
       cursor: pointer;
       display: none;
@@ -593,6 +796,15 @@ function _buildUI() {
       width: min(55vw, 220px);
       aspect-ratio: 5 / 7;
       display: none;
+    }
+    /* Opaque backing — kills pack-carousel bleed-through behind the card
+       frame's transparent edges/corners. First child so it sits behind the
+       art window + frame. Inset slightly so the frame's outer glow is kept. */
+    #poss-cam-backdrop {
+      position: absolute;
+      inset: 2%;
+      background: #0a140a;
+      border-radius: 4px;
     }
     /* Art window sits INSIDE the card frame's visible center — the
        trading-card border (poss-card-frame img) overlays the outer rim.
@@ -1024,9 +1236,9 @@ function _buildUI() {
       background: rgba(255,176,48,0.18);
       border: 2px solid rgba(255,176,48,0.85);
       color: #ffb030;
-      font-family: monospace;
-      font-size: 16px;
-      letter-spacing: 3px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 17px;
+      letter-spacing: 1px;
       text-transform: uppercase;
       cursor: pointer;
       display: none;
@@ -1050,17 +1262,22 @@ function _buildUI() {
     #poss-release {
       pointer-events: all;
       position: absolute;
-      bottom: 202px;
+      /* Floats ABOVE the cam window (top-centre) — well out of the thumb zone
+         so it can't be pressed by accident while driving the critter. */
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
+      bottom: auto;
+      transform: translate(-50%, calc(-50% - 178px));
+      z-index: 13;
       padding: 6px 18px;
-      background: transparent;
+      background: rgba(6, 16, 12, 0.7);
       border: 1px solid rgba(255,255,255,0.2);
-      color: rgba(255,255,255,0.35);
-      font-size: 11px;
-      letter-spacing: 1px;
+      color: rgba(255,255,255,0.5);
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.04em;
       cursor: pointer;
-      border-radius: 3px;
+      border-radius: 10px;
       display: none;
       white-space: nowrap;
     }
@@ -1077,8 +1294,8 @@ function _buildUI() {
       background: rgba(140,16,16,0.20);
       border: 2px solid rgba(200,28,28,0.75);
       color: #e85050;
-      font-family: monospace;
-      font-size: 13px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 14px;
       font-weight: bold;
       letter-spacing: 1px;
       text-transform: uppercase;
@@ -1112,28 +1329,44 @@ function _buildUI() {
        Stays alive independently of possession sessions — the mushroom keeps
        existing on the ground after the possession timer expires.
        Dismissed only when fungi_destroyed arrives (boss/fleshling ate it). */
+    /* Framed mushroom-control window — reads as part of the mushroom UI rather
+       than a stray button. Rounded green card to match the placement window. */
     #poss-spore-panel {
       pointer-events: all;
       position: fixed;
-      top: 24px;
-      left: 24px;
+      bottom: 100px;
+      left: 50%;
+      transform: translateX(-50%);
       display: none;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 6px;
+      align-items: center;
+      gap: 8px;
       z-index: 10000;
+      padding: 12px 14px;
+      background: rgba(8, 20, 10, 0.92);
+      border: 2px solid rgba(101,255,76,0.5);
+      border-radius: 16px;
+      box-shadow: 0 0 14px rgba(101,255,76,0.22), inset 0 0 10px rgba(0,0,0,0.5);
+    }
+    #poss-spore-title {
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: rgba(160,255,140,0.85);
+      text-shadow: 0 0 6px rgba(101,255,76,0.4);
     }
     #poss-spore-btn {
-      padding: 12px 20px;
+      padding: 12px 22px;
       background: rgba(101,255,76,0.12);
       border: 2px solid rgba(101,255,76,0.68);
       color: #65ff4c;
-      font-family: monospace;
-      font-size: 12px;
-      letter-spacing: 3px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 15px;
+      letter-spacing: 0.04em;
       text-transform: uppercase;
       cursor: pointer;
-      border-radius: 3px;
+      border-radius: 12px;
       white-space: nowrap;
       text-shadow: 0 0 10px rgba(101,255,76,0.55);
       box-shadow: 0 0 12px rgba(101,255,76,0.25);
@@ -1171,11 +1404,10 @@ function _buildUI() {
     /* Status line: READY / ACTIVE Xs / COOLDOWN Xs */
     #poss-spore-status {
       color: rgba(101,255,76,0.58);
-      font-family: monospace;
-      font-size: 10px;
-      letter-spacing: 2px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
-      padding-left: 2px;
     }
 
     /* ── Blind Box inhabit button ──────────────────────────────────────────
@@ -1308,12 +1540,15 @@ function _buildUI() {
          All buttons/joystick rendered on top; background page blocked below. -->
     <div id="poss-block-overlay"></div>
     <button id="poss-box-btn">Inhabit the Blind Box</button>
+    <button id="poss-serpent-btn">Become the Serpent</button>
+    <button id="poss-seagull-btn">Inhabit a seagull</button>
     <button id="poss-fox-btn">Inhabit a fox</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
     <div id="poss-eaten">EATEN — <span id="poss-eaten-count">0</span></div>
     <div id="poss-video-wrap">
+      <div id="poss-cam-backdrop"></div>
       <div id="poss-art-window">
         <!-- ── Game Boy Color chrome ────────────────────────────────────────
              Three rows: wordmark header, LCD screen with grid overlay, and
@@ -1366,6 +1601,8 @@ function _buildUI() {
     <button id="poss-eat">EAT</button>
     <button id="poss-flap">FLAP</button>
     <button id="poss-pounce">POUNCE</button>
+    <button id="poss-dive">STEAL<br>CHIPS</button>
+    <button id="poss-bloom">BLOOM</button>
     <button id="poss-place">PLACE</button>
     <button id="poss-open-box">OPEN<br>BOX</button>
     <button id="poss-release">release</button>
@@ -1390,6 +1627,7 @@ function _buildUI() {
     <!-- Fungi spore panel — top-left corner, persists after mushroom placement.
          Hidden by default; shown on fungi_placed, dismissed on fungi_destroyed. -->
     <div id="poss-spore-panel">
+      <div id="poss-spore-title">🍄 YOUR MUSHROOM</div>
       <button id="poss-spore-btn">&#x2601; SPORE CLOUD</button>
       <div id="poss-spore-status">READY</div>
     </div>
@@ -1401,6 +1639,8 @@ function _buildUI() {
     btn:              root.querySelector('#poss-btn'),
     duckBtn:          root.querySelector('#poss-duck-btn'),
     foxBtn:           root.querySelector('#poss-fox-btn'),
+    seagullBtn:       root.querySelector('#poss-seagull-btn'),
+    serpentBtn:       root.querySelector('#poss-serpent-btn'),
     boxBtn:           root.querySelector('#poss-box-btn'),
     blindScreen:      root.querySelector('#poss-blind-screen'),
     timer:            root.querySelector('#poss-timer'),
@@ -1421,6 +1661,8 @@ function _buildUI() {
     eat:              root.querySelector('#poss-eat'),
     flap:             root.querySelector('#poss-flap'),
     pounce:           root.querySelector('#poss-pounce'),
+    dive:             root.querySelector('#poss-dive'),
+    bloom:            root.querySelector('#poss-bloom'),
     place:            root.querySelector('#poss-place'),
     placeOverlay:     root.querySelector('#poss-place-overlay'),
     placeCardContent: root.querySelector('#poss-place-card-content'),
@@ -1437,6 +1679,8 @@ function _buildUI() {
   _ui.btn.addEventListener('click',        _requestPossession);
   _ui.duckBtn.addEventListener('click',    _requestDuckPossession);
   _ui.foxBtn.addEventListener('click',     _requestFoxPossession);
+  _ui.seagullBtn.addEventListener('click', _requestSeagullPossession);
+  _ui.serpentBtn.addEventListener('click', _requestSerpentPossession);
   _ui.boxBtn.addEventListener('click',     _requestBoxPossession);
   _ui.openBox.addEventListener('click',    _openBox);
   _ui.release.addEventListener('click',    _releasePossession);
@@ -1447,6 +1691,10 @@ function _buildUI() {
   _ui.flap.addEventListener('click',        _flap);
   _ui.pounce.addEventListener('touchstart', e => { e.preventDefault(); _pounce();       }, { passive: false });
   _ui.pounce.addEventListener('click',      _pounce);
+  _ui.dive.addEventListener('touchstart',   e => { e.preventDefault(); _dive();         }, { passive: false });
+  _ui.dive.addEventListener('click',        _dive);
+  _ui.bloom.addEventListener('touchstart',  e => { e.preventDefault(); _bloom();        }, { passive: false });
+  _ui.bloom.addEventListener('click',       _bloom);
   _ui.place.addEventListener('touchstart',  e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
   _ui.place.addEventListener('click',       _confirmPlace);
   // Spore button — touchstart for zero-latency on mobile, click as desktop fallback
@@ -1466,6 +1714,14 @@ function _buildUI() {
   if (!_foxAvailable) {
     _ui.foxBtn.classList.add('poss-hidden');
     console.log('[possession.js] Fox button locked — waiting for first fox_spawned');
+  }
+  if (!_seagullAvailable) {
+    _ui.seagullBtn.classList.add('poss-hidden');
+    console.log('[possession.js] Seagull button locked — waiting for first seagull_spawned');
+  }
+  if (!_serpentAvailable) {
+    _ui.serpentBtn.classList.add('poss-hidden');
+    console.log('[possession.js] Serpent button locked — waiting for first serpent_spawned');
   }
   // Box button is always hidden until blind_box_spawned|clientId arrives
   _ui.boxBtn.classList.add('poss-hidden');
@@ -1556,17 +1812,48 @@ function _requestFoxPossession() {
   send(`fox_possess_request|${CLIENT_ID}`);
 }
 
+function _requestSeagullPossession() {
+  _ui.seagullBtn.textContent   = 'Requesting…';
+  _ui.seagullBtn.style.opacity = '0.5';
+  // iOS Safari autoplay priming — same as sheep/duck/fox
+  _ui.video.muted = true;
+  _ui.video.play().catch(() => {});
+  send(`seagull_possess_request|${CLIENT_ID}`);
+}
+
+function _requestSerpentPossession() {
+  _ui.serpentBtn.textContent   = 'Requesting…';
+  _ui.serpentBtn.style.opacity = '0.5';
+  _ui.video.muted = true;
+  _ui.video.play().catch(() => {});
+  send(`serpent_possess_request|${CLIENT_ID}`);
+}
+
 function _pounce() {
   if (!_possessed || _creatureType !== 'fox') return;
   send(`fox_pounce|${CLIENT_ID}`);
 }
 
+// STEAL CHIPS — the seagull's dive-bomb swoop (10 dmg to foes below).
+function _dive() {
+  if (!_possessed || _creatureType !== 'seagull') return;
+  send(`seagull_dive|${CLIENT_ID}`);
+}
+
+// BLOOM — the serpent drops a damaging flower at its head.
+function _bloom() {
+  if (!_possessed || _creatureType !== 'serpent') return;
+  send(`serpent_bloom|${CLIENT_ID}`);
+}
+
 function _releasePossession() {
   // Send the verb that matches whichever creature we currently inhabit
-  if      (_creatureType === 'duck') send(`duck_possess_end|${CLIENT_ID}`);
-  else if (_creatureType === 'fox')  send(`fox_possess_end|${CLIENT_ID}`);
-  else if (_creatureType === 'box')  send(`box_possess_end|${CLIENT_ID}`);
-  else                               send(`possess_end|${CLIENT_ID}`);
+  if      (_creatureType === 'duck')    send(`duck_possess_end|${CLIENT_ID}`);
+  else if (_creatureType === 'fox')     send(`fox_possess_end|${CLIENT_ID}`);
+  else if (_creatureType === 'seagull') send(`seagull_possess_end|${CLIENT_ID}`);
+  else if (_creatureType === 'serpent') send(`serpent_possess_end|${CLIENT_ID}`);
+  else if (_creatureType === 'box')     send(`box_possess_end|${CLIENT_ID}`);
+  else                                  send(`possess_end|${CLIENT_ID}`);
   _onEnded();   // optimistic — server will confirm with the matching ended message
 }
 
@@ -1600,8 +1887,12 @@ function _onGranted(duration, creature) {
   _ui.btn.classList.add('poss-hidden');
   _ui.duckBtn.classList.add('poss-hidden');
   _ui.foxBtn.classList.add('poss-hidden');
+  _ui.seagullBtn.classList.add('poss-hidden');
+  _ui.serpentBtn.classList.add('poss-hidden');
+  _ui.boxBtn.classList.add('poss-hidden');
 
   _ui.vidWrap.style.display  = 'block';
+  _ui.vidWrap.classList.remove('cam-preview');   // camera is going live now
   _ui.vidLabel.style.display = 'flex';   // show "CONNECTING…" until first frame
   _ui.joyZone.style.display  = 'flex';
   _ui.release.style.display  = 'block';
@@ -1610,23 +1901,28 @@ function _onGranted(duration, creature) {
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
 
   // ── Game Boy Color in-card readouts ──
-  if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'  ? 'FOX CAM'  :
-                                             creature === 'duck' ? 'DUCK CAM' : 'SHEEP CAM';
+  if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'     ? 'FOX CAM'     :
+                                             creature === 'serpent' ? 'SERPENT CAM' :
+                                             creature === 'seagull' ? 'SEAGULL CAM' :
+                                             creature === 'duck'    ? 'DUCK CAM'    : 'SHEEP CAM';
   _setGbTimer(duration);
 
-  // Show the action button that matches the creature
+  // Show the action button that matches the creature (hide the rest).
+  _ui.eat.style.display    = 'none';
+  _ui.flap.style.display   = 'none';
+  _ui.pounce.style.display = 'none';
+  _ui.dive.style.display   = 'none';
+  _ui.bloom.style.display  = 'none';
   if (creature === 'duck') {
     _ui.flap.style.display   = 'flex';
-    _ui.eat.style.display    = 'none';
-    _ui.pounce.style.display = 'none';
   } else if (creature === 'fox') {
     _ui.pounce.style.display = 'flex';
-    _ui.eat.style.display    = 'none';
-    _ui.flap.style.display   = 'none';
+  } else if (creature === 'seagull') {
+    _ui.dive.style.display   = 'flex';
+  } else if (creature === 'serpent') {
+    _ui.bloom.style.display  = 'flex';
   } else {
     _ui.eat.style.display        = 'flex';
-    _ui.flap.style.display       = 'none';
-    _ui.pounce.style.display     = 'none';
     _ui.eatenCount.textContent   = '0';
   }
 
@@ -1640,8 +1936,10 @@ function _onGranted(duration, creature) {
   // connected even while idle. Drops the per-player message rate from a
   // constant 20/s to ~1–2/s when the stick is centred. Verb depends on
   // what's being possessed.
-  const inputVerb = creature === 'fox'  ? 'fox_input'  :
-                    creature === 'duck' ? 'duck_input' : 'sheep_input';
+  const inputVerb = creature === 'fox'     ? 'fox_input'     :
+                    creature === 'duck'    ? 'duck_input'    :
+                    creature === 'seagull' ? 'seagull_input' :
+                    creature === 'serpent' ? 'serpent_input' : 'sheep_input';
   _resetInputSendTracking();  // first tick always fires
   _inputInterval = setInterval(() => {
     if (_shouldSendInput()) {
@@ -1677,10 +1975,36 @@ function _onDenied(creature) {
  * (i.e. the user pulled the common card in a critter pack).
  * Unlocks the Inhabit button and persists across reloads.
  */
+// Shows the cam window in a "ready" preview (title + the overlaid Inhabit
+// button) whenever a creature is available but not yet inhabited — so the
+// button can't be missed back on the pack screen. Hides the window when
+// nothing is available. Never runs during an active possession.
+function _refreshCamPreview() {
+  if (!_ui || _possessed) return;
+  const box = _blindBoxAvailable;
+  const any = _sheepAvailable || _duckAvailable || _foxAvailable || _seagullAvailable || _serpentAvailable || box;
+  if (!any) {
+    _ui.vidWrap.classList.remove('cam-preview');
+    _ui.vidWrap.style.display = 'none';
+    return;
+  }
+  // Title reflects the highest-priority available creature.
+  const title = box ? 'BOX CAM'
+              : _serpentAvailable ? 'SERPENT CAM'
+              : _foxAvailable     ? 'FOX CAM'
+              : _seagullAvailable ? 'SEAGULL CAM'
+              : _duckAvailable    ? 'DUCK CAM'
+              :                     'SHEEP CAM';
+  if (_ui.gbTitle) _ui.gbTitle.textContent = title;
+  _ui.vidWrap.style.display = 'block';
+  _ui.vidWrap.classList.add('cam-preview');
+}
+
 function _onSheepSpawned() {
   _sheepAvailable = true;
   if (_ui && !_possessed) {
     _ui.btn.classList.remove('poss-hidden');
+    _refreshCamPreview();
     console.log('[possession.js] Sheep card pulled — Inhabit button unlocked');
   }
 }
@@ -1693,6 +2017,7 @@ function _onDuckSpawned() {
   _duckAvailable = true;
   if (_ui && !_possessed) {
     _ui.duckBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
     console.log('[possession.js] Duck card pulled — duck Inhabit button unlocked');
   }
 }
@@ -1730,7 +2055,34 @@ function _onFoxSpawned() {
   _foxAvailable = true;
   if (_ui && !_possessed) {
     _ui.foxBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
     console.log('[possession.js] Fox card pulled — fox Inhabit button unlocked');
+  }
+}
+
+/**
+ * Called when Unity broadcasts that a seagull has spawned (rare critter pack).
+ * Unlocks the seagull inhabit button. Each seagull card grants one flight.
+ */
+function _onSeagullSpawned() {
+  _seagullAvailable = true;
+  if (_ui && !_possessed) {
+    _ui.seagullBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
+    console.log('[possession.js] Seagull card pulled — seagull Inhabit button unlocked');
+  }
+}
+
+/**
+ * Called when Unity broadcasts that the Emerald Serpent has spawned
+ * (legendary-alpha critter pack). Unlocks the "Become the Serpent" button.
+ */
+function _onSerpentSpawned() {
+  _serpentAvailable = true;
+  if (_ui && !_possessed) {
+    _ui.serpentBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
+    console.log('[possession.js] Emerald Serpent pulled — serpent button unlocked');
   }
 }
 
@@ -2046,6 +2398,7 @@ function _onBoxSpawned() {
   _blindBoxAvailable = true;
   if (_ui && !_possessed) {
     _ui.boxBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
     console.log('[possession.js] Blind Box spawned — inhabit button unlocked');
   }
 }
@@ -2130,9 +2483,11 @@ function _onEnded() {
   }
   _possessionCompletedFull = false;
 
-  const wasDuck = _creatureType === 'duck';
-  const wasFox  = _creatureType === 'fox';
-  const wasBox  = _creatureType === 'box';
+  const wasDuck    = _creatureType === 'duck';
+  const wasFox     = _creatureType === 'fox';
+  const wasSeagull = _creatureType === 'seagull';
+  const wasSerpent = _creatureType === 'serpent';
+  const wasBox     = _creatureType === 'box';
   _possessed    = false;
   clearInterval(_inputInterval);
   _joystickActive = false;
@@ -2178,6 +2533,16 @@ function _onEnded() {
     _duckAvailable = false;
     _ui.duckBtn.textContent   = 'Inhabit a duck';
     _ui.duckBtn.style.opacity = '1';
+  } else if (wasSeagull) {
+    // Each seagull card pull = one flight. Lock until the next seagull card.
+    _seagullAvailable = false;
+    _ui.seagullBtn.textContent   = 'Inhabit a seagull';
+    _ui.seagullBtn.style.opacity = '1';
+  } else if (wasSerpent) {
+    // The serpent is one-and-done — it flies off and despawns after its reign.
+    _serpentAvailable = false;
+    _ui.serpentBtn.textContent   = 'Become the Serpent';
+    _ui.serpentBtn.style.opacity = '1';
   } else {
     // Same one-per-pull model for sheep
     _sheepAvailable = false;
@@ -2186,9 +2551,11 @@ function _onEnded() {
   }
 
   // Restore buttons whose credits are still live
-  if (_sheepAvailable) _ui.btn.classList.remove('poss-hidden');
-  if (_duckAvailable)  _ui.duckBtn.classList.remove('poss-hidden');
-  if (_foxAvailable)   _ui.foxBtn.classList.remove('poss-hidden');
+  if (_sheepAvailable)   _ui.btn.classList.remove('poss-hidden');
+  if (_duckAvailable)    _ui.duckBtn.classList.remove('poss-hidden');
+  if (_foxAvailable)     _ui.foxBtn.classList.remove('poss-hidden');
+  if (_seagullAvailable) _ui.seagullBtn.classList.remove('poss-hidden');
+  if (_serpentAvailable) _ui.serpentBtn.classList.remove('poss-hidden');
 
   // Lift the background block — pack carousel is interactive again
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'none';
@@ -2196,12 +2563,17 @@ function _onEnded() {
   if (_ui.gbTimer) _ui.gbTimer.classList.remove('timer-low');
   _ui.timer.style.display    = 'none';
   _ui.eaten.style.display    = 'none';
+  // Keep the cam window up in PREVIEW if another creature is still available,
+  // otherwise hide it. (_refreshCamPreview sets display + cam-preview class.)
   _ui.vidWrap.style.display  = 'none';
+  _refreshCamPreview();
   _ui.joyZone.style.display  = 'none';
   _ui.release.style.display  = 'none';
   _ui.eat.style.display      = 'none';
   _ui.flap.style.display     = 'none';
   _ui.pounce.style.display   = 'none';
+  _ui.dive.style.display     = 'none';
+  _ui.bloom.style.display    = 'none';
   _ui.joyKnob.style.transform = 'translate(-50%,-50%)';
 
   _creatureType = null;

@@ -735,6 +735,31 @@ body.glitch-active .star-counter-row {
 }
 .choose-sub { font-family:'lo-res', sans-serif; font-size:8px; color:var(--muted); letter-spacing:0.1em; }
 .choice-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; width:100%; padding:4px; }
+
+/* ── Legendary reveal — single centred card from the shop ─────────────────── */
+/* NOTE: do NOT set `display` here — the base `.screen` rule already flex-centres,
+   and an id-level `display` would beat `.screen.hidden { display:none }`, leaving
+   this screen visible everywhere. Only override the gap. */
+#screen-legendary { gap: 22px; }
+.legendary-header { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.legendary-title {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 30px; letter-spacing: 0.14em;
+  color: #f0c860;
+  text-shadow: 0 0 14px rgba(240,200,90,0.6), 2px 2px 0 rgba(120,80,10,0.5);
+  animation: legendaryPulse 2s steps(4) infinite;
+}
+.legendary-sub {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 13px; letter-spacing: 0.06em;
+  color: rgba(240,200,90,0.65); text-transform: uppercase;
+}
+.legendary-grid {
+  display: flex; justify-content: center; align-items: center;
+  width: 62%; max-width: 240px;
+}
+/* The single 3D card cell fills the centred container */
+.legendary-grid .choice-cell-3d { width: 100%; }
 .choice-cell-3d { width:100%; aspect-ratio:2/3; cursor:pointer; position:relative; }
 .choice-cell-3d canvas { display:block; width:100%!important; height:100%!important; image-rendering:pixelated; transition: filter 0.3s ease, opacity 0.3s ease; }
 /* Unaffordable card — greyed out, colour + bloom drained. Affordable cards keep
@@ -782,6 +807,67 @@ body.glitch-active .star-counter-row {
 .gate-footnote {
   font-family:'lo-res', sans-serif; font-size:8px; color:var(--dim);
   letter-spacing:0.06em; text-align:center; line-height:1.6; max-width:280px;
+}
+
+/* ── Pristine "no packs" screen — calm, generous, no ads ────────────────── */
+.empty-wrapper {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 18px; padding: 32px 24px; width: 100%; max-width: 320px;
+}
+.empty-icon {
+  font-size: 52px; line-height: 1;
+}
+.empty-title {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 26px; letter-spacing: 0.06em;
+  color: #bfefff;
+  text-shadow: 0 0 12px rgba(129,212,250,0.4);
+  text-align: center;
+}
+.empty-sub {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 14px; letter-spacing: 0.03em; line-height: 1.5;
+  color: rgba(129,212,250,0.7); text-align: center;
+}
+.empty-cooldown {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 12px 24px;
+  border: 2px solid rgba(129,212,250,0.4);
+  border-radius: 14px;
+  background: rgba(8,18,26,0.6);
+}
+.empty-cooldown-label {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: rgba(129,212,250,0.55);
+}
+.empty-cooldown-timer {
+  font-family: 'pf-pixelscript', cursive;
+  font-size: 36px; line-height: 1;
+  color: #bfefff;
+  text-shadow: 0 0 10px rgba(129,212,250,0.6);
+}
+.empty-btn {
+  width: 100%; padding: 14px;
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 18px; letter-spacing: 0.04em;
+  background: rgba(129,212,250,0.14);
+  border: 2px solid rgba(129,212,250,0.55);
+  border-radius: 14px;
+  color: #bfefff;
+  cursor: pointer;
+  transition: background 0.2s, opacity 0.2s;
+  box-shadow: 0 0 10px rgba(129,212,250,0.1);
+}
+.empty-btn:not(:disabled):active { background: rgba(129,212,250,0.3); }
+.empty-btn:disabled { opacity: 0.35; cursor: default; }
+.empty-shop-btn {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 14px; letter-spacing: 0.04em;
+  background: transparent; border: none;
+  color: rgba(129,212,250,0.5);
+  cursor: pointer; text-decoration: underline;
+  padding: 4px 0;
 }
 
 /* ── AD SCREEN ───────────────────────────────────── */

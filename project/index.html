@@ -21,6 +21,7 @@
       <button onclick="debugSpawnBoss(); debugMenuClose()">spawn boss</button>
       <button onclick="debugSpawnFleshling(); debugMenuClose()">spawn fleshling</button>
       <button onclick="debugSpawnBlindBox(); debugMenuClose()">spawn blind box</button>
+      <button onclick="debugAddStars(); debugMenuClose()">+25 stars</button>
     </div>
   </div>
   <div class="god-pack-banner hidden" id="godPackBanner">
@@ -143,6 +144,15 @@
         <div class="choice-grid" id="choiceGrid"></div>
       </div>
 
+      <!-- LEGENDARY REVEAL — single card from the shop's guaranteed legendary -->
+      <div class="screen hidden" id="screen-legendary">
+        <div class="legendary-header">
+          <span class="legendary-title">★ LEGENDARY ★</span>
+          <span class="legendary-sub">tap to claim</span>
+        </div>
+        <div class="legendary-grid" id="legendaryGrid"></div>
+      </div>
+
       <!-- SHOP SCREEN -->
       <div class="screen hidden" id="screen-shop">
         <div class="shop-wrapper">
@@ -174,9 +184,9 @@
                 <span class="shop-item-icon">📦</span>
                 <div class="shop-item-info">
                   <div class="shop-item-name">6 PACKS</div>
-                  <div class="shop-item-stars">★ 3</div>
+                  <div class="shop-item-stars">★ 6</div>
                 </div>
-                <button class="shop-btn" onclick="shopBuyPacks(3, 6, this)">BUY</button>
+                <button class="shop-btn" onclick="shopBuyPacks(6, 6, this)">BUY</button>
               </div>
 
               <div class="shop-item">
@@ -185,7 +195,7 @@
                   <div class="shop-item-name">REFRESH TASKS</div>
                   <div class="shop-item-stars">★ 1</div>
                 </div>
-                <button class="shop-btn" onclick="shopRefreshTasks(this)">REFRESH</button>
+                <button class="shop-btn" id="shopRefreshBtn" onclick="shopRefreshTasks(this)">REFRESH</button>
               </div>
 
               <div class="shop-item shop-item--legendary">
@@ -348,6 +358,23 @@
 
           <span class="gate-footnote">watching an ad earns exactly enough stars to skip one future ad. the system is working as intended.</span>
 
+        </div>
+      </div>
+
+      <!-- PRISTINE OUT-OF-PACKS SCREEN — calm cooldown, no ads ──────────── -->
+      <div class="screen hidden" id="screen-empty">
+        <div class="empty-wrapper">
+          <div class="empty-icon">📦</div>
+          <div class="empty-title">No packs left</div>
+          <div class="empty-sub">Complete tasks to earn stars,<br>or visit the shop to get more.</div>
+          <div class="empty-cooldown" id="emptyCooldownWrap">
+            <span class="empty-cooldown-label">Next free pack in</span>
+            <span class="empty-cooldown-timer" id="emptyCooldownTimer">0:30</span>
+          </div>
+          <button class="empty-btn" id="emptyCooldownBtn" onclick="emptyClaimFree()" disabled>
+            Get a free pack
+          </button>
+          <button class="empty-shop-btn" onclick="emptyOpenShop()">Open shop</button>
         </div>
       </div>
 

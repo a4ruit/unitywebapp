@@ -1435,23 +1435,84 @@ const CardTextures = (() => {
       });
 
     } else if (rarity === 'rare') {
-      // Flock of Birds — V formation, seven birds at different scales
+      // Seagull — in-flight profile: wide M-shape wings, white body, black tips,
+      // orange beak. Drawn to match the creature this card spawns in Unity.
       ctx.strokeStyle = '#9a6ab8'; ctx.lineWidth = 1.5;
-      const birds = [[0,0,1.0],[-22,10,0.78],[22,10,0.78],[-40,18,0.62],[40,18,0.62],[-54,28,0.5],[54,28,0.5]];
-      birds.forEach(([bx,by,sc]) => {
-        ctx.save(); ctx.translate(bx,by); ctx.scale(sc,sc);
-        ctx.fillStyle = `rgba(154,106,184,${0.28+sc*0.3})`;
-        ctx.strokeStyle = '#9a6ab8'; ctx.lineWidth = 1.5/sc;
-        // Body
-        ctx.beginPath(); ctx.ellipse(0,0,7,4,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-        // Wings
-        ctx.beginPath(); ctx.moveTo(-7,0); ctx.bezierCurveTo(-13,-8,-19,-10,-23,-6); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(7,0); ctx.bezierCurveTo(13,-8,19,-10,23,-6); ctx.stroke();
-        // Head
-        ctx.beginPath(); ctx.arc(8,-2,3.5,0,Math.PI*2);
-        ctx.fillStyle = `rgba(118,75,158,${0.48+sc*0.3})`; ctx.fill();
-        ctx.restore();
-      });
+
+      // ── Wing glow / air beneath ───────────────────────────────────────────
+      const glow = ctx.createRadialGradient(0,0,5, 0,0,46);
+      glow.addColorStop(0,   'rgba(200,215,255,0.22)');
+      glow.addColorStop(1,   'rgba(154,106,184,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath(); ctx.arc(0,0,46,0,Math.PI*2); ctx.fill();
+
+      // ── Left wing ─────────────────────────────────────────────────────────
+      // Outer top surface — light grey-white
+      ctx.fillStyle = 'rgba(218,222,228,0.88)';
+      ctx.strokeStyle = 'rgba(154,106,184,0.7)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-4,-2);
+      ctx.bezierCurveTo(-18,-16,-36,-18,-46,-10);   // leading edge sweeps far left
+      ctx.bezierCurveTo(-38,-6,-22,4,-4,6);          // trailing edge curves back in
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Black wingtip
+      ctx.fillStyle = 'rgba(38,32,48,0.82)';
+      ctx.beginPath();
+      ctx.moveTo(-40,-12); ctx.bezierCurveTo(-46,-10,-48,-6,-42,-4);
+      ctx.bezierCurveTo(-38,-2,-36,2,-38,6); ctx.lineTo(-42,4);
+      ctx.bezierCurveTo(-46,0,-44,-8,-40,-12); ctx.fill();
+
+      // ── Right wing ────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(218,222,228,0.88)';
+      ctx.strokeStyle = 'rgba(154,106,184,0.7)'; ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(4,-2);
+      ctx.bezierCurveTo(18,-16,36,-18,46,-10);
+      ctx.bezierCurveTo(38,-6,22,4,4,6);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Black wingtip
+      ctx.fillStyle = 'rgba(38,32,48,0.82)';
+      ctx.beginPath();
+      ctx.moveTo(40,-12); ctx.bezierCurveTo(46,-10,48,-6,42,-4);
+      ctx.bezierCurveTo(38,-2,36,2,38,6); ctx.lineTo(42,4);
+      ctx.bezierCurveTo(46,0,44,-8,40,-12); ctx.fill();
+
+      // ── Body ──────────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(238,240,244,0.95)';
+      ctx.strokeStyle = 'rgba(154,106,184,0.6)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.ellipse(0,2,12,7,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      // Belly sheen
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath(); ctx.ellipse(-2,0,6,3,-0.3,0,Math.PI*2); ctx.fill();
+
+      // ── Head ──────────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(235,238,244,0.96)';
+      ctx.strokeStyle = 'rgba(154,106,184,0.6)'; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.arc(14,-6,8,0,Math.PI*2); ctx.fill(); ctx.stroke();
+
+      // ── Eye ───────────────────────────────────────────────────────────────
+      ctx.fillStyle = '#1a1428';
+      ctx.beginPath(); ctx.arc(17,-8,2.2,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.beginPath(); ctx.arc(16,-9,0.8,0,Math.PI*2); ctx.fill();
+
+      // ── Beak ──────────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(228,148,38,0.95)';
+      ctx.strokeStyle = 'rgba(180,110,20,0.8)'; ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(22,-6); ctx.lineTo(32,-8); ctx.lineTo(31,-5); ctx.lineTo(22,-4);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // Red spot on lower mandible
+      ctx.fillStyle = 'rgba(200,40,30,0.85)';
+      ctx.beginPath(); ctx.arc(29,-6,1.4,0,Math.PI*2); ctx.fill();
+
+      // ── Tail ──────────────────────────────────────────────────────────────
+      ctx.fillStyle = 'rgba(218,222,228,0.8)';
+      ctx.strokeStyle = 'rgba(154,106,184,0.5)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(-10,4); ctx.bezierCurveTo(-14,10,-18,14,-16,18);
+      ctx.bezierCurveTo(-12,16,-8,10,-4,6);
+      ctx.lineTo(-10,4); ctx.closePath(); ctx.fill(); ctx.stroke();
 
     } else if (rarity === 'legendary') {
       // Red Fox — alert profile, bushy tail, pointed ears
@@ -1573,32 +1634,59 @@ const CardTextures = (() => {
       }
 
     } else if (rarity === 'legendary-alpha') {
-      // The Herd — row of animal silhouettes on glowing ground, rainbow shimmer
-      const pulse = 1 + Math.sin(t*2)*0.05;
-      ctx.scale(pulse,pulse);
-      const grad = ctx.createLinearGradient(-46,-40,46,40);
-      for (let i = 0; i <= 6; i++) grad.addColorStop(i/6, rainbow(t,i*60));
-      // Ground
-      ctx.strokeStyle = grad; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(-50,26); ctx.lineTo(50,26); ctx.stroke();
-      // Five animal silhouettes
-      [-36,-18,-2,14,30].forEach((ax,idx) => {
-        const h = ((t*60+idx*72)%360+360)%360;
-        ctx.fillStyle = `hsla(${h},76%,55%,${0.42+Math.sin(t*2+idx)*0.14})`;
-        ctx.strokeStyle = grad; ctx.lineWidth = 1;
-        ctx.beginPath(); ctx.ellipse(ax,16,9,7,0,0,Math.PI*2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.arc(ax+10,8,5,0,Math.PI*2); ctx.fill(); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(ax+8,4); ctx.lineTo(ax+6,-2); ctx.lineTo(ax+12,3); ctx.fill();
-        ctx.strokeStyle = `hsla(${h},76%,44%,0.8)`; ctx.lineWidth = 1.5;
-        [[ax-4,22],[ax+2,22],[ax-8,22]].forEach(([x,y]) => {
-          ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y+6); ctx.stroke();
-        });
+      // Emerald Serpent — prismatic serpentine body, blooming flowers, a head
+      // with eyes + forked tongue. Animated shimmer (legendary-alpha is animated).
+      const pulse = 1 + Math.sin(t*2)*0.04;
+      ctx.scale(pulse, pulse);
+
+      // Sample an undulating S-curve spine, left (tail) → right (head)
+      const N = 24;
+      const pts = [];
+      for (let i = 0; i <= N; i++) {
+        const u = i / N;
+        const x = -42 + u * 84;
+        const y = Math.sin(u * Math.PI * 2.2 + t * 1.5) * 18 * (0.4 + u * 0.6);
+        pts.push([x, y]);
+      }
+
+      // Body — overlapping circles, tapering tail→head, emerald prismatic shimmer
+      for (let i = N; i >= 0; i--) {
+        const u = i / N;
+        const r = 2 + u * 7;
+        const hue = ((140 + Math.sin(t * 1.2 + i * 0.3) * 42) % 360 + 360) % 360;
+        ctx.fillStyle = `hsla(${hue},70%,${48 + u * 12}%,0.93)`;
+        ctx.beginPath(); ctx.arc(pts[i][0], pts[i][1], r, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = `hsla(${hue},85%,82%,0.22)`;   // glossy scale highlight
+        ctx.beginPath(); ctx.arc(pts[i][0] - r * 0.3, pts[i][1] - r * 0.3, r * 0.4, 0, Math.PI * 2); ctx.fill();
+      }
+
+      // Head
+      const hp = pts[N];
+      const hhue = ((152 + Math.sin(t * 1.2) * 30) % 360 + 360) % 360;
+      ctx.fillStyle = `hsla(${hhue},75%,52%,1)`;
+      ctx.beginPath(); ctx.ellipse(hp[0] + 2, hp[1], 11, 8, 0, 0, Math.PI * 2); ctx.fill();
+      // Eye
+      ctx.fillStyle = '#0a1410';
+      ctx.beginPath(); ctx.arc(hp[0] + 6, hp[1] - 2.5, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = 'rgba(180,255,220,0.7)';
+      ctx.beginPath(); ctx.arc(hp[0] + 5.4, hp[1] - 3, 0.7, 0, Math.PI * 2); ctx.fill();
+      // Forked tongue
+      ctx.strokeStyle = '#ff5a7a'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(hp[0] + 12, hp[1]); ctx.lineTo(hp[0] + 18, hp[1] - 2); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(hp[0] + 12, hp[1]); ctx.lineTo(hp[0] + 18, hp[1] + 2); ctx.stroke();
+
+      // Blooming flowers trailing along the body — the garden answers the wound
+      [[-34, 22], [-8, 28], [22, 24]].forEach(([fx, fy], k) => {
+        const fhue = ((40 + k * 60 + t * 40) % 360 + 360) % 360;
+        for (let p = 0; p < 5; p++) {
+          const a = (p / 5) * Math.PI * 2 + t;
+          ctx.fillStyle = `hsla(${fhue},85%,70%,0.9)`;
+          ctx.beginPath();
+          ctx.ellipse(fx + Math.cos(a) * 3, fy + Math.sin(a) * 3, 2, 1.3, a, 0, Math.PI * 2); ctx.fill();
+        }
+        ctx.fillStyle = '#ffe27a';
+        ctx.beginPath(); ctx.arc(fx, fy, 1.6, 0, Math.PI * 2); ctx.fill();
       });
-      // Rainbow ground line
-      const lg = ctx.createLinearGradient(-50,28,50,28);
-      for (let i = 0; i <= 4; i++) lg.addColorStop(i/4, rainbow(t,i*90));
-      ctx.strokeStyle = lg; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(-50,28); ctx.lineTo(50,28); ctx.stroke();
     }
 
     ctx.restore();
@@ -2031,6 +2119,71 @@ const CardTextures = (() => {
 
   // â”€â”€â”€ Public: buildFace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  // Ouroboros — the Emerald Serpent biting its own tail in a ring. Emerald body
+  // with yellow dorsal fins + horned head, gentle emerald shimmer.
+  function drawOuroboros(ctx, t) {
+    ctx.save();
+    ctx.translate(128, 178);
+    const R = 44, N = 30;
+    const gap = 0.6;                       // radians of open mouth/tail gap
+    const span = Math.PI * 2 - gap;
+    const start = -Math.PI / 2 + gap * 0.5;
+
+    // Soft emerald aura
+    const glow = ctx.createRadialGradient(0, 0, 8, 0, 0, R + 20);
+    glow.addColorStop(0, 'rgba(120,255,180,0.16)');
+    glow.addColorStop(1, 'rgba(40,160,90,0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath(); ctx.arc(0, 0, R + 20, 0, Math.PI * 2); ctx.fill();
+
+    // Body segments, tail (thin) → head (thick)
+    for (let i = N; i >= 0; i--) {
+      const u   = i / N;
+      const ang = start + span * u;
+      const x   = Math.cos(ang) * R, y = Math.sin(ang) * R;
+      const r   = 3 + u * 6.5;
+      const ox  = Math.cos(ang), oy = Math.sin(ang);   // outward normal
+      const hue = ((140 + Math.sin(t * 0.9 + i * 0.22) * 16) % 360 + 360) % 360;
+
+      // Yellow dorsal fin on the outer edge, every 3rd segment
+      if (i % 3 === 0 && i < N - 2 && i > 1) {
+        ctx.fillStyle = 'rgba(255,205,40,0.92)';
+        ctx.beginPath();
+        ctx.moveTo(x + ox * r,        y + oy * r);
+        ctx.lineTo(x + ox * (r + 7),  y + oy * (r + 7));
+        ctx.lineTo(x + ox * r - oy * 3, y + oy * r + ox * 3);
+        ctx.closePath(); ctx.fill();
+      }
+
+      ctx.fillStyle = `hsla(${hue},70%,${46 + u * 12}%,0.96)`;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `hsla(${hue},85%,82%,0.22)`;       // scale gloss
+      ctx.beginPath(); ctx.arc(x - ox * r * 0.3, y - oy * r * 0.3, r * 0.4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Head at the body's leading end, jaw open toward the tail (the gap)
+    const hAng = start + span;
+    ctx.save();
+    ctx.translate(Math.cos(hAng) * R, Math.sin(hAng) * R);
+    ctx.rotate(hAng + Math.PI / 2);        // local +X = forward (toward the tail)
+    ctx.fillStyle = 'hsla(150,72%,50%,1)';
+    ctx.beginPath(); ctx.ellipse(2, 0, 11, 8, 0, 0, Math.PI * 2); ctx.fill();
+    // Open jaws reaching for the tail
+    ctx.fillStyle = 'hsla(150,60%,38%,1)';
+    ctx.beginPath(); ctx.moveTo(8, -2); ctx.lineTo(21, -7); ctx.lineTo(18, -1); ctx.lineTo(9, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(8,  2); ctx.lineTo(21,  7); ctx.lineTo(18,  1); ctx.lineTo(9, 0); ctx.closePath(); ctx.fill();
+    // Swept-back horns
+    ctx.strokeStyle = 'rgba(255,205,40,0.95)'; ctx.lineWidth = 2.5; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(-4, -4); ctx.lineTo(-15, -10); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-4,  4); ctx.lineTo(-15,  10); ctx.stroke();
+    // Glowing eye
+    ctx.fillStyle = '#fff0a0';
+    ctx.beginPath(); ctx.arc(3, -3, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
   function buildFace(card, canvas, t = 0) {
     if (!canvas) {
       canvas = document.createElement('canvas');
@@ -2057,7 +2210,11 @@ const CardTextures = (() => {
       drawCorners(ctx, card.rarity, t);
     }
 
-    drawShape(ctx, card.rarity, t);
+    // The Emerald Serpent always renders as its ouroboros, independent of which
+    // pack type the player is currently on (the normal drawShape dispatch keys
+    // off activePackType, which would otherwise draw the nature Tree of Life).
+    if (card.name === 'Emerald Serpent') drawOuroboros(ctx, t);
+    else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t);
     return canvas;
   }

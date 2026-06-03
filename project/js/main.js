@@ -39,7 +39,7 @@ const NATURE_CARDS = [
 
 // ─── FLESH (garbage / horror) ─────────────────────────────────────────────────
 const FLESH_CARDS = [
-  { id:'small_cube', name:'Unidentified Tissue', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
+  { id:'small_cube', name:'Mystery Meat', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
   { id:'large_cube', name:'Fleshling',           rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Small. Hungry. It found you first.' },
   { id:'sphere',     name:'Blind Box',            rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It has eyes. They do not work. But it knows you are here.' },
   { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. Pre-dates the colony.' },
@@ -52,11 +52,11 @@ const FLESH_CARDS = [
 const CRITTER_CARDS = [
   { id:'small_cube', name:'Sheep',            rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
   { id:'large_cube', name:'Duck',             rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
-  { id:'sphere',     name:'Flock of Birds',   rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Moving together. No leader. No mistake.' },
+  { id:'sphere',     name:'Seagull',          rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'Red Fox',          rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
   { id:'octagon',    name:'Great Stag',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The forest holds its breath.' },
   { id:'triad',      name:'The Migration',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Thousands. No map. Right on time.' },
-  { id:'star',       name:'The Herd',         rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Before the fence. Before the road.' },
+  { id:'star',       name:'Emerald Serpent',  rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
 ];
 
 // ─── SCOURGE (ewaste / horror) ────────────────────────────────────────────────
@@ -353,9 +353,10 @@ function rollPack() {
   else                   topCard = pick('uncommon');
 
   // Guaranteed Legendary voucher (bought in the pristine shop). Forces the top
-  // card to legendary-or-better, then consumes the voucher. Pierces the gacha.
+  // card to the Emerald Serpent (critter legendary-alpha) — the only legendary
+  // creature available right now. Update this once more legendaries exist.
   if (window._guaranteedLegendary) {
-    if (topCard.rarityRank < 3) topCard = pick('legendary');
+    topCard = { ...CRITTER_CARDS.find(c => c.rarity === 'legendary-alpha') };
     window._guaranteedLegendary = false;
   }
 
@@ -822,6 +823,33 @@ function showChoiceGrid() {
   });
 }
 
+// ─── Legendary reveal (shop "guaranteed legendary") ─────────────────────────────
+// A dedicated single-card screen. Already paid for in the shop, so tapping the
+// card just claims + spawns it — no extra cost. Currently always the Emerald
+// Serpent (the only legendary creature); expand when more legendaries exist.
+function showLegendaryReveal() {
+  Cards3D.destroy();
+  const el = document.getElementById('revealCard');
+  if (el) { el.innerHTML = ''; el.style.opacity = ''; }
+
+  const card = { ...CRITTER_CARDS.find(c => c.rarity === 'legendary-alpha'), starCost: 0 };
+
+  showScreen('screen-legendary');
+
+  ChoiceGrid3D.show([card], 'legendaryGrid', (chosenCard) => {
+    setTimeout(() => {
+      // Count toward the "first legendary" / placement tasks.
+      if (typeof TaskTracker !== 'undefined') {
+        TaskTracker.recordEvent('placement', { rarity: chosenCard.rarity });
+      }
+      // Force the CRITTER pool so it always spawns the Emerald Serpent,
+      // regardless of which pack type / phase the player is currently in.
+      send(`${chosenCard.command}|${CLIENT_ID}|critter`);
+      resetToPackScreen();
+    }, 400);
+  });
+}
+
 // ─── God-pack claim grid ──────────────────────────────────────────────────────
 
 function showGodPackClaimGrid() {
@@ -982,6 +1010,11 @@ function debugSpawnFleshling() {
 function debugSpawnBlindBox() {
   send('debug_spawn_blind_box');
   console.log('[DEBUG] requested blind box spawn');
+}
+
+function debugAddStars() {
+  if (typeof addStars === 'function') addStars(25);
+  console.log('[DEBUG] +25 stars granted');
 }
 
 // ── Horror Phase Roulette (Three.js) ──────────────────────────────────────

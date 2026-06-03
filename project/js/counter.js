@@ -116,17 +116,70 @@ function updateCounterDisplay() {
 function consumePack() {
   if (packsLeft <= 0) {
     if (document.body.classList.contains('pristine-phase')) {
-      // Pristine phase: no gate — just silently refill and continue
-      packsLeft = PACKS_PER_BATCH;
+      showEmpty();   // calm cooldown screen — no ads in the pristine phase
     } else {
-      showGate();
-      return false;
+      showGate();    // horror gate with ad/spend options
     }
+    return false;
   }
   packsLeft--;
   updateCounterDisplay();
   pulseCounter();
   return true;
+}
+
+// ─── Pristine "no packs" cooldown screen ─────────────────────────────────────
+
+const EMPTY_COOLDOWN_SECS = 30;
+let _emptyCooldownUntil = 0;
+let _emptyCooldownTimer = null;
+
+function showEmpty() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById('screen-empty').classList.remove('hidden');
+  _startEmptyCooldown();
+}
+
+function _startEmptyCooldown() {
+  // Only start a new countdown if one isn't already running.
+  if (Date.now() < _emptyCooldownUntil) { _syncEmptyBtn(); return; }
+  _emptyCooldownUntil = Date.now() + EMPTY_COOLDOWN_SECS * 1000;
+  clearInterval(_emptyCooldownTimer);
+  _emptyCooldownTimer = setInterval(_syncEmptyBtn, 250);
+  _syncEmptyBtn();
+}
+
+function _syncEmptyBtn() {
+  const btn   = document.getElementById('emptyCooldownBtn');
+  const timer = document.getElementById('emptyCooldownTimer');
+  const remaining = Math.max(0, _emptyCooldownUntil - Date.now());
+  if (remaining > 0) {
+    const s = Math.ceil(remaining / 1000);
+    const mm = Math.floor(s / 60), ss = s % 60;
+    if (timer) timer.textContent = `${mm}:${String(ss).padStart(2,'0')}`;
+    if (btn)   { btn.disabled = true; }
+  } else {
+    if (timer) timer.textContent = 'Ready!';
+    if (btn)   { btn.disabled = false; }
+    clearInterval(_emptyCooldownTimer);
+    _emptyCooldownTimer = null;
+  }
+}
+
+// Player taps "Get a free pack" after the countdown.
+function emptyClaimFree() {
+  if (Date.now() < _emptyCooldownUntil) return;
+  packsLeft += 1;
+  updateCounterDisplay();
+  resetToPackScreen();
+}
+
+// Player taps "Open shop" from the empty screen.
+function emptyOpenShop() {
+  // showScreen returns to pack-screen first, then open the shop inside it.
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById('screen-empty').classList.add('hidden');
+  if (typeof openShop === 'function') openShop();
 }
 
 function pulseCounter() {
@@ -202,7 +255,8 @@ function openShop() {
   const el = document.getElementById('shopStarBalance');
   if (el) el.textContent = stars;
   updateShopButtons();
-  _syncGiftButton();   // keep the gift CLAIMED if already taken this session
+  _syncGiftButton();      // keep the gift CLAIMED if already taken this session
+  _syncRefreshButton();   // keep the refresh cooldown countdown showing
 }
 
 function closeShop() {
@@ -300,24 +354,63 @@ function shopBuyPacks(cost, n, btn) {
   _shopConfirm(btn, '+' + n);
 }
 
-// Refresh tasks — reset individual tasks so the player keeps earning. Costs 1 star.
+// Refresh tasks — reset individual tasks so the player keeps earning. Costs 1
+// star AND has a 15-minute cooldown per session (in-memory → resets on reload).
+const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+let _refreshCooldownUntil = 0;
+let _refreshTimer = null;
+
 function shopRefreshTasks(btn) {
+  if (Date.now() < _refreshCooldownUntil) { _shopDenied(); return; }   // still cooling down
   if (!spendStars(1)) { _shopDenied(); return; }
   if (typeof TaskTracker !== 'undefined' && TaskTracker.refreshIndividual) {
     TaskTracker.refreshIndividual();
   }
   syncShopBalance();
+  _refreshCooldownUntil = Date.now() + REFRESH_COOLDOWN_MS;
+  _startRefreshCooldownUI();
   updateShopButtons();
-  _shopConfirm(btn, 'DONE');
+}
+
+// Drives the mm:ss countdown on the refresh button until the cooldown ends.
+function _startRefreshCooldownUI() {
+  _syncRefreshButton();
+  clearInterval(_refreshTimer);
+  _refreshTimer = setInterval(() => {
+    _syncRefreshButton();
+    if (Date.now() >= _refreshCooldownUntil) { clearInterval(_refreshTimer); _refreshTimer = null; }
+  }, 1000);
+}
+
+// Reflect the cooldown state on the refresh button (called on tick + shop open).
+function _syncRefreshButton() {
+  const btn = document.getElementById('shopRefreshBtn');
+  if (!btn) return;
+  const remaining = _refreshCooldownUntil - Date.now();
+  if (remaining > 0) {
+    const m = Math.floor(remaining / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    btn.textContent  = `${m}:${String(s).padStart(2, '0')}`;
+    btn.disabled     = true;
+    btn.style.opacity = '0.5';
+  } else {
+    btn.textContent  = 'REFRESH';
+    btn.disabled     = false;
+    btn.style.opacity = '';
+  }
 }
 
 // Guaranteed legendary — pierce the gacha. Next pack's top card is legendary+.
 function shopBuyLegendary(cost, btn) {
   if (!spendStars(cost)) { _shopDenied(); return; }
-  window._guaranteedLegendary = true;
   syncShopBalance();
   updateShopButtons();
-  _shopConfirm(btn, 'READY');
+  // Take the player to the single-card legendary reveal (they tap to claim it).
+  if (typeof showLegendaryReveal === 'function') {
+    showLegendaryReveal();
+  } else {
+    window._guaranteedLegendary = true;   // fallback to next-pull voucher
+  }
 }
 
 function updateShopButtons() {
@@ -342,4 +435,5 @@ function updateShopButtons() {
       item.style.opacity = canAfford ? '1' : '0.6';
     }
   });
+  _syncRefreshButton();   // cooldown state must win over the affordability pass
 }

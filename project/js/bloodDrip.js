@@ -37,7 +37,7 @@ const BloodDrip = (() => {
   let raf             = null;
   let spawnTimer      = null;
   let packDripTimer   = null;
-
+ 
   // ── Init ─────────────────────────────────────────────────────────────────
 
   function ensureInit() {
