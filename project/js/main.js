@@ -172,6 +172,8 @@ function updatePersonalPhase() {
   }
   // Tell Unity THIS player's current pack type so per-spawn routing is correct
   sendPackType();
+  // Reveal the horror half of the card collection once this phone flips phase
+  if (typeof Collection !== 'undefined' && Collection.onPhaseChange) Collection.onPhaseChange();
 }
 
 function updateFirstPackTab(isPristine) {

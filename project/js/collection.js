@@ -47,6 +47,20 @@ const Collection = (() => {
     }
   }
 
+  // ── Phase gating ──────────────────────────────────────────────────────────────
+  // Pristine phase shows only the three pristine pools (nature/critter/fungi).
+  // The horror-phase pools (flesh/scourge/ritual) stay hidden until THIS phone
+  // crosses into the horror phase, at which point the full collection reveals.
+  function _isHorror() {
+    try { return personalPacksOpened >= HORROR_THRESHOLD; }
+    catch (e) { return false; }
+  }
+  function _phaseKey() { return _isHorror() ? 'h' : 'p'; }
+  function _visiblePools(horror) {
+    // corruption:0 marks the pristine trio; the rest are horror-only.
+    return horror ? POOLS : POOLS.filter(p => p.corruption === 0);
+  }
+
   // Rarity tiers, low → high. labelShort keeps the panel header tidy.
   const TIERS = [
     { rarity:'common',          label:'COMMONS',     reward:5  },
@@ -62,20 +76,23 @@ const Collection = (() => {
 
   // ── State ────────────────────────────────────────────────────────────────────
   // Collected cards keyed by card.name (every card name is unique across pools).
-  const _collected   = new Set();
-  const _tierClaimed  = new Set();   // rarities whose set-bonus has been paid
-  let   _grandClaimed = false;
+  const _collected    = new Set();
+  const _tierClaimed  = new Set();   // "<rarity>:<phase>" set-bonuses already paid
+  const _grandClaimed = new Set();   // phases whose full-collection bonus was paid
   let   _open         = false;
   let   _catalog      = null;        // lazily built once the pools exist
+  let   _catalogPhase = null;        // phase the cached catalog was built for
 
   // ── Catalog (built lazily so it reads main.js's pool consts after they load) ─
-  function _buildCatalog() {
+  // Scoped to the current phase: only the visible pools are included, so the
+  // horror cards simply don't exist in the catalog until horror is reached.
+  function _buildCatalog(horror) {
     const pools  = _resolvePools();
     const byTier = TIERS.map(tier => ({
       ...tier,
       cards: [],   // [{ card, poolKey, type, corruption }]
     }));
-    POOLS.forEach(pool => {
+    _visiblePools(horror).forEach(pool => {
       const arr = pools[pool.global];
       if (!arr) return;
       arr.forEach(card => {
@@ -87,15 +104,22 @@ const Collection = (() => {
   }
 
   function _cat() {
-    if (!_catalog) _catalog = _buildCatalog();
+    const horror = _isHorror();
+    if (!_catalog || _catalogPhase !== horror) {
+      _catalog      = _buildCatalog(horror);
+      _catalogPhase = horror;
+    }
     return _catalog;
   }
 
   function _total() {
     return _cat().reduce((n, t) => n + t.cards.length, 0);
   }
+  // Cards collected among those currently visible (robust if scope ever shrinks).
   function _collectedCount() {
-    return _collected.size;
+    let n = 0;
+    _cat().forEach(t => t.cards.forEach(e => { if (_collected.has(e.card.name)) n++; }));
+    return n;
   }
 
   // ── Public: record a claimed card ─────────────────────────────────────────────
@@ -109,21 +133,39 @@ const Collection = (() => {
   }
 
   // ── Rewards — full-tier set bonuses + grand completion ────────────────────────
+  // Completion is measured against the currently-revealed catalog and tracked
+  // per phase, so completing a rarity in pristine (3 cards) and again in horror
+  // (all 6) are distinct, separately-earnable bonuses.
   function _checkRewards() {
+    const phase = _phaseKey();
     _cat().forEach(tier => {
-      if (_tierClaimed.has(tier.rarity)) return;
+      const key = tier.rarity + ':' + phase;
+      if (_tierClaimed.has(key)) return;
       const have = tier.cards.filter(e => _collected.has(e.card.name)).length;
       if (have >= tier.cards.length && tier.cards.length > 0) {
-        _tierClaimed.add(tier.rarity);
+        _tierClaimed.add(key);
         if (typeof addStars === 'function') addStars(tier.reward);
         _toast(`${tier.label} complete`, tier.reward);
       }
     });
-    if (!_grandClaimed && _collectedCount() >= _total() && _total() > 0) {
-      _grandClaimed = true;
+    if (!_grandClaimed.has(phase) && _collectedCount() >= _total() && _total() > 0) {
+      _grandClaimed.add(phase);
       if (typeof addStars === 'function') addStars(GRAND_BONUS);
       _toast('FULL COLLECTION', GRAND_BONUS);
     }
+  }
+
+  // ── Public: phase changed (called from main.js updatePersonalPhase) ──────────
+  // Rebuilds the catalog for the new phase and re-renders, so crossing into the
+  // horror phase reveals the full collection immediately — and a pulse on the
+  // trigger nudges the player to look.
+  function onPhaseChange() {
+    const horror = _isHorror();
+    if (_catalogPhase === horror) return;    // no actual change
+    const firstInit = _catalogPhase === null; // startup, not a real transition
+    _catalog = null;                          // force rebuild on next _cat()
+    _render();
+    if (!firstInit) _pulseTab();              // nudge only on a genuine reveal
   }
 
   // ── Panel toggle (mirrors TaskTracker) ────────────────────────────────────────
@@ -184,10 +226,11 @@ const Collection = (() => {
 
     body.innerHTML = '';
 
+    const phase = _phaseKey();
     _cat().forEach(tier => {
       const have  = tier.cards.filter(e => _collected.has(e.card.name)).length;
       const goal  = tier.cards.length;
-      const done  = _tierClaimed.has(tier.rarity);
+      const done  = _tierClaimed.has(tier.rarity + ':' + phase);
       const accent = (typeof CardTextures !== 'undefined' && CardTextures.getCfg)
         ? CardTextures.getCfg(tier.rarity).border : '#8bc28b';
 
@@ -273,6 +316,6 @@ const Collection = (() => {
     window.addEventListener('load', () => { _catalog = null; _updateTrigger(); });
   }
 
-  return { record, togglePanel };
+  return { record, togglePanel, onPhaseChange };
 
 })();
