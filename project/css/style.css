@@ -2989,3 +2989,241 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   pointer-events: none;
   white-space: nowrap;
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   COLLECTION PANEL — left-side slide-out "dex" (see js/collection.js)
+   Mirror of the right-side task panel: the TRIGGER is pinned to the LEFT
+   screen edge and never moves; only the BODY-WRAP translates.
+     Closed: body translateX(-328px) → completely off-screen left.
+     Open:   body translateX(0)      → slides right into natural position.
+   Violet accent distinguishes it from the cyan/gold task tab. Slightly
+   bigger body than the task panel, with a 2-column card grid.
+   ══════════════════════════════════════════════════════════════════════════ */
+.coll-panel {
+  position: fixed;
+  left: 0;
+  top: 148px;          /* aligned with the task panel on the opposite edge */
+  width: 328px;        /* 60px trigger + 268px body */
+  display: flex;
+  flex-direction: row; /* trigger(first in DOM) → leftmost → left edge */
+  align-items: flex-start;
+  z-index: 20;
+  pointer-events: none;
+}
+
+/* ── Trigger — chunky pixel-art button, locked to left screen edge ── */
+.coll-panel-trigger {
+  pointer-events: auto;
+  flex: 0 0 60px;
+  width: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: rgba(14, 8, 22, 0.95);
+  /* Violet pixel-art raised-edge: bright violet top/left, deep plum bottom/right */
+  border-top:    2px solid rgba(200, 150, 255, 0.7);
+  border-right:  2px solid rgba(200, 150, 255, 0.7);
+  border-bottom: 2px solid rgba(55, 25, 80, 0.85);
+  border-left:   2px solid rgba(45, 20, 65, 0.7);
+  box-shadow:
+    0 0 8px 1px rgba(190, 130, 255, 0.45),
+    0 0 4px rgba(255, 215, 100, 0.25),
+    inset 0 0 6px rgba(200, 150, 255, 0.15);
+  color: rgba(238, 225, 255, 0.95);
+  font-family: 'VT323', monospace;
+  cursor: pointer;
+  padding: 8px 4px;
+  box-sizing: border-box;
+  animation: coll-tab-idle 2.8s ease-in-out infinite;
+}
+.coll-panel-trigger:active {
+  border-top-color:    rgba(55, 25, 80, 0.85);
+  border-right-color:  rgba(55, 25, 80, 0.85);
+  border-bottom-color: rgba(200, 150, 255, 0.7);
+  border-left-color:   rgba(200, 150, 255, 0.7);
+  background: rgba(20, 12, 30, 0.98);
+}
+.coll-panel--open .coll-panel-trigger {
+  border-top-color:    rgba(255, 230, 130, 0.8);
+  border-right-color:  rgba(255, 230, 130, 0.8);
+  background: rgba(22, 14, 30, 0.97);
+  color: rgba(255, 245, 220, 1);
+  box-shadow:
+    0 0 12px 2px rgba(255, 215, 100, 0.5),
+    0 0 6px rgba(190, 130, 255, 0.4),
+    inset 0 0 8px rgba(255, 220, 130, 0.2);
+}
+
+.coll-trigger-label {
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  text-align: center;
+  width: 100%;
+  color: rgba(248, 235, 255, 0.85);
+  text-shadow: 0 0 4px rgba(200, 150, 255, 0.4);
+}
+.coll-trigger-count {
+  font-size: 20px;
+  color: rgba(210, 170, 255, 1);
+  line-height: 1;
+  text-align: center;
+  text-shadow:
+    0 0 6px rgba(190, 130, 255, 0.75),
+    0 0 12px rgba(170, 110, 255, 0.35);
+}
+.coll-panel--open .coll-trigger-count {
+  color: rgba(255, 235, 150, 1);
+  text-shadow:
+    0 0 6px rgba(255, 215, 100, 0.75),
+    0 0 12px rgba(255, 200, 120, 0.4);
+}
+.coll-trigger-bar {
+  font-size: 10px;
+  letter-spacing: -1px;
+  line-height: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+.coll-trigger-bar-fill {
+  color: rgba(200, 150, 255, 0.95);
+  text-shadow: 0 0 4px rgba(190, 130, 255, 0.7), 0 0 8px rgba(170, 110, 255, 0.4);
+}
+.coll-trigger-bar-empty { color: rgba(60, 45, 75, 0.85); }
+
+@keyframes coll-tab-idle {
+  0%, 100% {
+    box-shadow:
+      0 0 8px 1px rgba(190, 130, 255, 0.40),
+      0 0 4px rgba(255, 215, 100, 0.22),
+      inset 0 0 6px rgba(200, 150, 255, 0.15);
+  }
+  50% {
+    box-shadow:
+      0 0 14px 2px rgba(190, 130, 255, 0.6),
+      0 0 8px rgba(255, 215, 100, 0.4),
+      inset 0 0 10px rgba(215, 175, 255, 0.22);
+  }
+}
+@keyframes coll-tab-ping {
+  0%, 50%, 100% { filter: none; transform: scale(1); }
+  25%, 75%      { filter: brightness(1.6) saturate(1.4); transform: scale(1.06); }
+}
+.coll-panel-trigger--ping {
+  animation: coll-tab-idle 2.8s ease-in-out infinite, coll-tab-ping 0.55s steps(1) 1;
+}
+
+/* ── Panel body — slides in/out independently of the trigger ── */
+.coll-panel-body-wrap {
+  pointer-events: none;
+  flex: 0 0 268px;
+  width: 268px;
+  height: 340px;       /* slightly bigger than the task panel (220×270) */
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: rgba(8, 4, 12, 0.97);
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent, transparent 3px,
+    rgba(0, 0, 0, 0.18) 3px, rgba(0, 0, 0, 0.18) 4px
+  );
+  border-top:    2px solid rgba(150, 100, 200, 0.45);
+  border-right:  2px solid rgba(150, 100, 200, 0.45);
+  border-bottom: 2px solid rgba(45, 20, 65, 0.7);
+  border-left:   none;
+  box-sizing: border-box;
+  transform: translateX(-328px);          /* closed: 60px trigger + 268px body */
+  transition: transform 0.22s steps(6);   /* chunky pixel-art slide */
+}
+.coll-panel--open .coll-panel-body-wrap {
+  pointer-events: auto;
+  transform: translateX(0);
+}
+.coll-panel-body-wrap::-webkit-scrollbar       { width: 3px; }
+.coll-panel-body-wrap::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.4); }
+.coll-panel-body-wrap::-webkit-scrollbar-thumb { background: rgba(140, 90, 200, 0.35); }
+
+/* ── Tier headers (one per rarity) ── */
+.coll-tier-hdr {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px 4px;
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(140, 90, 200, 0.12);
+}
+.coll-tier-name {
+  flex: 0 0 auto;
+  color: var(--tier, #c28bff);
+  text-shadow: 0 0 5px color-mix(in srgb, var(--tier, #c28bff) 55%, transparent);
+}
+.coll-tier-prog {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  min-width: 0;
+}
+.coll-bar { font-size: 12px; letter-spacing: -1px; line-height: 1; flex-shrink: 0; }
+.coll-bar-fill {
+  color: rgba(200, 150, 255, 1);
+  text-shadow: 0 0 4px rgba(190, 130, 255, 0.7);
+}
+.coll-bar-empty { color: rgba(50, 38, 65, 1); }
+.coll-tier-count {
+  font-size: 12px;
+  color: rgba(190, 165, 215, 0.7);
+  min-width: 26px;
+  text-align: right;
+}
+.coll-tier-rwd {
+  flex: 0 0 auto;
+  font-size: 14px;
+  color: #ffd96b;
+  min-width: 34px;
+  text-align: right;
+  text-shadow:
+    0 0 4px rgba(255, 215, 80, 0.8),
+    0 0 8px rgba(255, 200, 100, 0.5);
+}
+.coll-tier-rwd--done {
+  color: rgba(150, 240, 170, 0.95);
+  text-shadow: 0 0 5px rgba(120, 255, 160, 0.7);
+}
+.coll-tier-hdr--done .coll-tier-name { opacity: 0.75; }
+
+/* ── Card grid — 2 columns ── */
+.coll-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 6px 8px 10px;
+}
+.coll-card { position: relative; min-width: 0; }
+.coll-card-face {
+  width: 100%;
+  height: auto;
+  display: block;
+  image-rendering: pixelated;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+  animation: coll-card-pop 0.32s steps(4) 1;
+}
+@keyframes coll-card-pop {
+  0%   { transform: scale(0.82); filter: brightness(1.8); }
+  100% { transform: scale(1);    filter: none; }
+}
+/* Uncollected — near-black slab, almost indistinguishable */
+.coll-card-locked {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  display: block;
+  background: #07090c;
+  border: 1px solid rgba(36, 40, 52, 0.45);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.85);
+}

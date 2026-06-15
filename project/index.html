@@ -99,6 +99,14 @@
           </div>
         </div>
 
+        <!-- Collection panel — left-side slide-out tab, mirrors the task panel -->
+        <div class="coll-panel" id="collPanel">
+          <button class="coll-panel-trigger" id="collPanelTrigger" onclick="Collection.togglePanel()"><span class="coll-trigger-label">CARDS</span><span class="coll-trigger-count">0/42</span><span class="coll-trigger-bar"><span class="coll-trigger-bar-fill"></span><span class="coll-trigger-bar-empty">░░░░░</span></span></button>
+          <div class="coll-panel-body-wrap">
+            <div id="collPanelBody"></div>
+          </div>
+        </div>
+
         <!-- Pack carousel stage -->
         <div class="pack-carousel-stage" id="packCarouselStage">
           <div class="pack-carousel-bg" id="packCarouselBg">
@@ -436,6 +444,7 @@
   <script src="js/bloodDrip.js"></script>
   <script src="js/possession.js"></script><!-- must be before main.js -->
   <script src="js/tasks.js"></script><!-- must be before main.js -->
+  <script src="js/collection.js"></script><!-- must be before main.js -->
   <!-- corruption-bar.js shelved — bar removed for now
   <script src="js/corruption-bar.js"></script> -->
   <script src="js/main.js"></script>

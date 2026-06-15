@@ -868,6 +868,8 @@ function showLegendaryReveal() {
       if (typeof TaskTracker !== 'undefined') {
         TaskTracker.recordEvent('placement', { rarity: chosenCard.rarity });
       }
+      // Session collection — claim the legendary
+      if (typeof Collection !== 'undefined') Collection.record(chosenCard);
       // Force the CRITTER pool so it always spawns the Emerald Serpent,
       // regardless of which pack type / phase the player is currently in.
       send(`${chosenCard.command}|${CLIENT_ID}|critter`);
@@ -891,6 +893,8 @@ function showGodPackClaimGrid() {
   ChoiceGrid3D.showGodPack(packCards, 'choiceGrid', (claimedCard) => {
     // Tag with CLIENT_ID + personal pack type — Unity routes per-spawn.
     send(`${claimedCard.command}|${CLIENT_ID}|${getUnityPackType()}`);
+    // Session collection — claim each god-pack card as it's released
+    if (typeof Collection !== 'undefined') Collection.record(claimedCard);
     godPackClaimed.push(claimedCard);
     if (godPackClaimed.length === packCards.length) {
       setTimeout(showGodPackComplete, 600);
@@ -921,6 +925,9 @@ function dropCard(card) {
   if (typeof TaskTracker !== 'undefined') {
     TaskTracker.recordEvent('placement', { rarity: card.rarity });
   }
+
+  // Session collection — the card is now claimed
+  if (typeof Collection !== 'undefined') Collection.record(card);
 
   // Placement cards get their own modal regardless of phase
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
