@@ -202,7 +202,7 @@ const Collection = (() => {
     window.activePackType = entry.type;
     document.body.dataset.corruption = entry.corruption;
     try {
-      CardTextures.buildFace(entry.card, cv, 0);
+      CardTextures.buildFace(entry.card, cv, 0, { hideFlavor: true });
     } catch (e) {
       // ignore — falls back to a blank canvas
     } finally {

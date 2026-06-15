@@ -1,6 +1,7 @@
 ﻿// cardTextures.js â€” shared animated card face/back texture builders
 // Reskinned: shapes now represent consumer waste items
-// Exposes: CardTextures.buildFace(card, t), CardTextures.buildBack(), CardTextures.isAnimated(rarity)
+// Exposes: CardTextures.buildFace(card, canvas, t, opts), CardTextures.buildBack(), CardTextures.isAnimated(rarity)
+//   opts.hideFlavor — skip the separator + flavour text (used by the collection grid)
 
 const CardTextures = (() => {
 
@@ -2035,7 +2036,7 @@ const CardTextures = (() => {
     }
   }
 
-  function drawLabels(ctx, card, rarity, t) {
+  function drawLabels(ctx, card, rarity, t, opts = {}) {
     const cfg = getCfg(rarity);
 
     let nameColor, rarityColor;
@@ -2074,6 +2075,11 @@ const CardTextures = (() => {
     ctx.font = `${LAYOUT.rarityFontSize}px "Share Tech Mono", monospace`;
     ctx.fillStyle = rarityColor;
     ctx.fillText(rarity.toUpperCase(), 128, LAYOUT.rarityY);
+
+    // Flavour block (separator + description) is the last thing drawn. Compact
+    // renders such as the collection grid pass { hideFlavor:true } to skip it —
+    // the text is illegible at that size. The real in-game card is untouched.
+    if (opts.hideFlavor) return;
 
     // Separator line between rarity and description
     ctx.strokeStyle = `rgba(${rarity === 'legendary-alpha' ? '255,255,255' : hexToRgb(cfg.border)},0.3)`;
@@ -2184,7 +2190,7 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
-  function buildFace(card, canvas, t = 0) {
+  function buildFace(card, canvas, t = 0, opts = {}) {
     if (!canvas) {
       canvas = document.createElement('canvas');
       canvas.width = 256; canvas.height = 384;
@@ -2215,7 +2221,7 @@ const CardTextures = (() => {
     // off activePackType, which would otherwise draw the nature Tree of Life).
     if (card.name === 'Emerald Serpent') drawOuroboros(ctx, t);
     else                                 drawShape(ctx, card.rarity, t);
-    drawLabels(ctx, card, card.rarity, t);
+    drawLabels(ctx, card, card.rarity, t, opts);
     return canvas;
   }
 
