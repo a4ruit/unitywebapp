@@ -2200,10 +2200,14 @@ const CardTextures = (() => {
 
     // ── Card skin override: use PNG base when available ──────────────────────
     const isNature = cardIsNaturePhase();
-    const skinKey  = isNature && card.rarity === 'common'   ? 'nature-common'
+    let skinKey    = isNature && card.rarity === 'common'   ? 'nature-common'
                    : isNature && card.rarity === 'uncommon' ? 'nature-uncommon'
                    : isNature && card.rarity === 'rare'     ? 'nature-rare'
                    : null;
+    // White Mushroom (fungi common) and Sheep (critter common) reuse the
+    // common-card.png background ('nature-common' skin); their own symbol + name
+    // are still drawn on top by drawShape / drawLabels below.
+    if (card.name === 'White Mushroom' || card.name === 'Sheep') skinKey = 'nature-common';
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
