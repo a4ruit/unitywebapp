@@ -131,7 +131,7 @@ let _blindBoxAvailable = false;
 // mushroom: when the budget runs out the panel closes; placing a new
 // mushroom resets a fresh budget.
 let _sporeOwned     = false;  // this client has a living placed mushroom
-let _sporeBudget    = 5;      // total world-units of spore for this mushroom
+let _sporeBudget    = 25;     // total world-units of spore for this mushroom (Unity is authoritative)
 let _sporeRemaining = 0;      // world-units left (drives the fill bar)
 let _sporeWorldW    = 1;      // drop-zone world width  (2*scatterX) — unit conversion
 let _sporeWorldH    = 1;      // drop-zone world height (2*scatterZ)
@@ -1345,23 +1345,23 @@ function _buildUI() {
     #poss-spore-panel {
       pointer-events: all;
       position: fixed;
-      bottom: 100px;
+      top: 50%;
       left: 50%;
-      transform: translateX(-50%);
+      transform: translate(-50%, -50%);   /* fully centred over the pack */
       display: none;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       z-index: 10000;
-      padding: 12px 14px;
-      background: rgba(8, 20, 10, 0.92);
+      padding: 14px 16px;
+      background: rgba(8, 20, 10, 0.94);
       border: 2px solid rgba(101,255,76,0.5);
       border-radius: 16px;
-      box-shadow: 0 0 14px rgba(101,255,76,0.22), inset 0 0 10px rgba(0,0,0,0.5);
+      box-shadow: 0 0 16px rgba(101,255,76,0.25), inset 0 0 12px rgba(0,0,0,0.55);
     }
     #poss-spore-title {
       font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-      font-size: 12px;
+      font-size: 15px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: rgba(160,255,140,0.85);
@@ -1372,7 +1372,7 @@ function _buildUI() {
        scrolling the page. */
     #poss-spore-minimap {
       width: auto;
-      height: 200px;
+      height: min(60vh, 420px);   /* bigger than the ~400px card pack behind it */
       aspect-ratio: 108 / 148;
       image-rendering: pixelated;
       border: 2px solid rgba(101,255,76,0.5);
@@ -1400,7 +1400,7 @@ function _buildUI() {
     /* Spore budget bar — green fill shrinks left→right as the player drags */
     #poss-spore-bar {
       width: 100%;
-      height: 12px;
+      height: 16px;
       border: 2px solid rgba(101,255,76,0.5);
       border-radius: 7px;
       background: rgba(0,0,0,0.5);
@@ -2373,7 +2373,7 @@ function _confirmPlace() {
  */
 function _onFungiSporeReady(budget, worldW, worldH, mushNx, mushNz) {
   _sporeOwned     = true;
-  _sporeBudget    = budget > 0 ? budget : 5;
+  _sporeBudget    = budget > 0 ? budget : 25;
   _sporeRemaining = _sporeBudget;
   _sporeWorldW    = worldW > 0 ? worldW : 1;
   _sporeWorldH    = worldH > 0 ? worldH : 1;
