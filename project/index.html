@@ -30,6 +30,24 @@
     <span class="god-banner-star">★</span>
   </div>
 
+  <!-- Global announcement banner — drops down from the top like a mobile push.
+       Boss-spawn banner minimises into #bossHud below. (see js/announce.js) -->
+  <div class="announce-banner" id="announceBanner">
+    <span class="announce-icon" id="announceIcon"></span>
+    <div class="announce-text">
+      <div class="announce-title" id="announceTitle"></div>
+      <div class="announce-body" id="announceBody"></div>
+    </div>
+  </div>
+
+  <!-- Minimized live boss HP bar — revealed when the boss-spawn banner retracts,
+       updated by boss_damaged, hidden on boss_slain. -->
+  <div class="boss-hud" id="bossHud">
+    <span class="boss-hud-name" id="bossHudName"></span>
+    <span class="boss-hud-bar"><span class="boss-hud-fill" id="bossHudFill"></span></span>
+    <span class="boss-hud-hp" id="bossHudHp"></span>
+  </div>
+
   <div class="shell">
 
     <!-- STATUS BAR -->
@@ -445,6 +463,7 @@
   <script src="js/possession.js"></script><!-- must be before main.js -->
   <script src="js/tasks.js"></script><!-- must be before main.js -->
   <script src="js/collection.js"></script><!-- must be before main.js -->
+  <script src="js/announce.js"></script><!-- must be before main.js -->
   <!-- corruption-bar.js shelved — bar removed for now
   <script src="js/corruption-bar.js"></script> -->
   <script src="js/main.js"></script>

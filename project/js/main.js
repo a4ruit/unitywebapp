@@ -507,6 +507,7 @@ function connect() {
       // high-frequency (every 0.5s) and we want to short-circuit early.
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleQuestMessage(e.data)) return;
+      if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       handlePossessionMessage(e.data);
     };
   } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
@@ -764,6 +765,12 @@ function doPackOpen(dir) {
   // Flash for high rarity pulls
   const isHighRarity = ['legendary','mythical','luck-maxxing','legendary-alpha'].includes(topCard?.rarity);
   if (isHighRarity) triggerFlash();
+
+  // God pack — announce to every phone (dormant until god packs are re-enabled).
+  if (isGodPack) {
+    send(`godpack_pulled|${playerName}|${playerColor}`);
+    if (typeof Announce !== 'undefined') Announce.godPack(playerName, playerColor);
+  }
 
   // Only send spawn_godpack in personal horror phase — Unity's SpawnGodPack
   // always queues flesh objects, so in pristine phase individual card commands

@@ -3239,3 +3239,146 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   color: rgba(150, 135, 180, 0.4);
   text-shadow: 0 0 6px rgba(120, 100, 160, 0.25);
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ANNOUNCEMENT BANNER + BOSS HUD (see js/announce.js)
+   Drop-down push-notification banners for shared moments (boss spawn/slain,
+   god pack). The boss-spawn banner minimises into the compact live HP bar.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Banner — pinned to the top, slides down into view like a native push. */
+.announce-banner {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -130%);   /* hidden above the screen */
+  width: min(94vw, 420px);
+  box-sizing: border-box;
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 15px;
+  z-index: 10050;
+  background: rgba(10, 8, 14, 0.96);
+  border: 2px solid rgba(255, 90, 122, 0.6);
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 16px rgba(255, 90, 122, 0.3);
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  pointer-events: none;
+  cursor: pointer;
+  transition: transform 0.34s steps(8);   /* chunky pixel-art drop */
+}
+.announce-banner--open {
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+}
+.announce-icon {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.announce-text { flex: 1; min-width: 0; }
+.announce-title {
+  font-size: 15px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  color: #fff;
+  margin-bottom: 3px;
+}
+.announce-body {
+  font-size: 13px;
+  line-height: 1.22;
+  color: rgba(230, 225, 235, 0.85);
+}
+.announce-name { font-weight: 700; }
+
+/* ── Type accents ── */
+.announce-banner--boss {
+  border-color: rgba(255, 90, 122, 0.7);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 18px rgba(200, 40, 80, 0.4);
+}
+.announce-banner--boss .announce-title {
+  color: #ff6a8a;
+  text-shadow: 0 0 8px rgba(255, 80, 110, 0.6);
+  /* chromatic-aberration glitch flicker — does NOT touch the banner transform */
+  animation: announceTitleGlitch 1.3s steps(1) infinite;
+}
+@keyframes announceTitleGlitch {
+  0%, 46%, 54%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(255, 80, 110, 0.6); }
+  50%                { opacity: 0.7; text-shadow: 2px 0 #00fff0, -2px 0 #ff004c; }
+}
+.announce-banner--slain {
+  border-color: rgba(101, 255, 76, 0.6);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 16px rgba(101, 255, 76, 0.3);
+}
+.announce-banner--slain .announce-title {
+  color: #8aff7a;
+  text-shadow: 0 0 8px rgba(101, 255, 76, 0.5);
+}
+.announce-banner--godpack {
+  border-color: rgba(255, 215, 107, 0.7);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.5), 0 0 18px rgba(255, 200, 80, 0.4);
+}
+.announce-banner--godpack .announce-title {
+  color: #ffd96b;
+  text-shadow: 0 0 8px rgba(255, 200, 80, 0.6);
+}
+
+/* ── Minimized boss HP bar — sits where the banner was ── */
+.boss-hud {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -130%);   /* hidden until the banner minimises */
+  width: min(92vw, 380px);
+  box-sizing: border-box;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  z-index: 10040;
+  background: rgba(10, 6, 10, 0.94);
+  border: 2px solid rgba(255, 90, 122, 0.55);
+  border-radius: 9px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 12px rgba(200, 40, 80, 0.3);
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  pointer-events: none;
+  transition: transform 0.3s steps(6);
+}
+.boss-hud--open { transform: translate(-50%, 0); }
+.boss-hud-name {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #ff6a8a;
+  text-shadow: 0 0 6px rgba(255, 80, 110, 0.5);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.boss-hud-bar {
+  flex: 1;
+  min-width: 0;
+  height: 10px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 90, 122, 0.4);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.boss-hud-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, rgba(255, 60, 90, 0.95), rgba(255, 120, 90, 0.95));
+  box-shadow: 0 0 8px rgba(255, 80, 110, 0.6);
+  transition: width 0.25s linear;
+}
+.boss-hud-hp {
+  font-size: 11px;
+  color: rgba(255, 180, 190, 0.85);
+  min-width: 44px;
+  text-align: right;
+  flex-shrink: 0;
+}
