@@ -131,7 +131,7 @@ let _blindBoxAvailable = false;
 // mushroom: when the budget runs out the panel closes; placing a new
 // mushroom resets a fresh budget.
 let _sporeOwned     = false;  // this client has a living placed mushroom
-let _sporeBudget    = 25;     // total world-units of spore for this mushroom (Unity is authoritative)
+let _sporeBudget    = 50;     // total world-units of spore for this mushroom (Unity is authoritative)
 let _sporeRemaining = 0;      // world-units left (drives the fill bar)
 let _sporeWorldW    = 1;      // drop-zone world width  (2*scatterX) — unit conversion
 let _sporeWorldH    = 1;      // drop-zone world height (2*scatterZ)
@@ -1372,7 +1372,7 @@ function _buildUI() {
        scrolling the page. */
     #poss-spore-minimap {
       width: auto;
-      height: min(60vh, 420px);   /* bigger than the ~400px card pack behind it */
+      height: min(48vh, 320px);   /* crisp at this size; comfortably over the card pack */
       aspect-ratio: 108 / 148;
       image-rendering: pixelated;
       border: 2px solid rgba(101,255,76,0.5);
@@ -1634,8 +1634,9 @@ function _buildUI() {
          (fungi_destroyed). Drag across the minimap to disperse spore clouds. -->
     <div id="poss-spore-panel">
       <div id="poss-spore-title">🍄 RELEASE SPORES</div>
-      <!-- drag-paint minimap of the Unity drop zone -->
-      <canvas id="poss-spore-minimap" width="108" height="148"></canvas>
+      <!-- drag-paint minimap of the Unity drop zone (hi-res backing so it stays
+           crisp when scaled up; same 108:148 aspect) -->
+      <canvas id="poss-spore-minimap" width="162" height="222"></canvas>
       <div id="poss-spore-hint">drag across the map to disperse</div>
       <!-- spore budget — depletes as you drag -->
       <div id="poss-spore-bar"><div id="poss-spore-bar-fill"></div></div>
@@ -2373,7 +2374,7 @@ function _confirmPlace() {
  */
 function _onFungiSporeReady(budget, worldW, worldH, mushNx, mushNz) {
   _sporeOwned     = true;
-  _sporeBudget    = budget > 0 ? budget : 25;
+  _sporeBudget    = budget > 0 ? budget : 50;
   _sporeRemaining = _sporeBudget;
   _sporeWorldW    = worldW > 0 ? worldW : 1;
   _sporeWorldH    = worldH > 0 ? worldH : 1;
