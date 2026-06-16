@@ -130,14 +130,17 @@ const Announce = (() => {
     _setHudData();
 
     const isMe = spawnerId && (typeof CLIENT_ID !== 'undefined') && spawnerId === CLIENT_ID;
+    // Player tag in the app's <NAME> convention, tinted with their tag colour.
+    const tag = name
+      ? `<span class="announce-name" style="color:${colorHex}">&lt;${_esc(name)}&gt;</span>`
+      : '';
     let title, body;
-    if (isMe) {
+    if (isMe && name) {
       title = "YOU'VE BEEN CORRUPTED";
-      body  = "A glitch has torn open around you.<br>Use placed objects to cleanse it.";
+      body  = `${tag} has been corrupted.<br>A glitch has torn open around you — use placed objects to cleanse it.`;
     } else if (name) {
       title = "⚠ GLITCH DETECTED";
-      body  = `<span class="announce-name" style="color:${colorHex}">${_esc(name)}</span> ` +
-              `has been corrupted.<br>Plant nature cards near it to cleanse it.`;
+      body  = `${tag} has been corrupted.<br>Plant nature cards near it to cleanse the glitch.`;
     } else {
       title = "⚠ GLITCH DETECTED";
       body  = "A glitch has been detected.<br>Use placed objects to cleanse it.";
@@ -173,7 +176,7 @@ const Announce = (() => {
     _enqueue({
       type: 'godpack', icon: '✦', title: 'GOD PACK',
       body: name
-        ? `<span class="announce-name" style="color:${col}">${_esc(name)}</span> pulled a GOD PACK!`
+        ? `<span class="announce-name" style="color:${col}">&lt;${_esc(name)}&gt;</span> pulled a GOD PACK!`
         : 'A GOD PACK was pulled!',
       duration: 5000, vibrate: [30, 30, 30],
     });

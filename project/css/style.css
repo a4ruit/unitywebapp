@@ -3246,19 +3246,16 @@ body:has(#screen-horror-spin:not(.hidden))::before {
    god pack). The boss-spawn banner minimises into the compact live HP bar.
    ══════════════════════════════════════════════════════════════════════════ */
 
-/* Banner — pinned to the top, slides down into view like a native push. */
+/* Banner — pinned to the top, drops in like an in-game alert (not a native push). */
 .announce-banner {
   position: fixed;
   top: 0;
   left: 50%;
   transform: translate(-50%, -130%);   /* hidden above the screen */
-  width: min(94vw, 420px);
+  width: min(92vw, 400px);
   box-sizing: border-box;
   margin-top: 8px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 15px;
+  padding: 12px 16px;
   z-index: 10050;
   background: rgba(10, 8, 14, 0.96);
   border: 2px solid rgba(255, 90, 122, 0.6);
@@ -3267,21 +3264,43 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   font-family: 'Pixelify Sans', 'lo-res', sans-serif;
   pointer-events: none;
   cursor: pointer;
+  overflow: hidden;                       /* clip the scanlines + glitch jitter */
   transition: transform 0.34s steps(8);   /* chunky pixel-art drop */
 }
 .announce-banner--open {
   transform: translate(-50%, 0);
   pointer-events: auto;
 }
-.announce-icon {
-  font-size: 26px;
-  line-height: 1;
-  flex-shrink: 0;
+/* CRT scanline overlay — instantly reads as a screen, not an OS notification. */
+.announce-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    0deg, rgba(0,0,0,0) 0 2px, rgba(0,0,0,0.22) 2px 3px);
+  opacity: 0.55;
 }
-.announce-text { flex: 1; min-width: 0; }
+/* Inner wrapper centres the content AND carries the glitch jitter, so the
+   shell's positioning transform is never disturbed. */
+.announce-inner {
+  position: relative;
+  z-index: 1;                  /* above the scanline overlay */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 3px;
+}
+.announce-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.announce-text { width: 100%; }
 .announce-title {
   font-size: 15px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   line-height: 1.1;
   color: #fff;
@@ -3289,7 +3308,7 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 }
 .announce-body {
   font-size: 13px;
-  line-height: 1.22;
+  line-height: 1.25;
   color: rgba(230, 225, 235, 0.85);
 }
 .announce-name { font-weight: 700; }
@@ -3302,8 +3321,20 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .announce-banner--boss .announce-title {
   color: #ff6a8a;
   text-shadow: 0 0 8px rgba(255, 80, 110, 0.6);
-  /* chromatic-aberration glitch flicker — does NOT touch the banner transform */
   animation: announceTitleGlitch 1.3s steps(1) infinite;
+}
+/* Subtle whole-banner glitch — content holds still, then briefly tears with a
+   horizontal jolt + chromatic shift every few seconds. Boss banner only. */
+.announce-banner--boss .announce-inner {
+  animation: announceGlitch 2.8s steps(1) infinite;
+}
+@keyframes announceGlitch {
+  0%, 88%, 100% { transform: translate(0, 0);                 filter: none; }
+  89%           { transform: translate(-3px, 0) skewX(-3deg); filter: hue-rotate(25deg) saturate(1.4); }
+  90%           { transform: translate(3px, 1px);             filter: none; }
+  91%           { transform: translate(-2px, -1px);           filter: hue-rotate(-20deg); }
+  92%           { transform: translate(2px, 0) skewX(2deg);   filter: none; }
+  93%           { transform: translate(0, 0);                 filter: none; }
 }
 @keyframes announceTitleGlitch {
   0%, 46%, 54%, 100% { opacity: 1; text-shadow: 0 0 8px rgba(255, 80, 110, 0.6); }
