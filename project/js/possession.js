@@ -123,12 +123,23 @@ try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 // NOT consumed — the same player can re-inhabit it until the box is eaten.
 let _blindBoxAvailable = false;
 
-// ── Fungi spore state ─────────────────────────────────────────────────────
+// ── Fungi spore-paint state ───────────────────────────────────────────────
 // Entirely independent of possession sessions — the mushroom keeps existing
-// on the ground after the possession timer expires.
-let _sporeOwned         = false;  // this client has a living placed mushroom
-let _sporeCooldownTimer = null;   // setInterval counting down active + cooldown
-let _sporeCooldownSecs  = 0;      // seconds remaining in the blocked window
+// on the ground after the possession timer expires. Instead of a one-tap
+// cloud, the placing player drags across a minimap to disperse a budget of
+// spore cloud (measured in world-units of path length). One-shot per
+// mushroom: when the budget runs out the panel closes; placing a new
+// mushroom resets a fresh budget.
+let _sporeOwned     = false;  // this client has a living placed mushroom
+let _sporeBudget    = 5;      // total world-units of spore for this mushroom
+let _sporeRemaining = 0;      // world-units left (drives the fill bar)
+let _sporeWorldW    = 1;      // drop-zone world width  (2*scatterX) — unit conversion
+let _sporeWorldH    = 1;      // drop-zone world height (2*scatterZ)
+let _sporePainting  = false;  // pointer currently down + dragging on the minimap
+let _sporeLastNorm  = null;   // last sent {x,y} normalized point this stroke
+let _sporeSendT     = 0;      // perf timestamp of the last spore_paint sent (throttle)
+let _sporeMushroom  = null;   // {x,y} normalized mushroom position to mark on the map
+let _sporeTrail     = [];     // [{x,y}] normalized painted points, for drawing the trail
 
 // ── Globals called by main.js ──────────────────────────────────────────────
 
@@ -376,21 +387,21 @@ function handlePossessionMessage(data) {
     return true;
   }
 
-  // ── Fungi spore lifecycle ──────────────────────────────────────────────────
-  // fungi_placed|clientId|cooldownSecs — mushroom confirmed on ground, show spore panel
-  if (msg.startsWith('fungi_placed|')) {
+  // ── Fungi spore-paint lifecycle ─────────────────────────────────────────────
+  // fungi_spore_ready|clientId|budget|worldW|worldH|mushNx|mushNz — mushroom
+  // confirmed on ground; open the spore-paint minimap with a full budget bar.
+  if (msg.startsWith('fungi_spore_ready|')) {
     const parts = msg.split('|');
-    if (parts[1] === CLIENT_ID) { _onFungiPlaced(Number(parts[2])); return true; }
+    if (parts[1] === CLIENT_ID) {
+      _onFungiSporeReady(Number(parts[2]), Number(parts[3]), Number(parts[4]),
+                         Number(parts[5]), Number(parts[6]));
+      return true;
+    }
   }
-  // fungi_spore_activated|clientId|duration|cooldown — cloud is now live in Unity
-  if (msg.startsWith('fungi_spore_activated|')) {
+  // fungi_spore_done|clientId — Unity exhausted the budget; close the panel.
+  if (msg.startsWith('fungi_spore_done|')) {
     const parts = msg.split('|');
-    if (parts[1] === CLIENT_ID) { _onSporeActivated(Number(parts[2]), Number(parts[3])); return true; }
-  }
-  // fungi_spore_cooldown|clientId|secsLeft — Unity rejected request (already on cooldown)
-  if (msg.startsWith('fungi_spore_cooldown|')) {
-    const parts = msg.split('|');
-    if (parts[1] === CLIENT_ID) { _onSporeOnCooldown(Number(parts[2])); return true; }
+    if (parts[1] === CLIENT_ID) { _closeSporePanel(); return true; }
   }
   // fungi_destroyed|clientId — mushroom was eaten; dismiss the spore panel
   if (msg.startsWith('fungi_destroyed|')) {
@@ -1356,58 +1367,52 @@ function _buildUI() {
       color: rgba(160,255,140,0.85);
       text-shadow: 0 0 6px rgba(101,255,76,0.4);
     }
-    #poss-spore-btn {
-      padding: 12px 22px;
-      background: rgba(101,255,76,0.12);
-      border: 2px solid rgba(101,255,76,0.68);
-      color: #65ff4c;
-      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-      font-size: 15px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      cursor: pointer;
-      border-radius: 12px;
-      white-space: nowrap;
-      text-shadow: 0 0 10px rgba(101,255,76,0.55);
-      box-shadow: 0 0 12px rgba(101,255,76,0.25);
-      transition: background 0.15s, transform 0.08s;
+    /* Drag-paint minimap — bigger than the placement map for comfortable
+       finger-dragging. touch-action:none so dragging paints instead of
+       scrolling the page. */
+    #poss-spore-minimap {
+      width: auto;
+      height: 200px;
+      aspect-ratio: 108 / 148;
+      image-rendering: pixelated;
+      border: 2px solid rgba(101,255,76,0.5);
+      box-shadow: 0 0 8px rgba(101,255,76,0.22), inset 0 0 10px rgba(0,0,0,0.5);
+      background: #0a160e;
+      touch-action: none;
+      cursor: crosshair;
       user-select: none;
-      touch-action: manipulation;
+      -webkit-user-select: none;
       -webkit-tap-highlight-color: transparent;
     }
-    #poss-spore-btn:active {
-      background: rgba(101,255,76,0.38);
-      transform: scale(0.93);
-    }
-    /* Pulsing glow when ready to fire */
-    #poss-spore-btn.spore-ready {
-      animation: spore-pulse 1.8s ease-in-out infinite;
-    }
-    /* Rapid pulse while the cloud is live in Unity */
-    #poss-spore-btn.spore-active {
-      background: rgba(101,255,76,0.28);
-      opacity: 0.80;
-      cursor: default;
-      animation: spore-pulse 0.55s ease-in-out infinite;
-    }
-    /* Dimmed, non-interactive during cooldown */
-    #poss-spore-btn.spore-cooldown {
-      opacity: 0.38;
-      cursor: not-allowed;
-      animation: none;
-      box-shadow: none;
-    }
-    @keyframes spore-pulse {
-      0%, 100% { box-shadow: 0 0 12px rgba(101,255,76,0.25); }
-      50%       { box-shadow: 0 0 26px rgba(101,255,76,0.80), 0 0 6px rgba(101,255,76,0.95); }
-    }
-    /* Status line: READY / ACTIVE Xs / COOLDOWN Xs */
-    #poss-spore-status {
-      color: rgba(101,255,76,0.58);
+    #poss-spore-hint {
       font-family: 'Pixelify Sans', 'lo-res', sans-serif;
       font-size: 11px;
       letter-spacing: 0.06em;
       text-transform: uppercase;
+      color: rgba(160,255,140,0.7);
+      text-shadow: 0 0 6px rgba(101,255,76,0.4);
+      animation: spore-hint-pulse 1.6s ease-in-out infinite;
+    }
+    @keyframes spore-hint-pulse {
+      0%, 100% { opacity: 0.55; }
+      50%      { opacity: 1; }
+    }
+    /* Spore budget bar — green fill shrinks left→right as the player drags */
+    #poss-spore-bar {
+      width: 100%;
+      height: 12px;
+      border: 2px solid rgba(101,255,76,0.5);
+      border-radius: 7px;
+      background: rgba(0,0,0,0.5);
+      box-shadow: inset 0 0 6px rgba(0,0,0,0.6);
+      overflow: hidden;
+    }
+    #poss-spore-bar-fill {
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(101,255,76,0.9), rgba(160,255,120,0.95));
+      box-shadow: 0 0 10px rgba(101,255,76,0.6);
+      transition: width 0.08s linear;
     }
 
     /* ── Blind Box inhabit button ──────────────────────────────────────────
@@ -1624,12 +1629,16 @@ function _buildUI() {
       </div>
     </div>
 
-    <!-- Fungi spore panel — top-left corner, persists after mushroom placement.
-         Hidden by default; shown on fungi_placed, dismissed on fungi_destroyed. -->
+    <!-- Fungi spore-paint panel — shown on fungi_spore_ready, dismissed when the
+         budget runs out (fungi_spore_done) or the mushroom is eaten
+         (fungi_destroyed). Drag across the minimap to disperse spore clouds. -->
     <div id="poss-spore-panel">
-      <div id="poss-spore-title">🍄 YOUR MUSHROOM</div>
-      <button id="poss-spore-btn">&#x2601; SPORE CLOUD</button>
-      <div id="poss-spore-status">READY</div>
+      <div id="poss-spore-title">🍄 RELEASE SPORES</div>
+      <!-- drag-paint minimap of the Unity drop zone -->
+      <canvas id="poss-spore-minimap" width="108" height="148"></canvas>
+      <div id="poss-spore-hint">drag across the map to disperse</div>
+      <!-- spore budget — depletes as you drag -->
+      <div id="poss-spore-bar"><div id="poss-spore-bar-fill"></div></div>
     </div>
   `;
   document.body.appendChild(root);
@@ -1670,10 +1679,10 @@ function _buildUI() {
     placeMinimap:     root.querySelector('#poss-place-minimap'),
     placeControls:    root.querySelector('#poss-place-controls'),
     blockOverlay:     root.querySelector('#poss-block-overlay'),
-    // Fungi spore panel
+    // Fungi spore-paint panel
     sporePanel:       root.querySelector('#poss-spore-panel'),
-    sporeBtn:         root.querySelector('#poss-spore-btn'),
-    sporeStatus:      root.querySelector('#poss-spore-status'),
+    sporeMinimap:     root.querySelector('#poss-spore-minimap'),
+    sporeBarFill:     root.querySelector('#poss-spore-bar-fill'),
   };
 
   _ui.btn.addEventListener('click',        _requestPossession);
@@ -1697,9 +1706,11 @@ function _buildUI() {
   _ui.bloom.addEventListener('click',       _bloom);
   _ui.place.addEventListener('touchstart',  e => { e.preventDefault(); _confirmPlace(); }, { passive: false });
   _ui.place.addEventListener('click',       _confirmPlace);
-  // Spore button — touchstart for zero-latency on mobile, click as desktop fallback
-  _ui.sporeBtn.addEventListener('touchstart', e => { e.preventDefault(); _triggerSpore(); }, { passive: false });
-  _ui.sporeBtn.addEventListener('click',      _triggerSpore);
+  // Spore-paint minimap — pointer events cover touch + mouse + pen. Move/up are
+  // on window so a drag that leaves the canvas still paints + releases cleanly.
+  _ui.sporeMinimap.addEventListener('pointerdown', _sporePointerDown);
+  window.addEventListener('pointermove', _sporePointerMove);
+  window.addEventListener('pointerup',   _sporePointerUp);
   _setupJoystick();
 
   // Hide all Inhabit buttons until the matching creature has been pulled.
@@ -2145,12 +2156,9 @@ function _mapPoly(ctx, pts, W, H) {
   ctx.closePath();
 }
 
-// Draw the grid mini-map with a minimal site-plan rough-out + the live X marker.
-function _drawPlaceMinimap() {
-  const cv = _ui && _ui.placeMinimap;
-  if (!cv) return;
-  const ctx = cv.getContext('2d');
-  const W = cv.width, H = cv.height;
+// Shared site-plan base — ground, grid, lake, rocks, border. Used by both the
+// placement mini-map and the fungi spore-paint mini-map.
+function _drawMapBase(ctx, W, H) {
   ctx.imageSmoothingEnabled = false;
 
   // Dark ground
@@ -2188,23 +2196,91 @@ function _drawPlaceMinimap() {
   // Border
   ctx.strokeStyle = 'rgba(120,200,140,0.4)';
   ctx.strokeRect(0.5, 0.5, W - 1, H - 1);
+}
+
+// Forward transform: raw normalized world (nx,nz) → canvas pixel, applying the
+// MINIMAP_ORIENT display calibration. Matches the placement X-marker mapping.
+function _normToMapXY(nx, nz, W, H) {
+  let u = nx, v = nz;
+  if (MINIMAP_ORIENT.swapXY) { const t = u; u = v; v = t; }
+  if (MINIMAP_ORIENT.flipX)  u = 1 - u;
+  if (MINIMAP_ORIENT.flipY)  v = 1 - v;
+  return { px: u * (W - 10) + 5, py: v * (H - 10) + 5 };
+}
+
+// Inverse transform: canvas pixel → raw normalized world (nx,nz). Used to turn
+// a finger-drag on the spore map back into coordinates Unity maps to the world.
+function _mapXYToNorm(px, py, W, H) {
+  let u = (px - 5) / (W - 10);
+  let v = (py - 5) / (H - 10);
+  u = Math.min(1, Math.max(0, u));
+  v = Math.min(1, Math.max(0, v));
+  if (MINIMAP_ORIENT.flipX)  u = 1 - u;
+  if (MINIMAP_ORIENT.flipY)  v = 1 - v;
+  if (MINIMAP_ORIENT.swapXY) { const t = u; u = v; v = t; }
+  return { x: u, y: v };
+}
+
+// Draw the placement mini-map: site-plan base + the live X tracking the preview.
+function _drawPlaceMinimap() {
+  const cv = _ui && _ui.placeMinimap;
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  _drawMapBase(ctx, W, H);
 
   // ── Live X marker — teal, glowing. Orientation via MINIMAP_ORIENT. ──
   if (_placePos) {
-    let u = _placePos.x, v = _placePos.y;
-    if (MINIMAP_ORIENT.swapXY) { const t = u; u = v; v = t; }
-    if (MINIMAP_ORIENT.flipX)  u = 1 - u;
-    if (MINIMAP_ORIENT.flipY)  v = 1 - v;
-    const px = Math.round(u * (W - 10)) + 5;
-    const py = Math.round(v * (H - 10)) + 5;
+    const { px, py } = _normToMapXY(_placePos.x, _placePos.y, W, H);
     ctx.save();
     ctx.shadowColor = 'rgba(0,224,200,0.9)';
     ctx.shadowBlur = 6;
     ctx.fillStyle = '#3effe0';
     for (let i = -3; i <= 3; i++) {
-      ctx.fillRect(px + i, py + i, 2, 2);
-      ctx.fillRect(px + i, py - i, 2, 2);
+      ctx.fillRect(Math.round(px) + i, Math.round(py) + i, 2, 2);
+      ctx.fillRect(Math.round(px) + i, Math.round(py) - i, 2, 2);
     }
+    ctx.restore();
+  }
+}
+
+// Draw the spore-paint mini-map: site-plan base + the mushroom marker + the
+// trail of spore already dispersed this session.
+function _drawSporeMinimap() {
+  const cv = _ui && _ui.sporeMinimap;
+  if (!cv) return;
+  const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height;
+  _drawMapBase(ctx, W, H);
+
+  // Painted spore trail — toxic-green dotted path
+  if (_sporeTrail.length) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(120,255,90,0.7)';
+    ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.shadowColor = 'rgba(120,255,90,0.8)';
+    ctx.shadowBlur = 5;
+    ctx.beginPath();
+    _sporeTrail.forEach((p, i) => {
+      const { px, py } = _normToMapXY(p.x, p.y, W, H);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Mushroom marker — small magenta cap so the player can orient relative to it
+  if (_sporeMushroom) {
+    const { px, py } = _normToMapXY(_sporeMushroom.x, _sporeMushroom.y, W, H);
+    ctx.save();
+    ctx.shadowColor = 'rgba(255,120,220,0.9)';
+    ctx.shadowBlur = 6;
+    ctx.fillStyle = '#ff7adc';
+    ctx.beginPath();
+    ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 }
@@ -2285,70 +2361,105 @@ function _confirmPlace() {
   send(`placement_confirm|${CLIENT_ID}`);
 }
 
-// ── Fungi spore panel ──────────────────────────────────────────────────────
+// ── Fungi spore-paint panel ────────────────────────────────────────────────
 
 /**
- * Unity confirmed the mushroom is planted and registered.
- * Show the spore panel in the READY state.
+ * Unity confirmed the mushroom is planted and registered. Open the spore-paint
+ * panel with a full budget bar.
+ *   budget  — total world-units of spore the player can disperse
+ *   worldW  — drop-zone world width  (2*scatterX) — for px→unit conversion
+ *   worldH  — drop-zone world height (2*scatterZ)
+ *   mushNx,mushNz — normalized mushroom position, marked on the minimap
  */
-function _onFungiPlaced(cooldownSecs) {
-  _sporeOwned        = true;
-  _sporeCooldownSecs = 0;
-  clearInterval(_sporeCooldownTimer);
-  _sporeCooldownTimer = null;
+function _onFungiSporeReady(budget, worldW, worldH, mushNx, mushNz) {
+  _sporeOwned     = true;
+  _sporeBudget    = budget > 0 ? budget : 5;
+  _sporeRemaining = _sporeBudget;
+  _sporeWorldW    = worldW > 0 ? worldW : 1;
+  _sporeWorldH    = worldH > 0 ? worldH : 1;
+  _sporePainting  = false;
+  _sporeLastNorm  = null;
+  _sporeTrail     = [];
+  _sporeMushroom  = (isFinite(mushNx) && isFinite(mushNz)) ? { x: mushNx, y: mushNz } : null;
 
   _ui.sporePanel.style.display = 'flex';
-  _ui.sporeBtn.classList.remove('spore-cooldown', 'spore-active');
-  _ui.sporeBtn.classList.add('spore-ready');
-  _ui.sporeStatus.textContent = 'READY';
+  _updateSporeBar();
+  _drawSporeMinimap();
 
-  console.log('[possession.js] Fungi placed — spore panel shown (cooldown:', cooldownSecs + 's)');
+  console.log('[possession.js] Fungi placed — spore-paint panel shown (budget:', _sporeBudget + ' units)');
 }
 
-/**
- * User presses SPORE CLOUD. Ignored if already on cooldown or no mushroom placed.
- */
-function _triggerSpore() {
-  if (!_sporeOwned || _sporeCooldownSecs > 0) return;
-  send(`fungi_spore|${CLIENT_ID}`);
+// Convert a pointer event to a raw normalized {x,y} world point on the minimap.
+function _sporeEventNorm(e) {
+  const cv = _ui.sporeMinimap;
+  const r  = cv.getBoundingClientRect();
+  const px = (e.clientX - r.left) * (cv.width  / r.width);
+  const py = (e.clientY - r.top)  * (cv.height / r.height);
+  return _mapXYToNorm(px, py, cv.width, cv.height);
 }
 
-/**
- * Unity confirms the cloud fired.
- * The spore ability is ONE-SHOT per placed mushroom — flash "ACTIVE!" briefly
- * for confirmation, then hide the panel entirely. It only reappears when the
- * player pulls another fungi card and places a new mushroom.
- */
-function _onSporeActivated(duration, cooldown) {
-  // Consume the ability immediately so a second tap cannot fire
-  _sporeOwned        = false;
-  _sporeCooldownSecs = duration + cooldown;
-  clearInterval(_sporeCooldownTimer);
-  _sporeCooldownTimer = null;
-
-  // Brief "ACTIVE!" visual confirmation before the panel vanishes
-  _ui.sporeBtn.classList.remove('spore-ready', 'spore-cooldown');
-  _ui.sporeBtn.classList.add('spore-active');
-  _ui.sporeStatus.textContent = 'ACTIVE!';
-
-  setTimeout(() => {
-    if (_ui && _ui.sporePanel) _ui.sporePanel.style.display = 'none';
-    // Reset button state for next time it appears
-    _ui.sporeBtn.classList.remove('spore-active', 'spore-cooldown');
-    _ui.sporeBtn.classList.add('spore-ready');
-    _ui.sporeStatus.textContent = 'READY';
-    _sporeCooldownSecs = 0;
-  }, 1400);   // 1.4s — long enough to read, short enough to feel responsive
-
-  console.log('[possession.js] Spore fired — panel will dismiss after flash');
+function _sporePointerDown(e) {
+  if (!_sporeOwned || _sporeRemaining <= 0) return;
+  e.preventDefault();
+  _sporePainting = true;
+  const n = _sporeEventNorm(e);
+  _sporeLastNorm = n;
+  _sporeTrail.push(n);
+  send(`spore_paint_start|${CLIENT_ID}|${n.x.toFixed(3)}|${n.y.toFixed(3)}`);
+  _drawSporeMinimap();
 }
 
-/**
- * Unity rejected the spore request (race condition — panel should already be
- * hidden by this point, but hide it defensively just in case).
- */
-function _onSporeOnCooldown(secsLeft) {
-  _sporeOwned = false;
+function _sporePointerMove(e) {
+  if (!_sporePainting) return;
+  // Self-throttle to ~30 Hz so the web and Unity measure the SAME points and
+  // their budgets stay in lockstep (no relay coalescing needed).
+  const now = performance.now();
+  if (now - _sporeSendT < 33) return;
+
+  const n = _sporeEventNorm(e);
+  const dnx = (n.x - _sporeLastNorm.x) * _sporeWorldW;
+  const dnz = (n.y - _sporeLastNorm.y) * _sporeWorldH;
+  const segLen = Math.hypot(dnx, dnz);
+  if (segLen < 0.001) return;   // ignore micro-jitter
+
+  _sporeSendT = now;
+  _sporeRemaining = Math.max(0, _sporeRemaining - segLen);
+  _sporeLastNorm  = n;
+  _sporeTrail.push(n);
+  send(`spore_paint|${CLIENT_ID}|${n.x.toFixed(3)}|${n.y.toFixed(3)}`);
+  _updateSporeBar();
+  _drawSporeMinimap();
+
+  if (_sporeRemaining <= 0) {
+    // Budget spent — end the stroke and close the panel (one-shot per mushroom).
+    send(`spore_paint_end|${CLIENT_ID}`);
+    _sporePainting = false;
+    _sporeLastNorm = null;
+    setTimeout(_closeSporePanel, 250);   // brief beat so the bar reads empty
+  }
+}
+
+function _sporePointerUp() {
+  if (!_sporePainting) return;
+  _sporePainting = false;
+  _sporeLastNorm = null;
+  send(`spore_paint_end|${CLIENT_ID}`);
+  // Released early — keep the remaining budget; the panel stays open so the
+  // player can resume dragging until it's empty.
+}
+
+function _updateSporeBar() {
+  if (!_ui || !_ui.sporeBarFill) return;
+  const pct = _sporeBudget > 0 ? Math.max(0, _sporeRemaining / _sporeBudget) : 0;
+  _ui.sporeBarFill.style.width = (pct * 100).toFixed(1) + '%';
+}
+
+// Hide + reset the panel. Called when the budget is exhausted (locally or on
+// Unity's fungi_spore_done), or when the mushroom is destroyed.
+function _closeSporePanel() {
+  _sporeOwned    = false;
+  _sporePainting = false;
+  _sporeLastNorm = null;
   if (_ui && _ui.sporePanel) _ui.sporePanel.style.display = 'none';
 }
 
@@ -2356,12 +2467,7 @@ function _onSporeOnCooldown(secsLeft) {
  * The mushroom was eaten by a boss or fleshling — close the spore panel.
  */
 function _onFungiDestroyed() {
-  _sporeOwned        = false;
-  _sporeCooldownSecs = 0;
-  clearInterval(_sporeCooldownTimer);
-  _sporeCooldownTimer = null;
-
-  if (_ui && _ui.sporePanel) _ui.sporePanel.style.display = 'none';
+  _closeSporePanel();
   console.log('[possession.js] Fungi destroyed — spore panel dismissed');
 }
 
