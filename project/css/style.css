@@ -2123,32 +2123,30 @@ body.pristine-phase .shop-close-btn {
   margin-top: 4px;
 }
 
-/* ── Sound on/off toggle on the username screen ───────────────────────────── */
+/* ── Sound toggle on the username screen — minimal borderless [x] sound ────── */
 .name-sound-toggle {
   background: transparent;
-  border: 1px solid #81d4fa;
+  border: none;
   color: #81d4fa;
   font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-  font-size: 18px;
-  letter-spacing: 0.06em;
-  padding: 4px 18px 5px;
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  padding: 2px 6px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   line-height: 1;
-  text-shadow: 0 0 8px rgba(129, 212, 250, 0.45);
-  box-shadow: 0 0 8px rgba(129, 212, 250, 0.18);
+  opacity: 0.85;
+  text-shadow: 0 0 6px rgba(129, 212, 250, 0.35);
   transition: transform 0.08s steps(2), opacity 0.12s;
 }
 .name-sound-toggle .name-sound-box { font-family: 'VT323', 'Courier New', monospace; }
-.name-sound-toggle:active { transform: scale(0.95); }
-/* OFF state — dimmed, no glow */
+.name-sound-toggle:active { transform: scale(0.94); }
+/* OFF state — dimmed */
 .name-sound-toggle:not(.name-sound-toggle--on) {
-  opacity: 0.55;
-  border-color: rgba(129, 212, 250, 0.45);
+  opacity: 0.4;
   text-shadow: none;
-  box-shadow: none;
 }
 
 /* ── AD PACK canvas glow — active state ──────────── */
