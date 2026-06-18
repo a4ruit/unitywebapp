@@ -50,13 +50,13 @@ const FLESH_CARDS = [
 
 // ─── CRITTER (ewaste / pristine) ──────────────────────────────────────────────
 const CRITTER_CARDS = [
-  { id:'small_cube', name:'Sheep',            rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
-  { id:'large_cube', name:'Duck',             rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
-  { id:'sphere',     name:'Seagull',          rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
-  { id:'triangle',   name:'Red Fox',          rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
-  { id:'octagon',    name:'Great Stag',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The forest holds its breath.' },
-  { id:'triad',      name:'The Migration',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Thousands. No map. Right on time.' },
-  { id:'star',       name:'Emerald Serpent',  rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
+  { id:'small_cube', name:'sheep.png',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Static bitmap. Grazes at 8×8. No threads spawned.' },
+  { id:'large_cube', name:'duck.gif',      rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Looping forever. Paddles on a timer. Never buffers.' },
+  { id:'sphere',     name:'gull.svg',      rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Vector. Scales without blur. Already airborne.' },
+  { id:'triangle',   name:'fox.exe',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Executable. Runs on sight. Asked no permission.' },
+  { id:'octagon',    name:'stag.sys',      rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'A driver. The system leans on it. Do not delete.' },
+  { id:'triad',      name:'swarm.bat',     rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'A batch job. Thousands of instances. Right on schedule.' },
+  { id:'star',       name:'ouroboros.exe', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'while(true){}. Eats its own tail. Never returns.' },
 ];
 
 // ─── SCOURGE (ewaste / horror) ────────────────────────────────────────────────

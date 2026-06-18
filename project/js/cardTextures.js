@@ -2066,7 +2066,9 @@ const CardTextures = (() => {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = nameColor;
     if (rarity !== 'legendary-alpha') { ctx.shadowColor = nameColor; ctx.shadowBlur = 6; }
-    const displayName = card.name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    // Render the name exactly as stored — existing names are already Title Case,
+    // and this preserves file-style names like "sheep.png" / "fox.exe".
+    const displayName = card.name;
     ctx.fillText(displayName, 128, ty + th / 2 + 1);
     ctx.shadowBlur = 0;
     ctx.textBaseline = 'alphabetic';
@@ -2208,8 +2210,8 @@ const CardTextures = (() => {
     // common-card.png background ('nature-common' skin); Duck (critter uncommon)
     // and Fairy Cap (fungi uncommon) reuse uncommon-card.png ('nature-uncommon').
     // Their own symbol + name are still drawn on top by drawShape / drawLabels.
-    if (card.name === 'White Mushroom' || card.name === 'Sheep')   skinKey = 'nature-common';
-    if (card.name === 'Duck'           || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
+    if (card.name === 'White Mushroom' || card.name === 'sheep.png') skinKey = 'nature-common';
+    if (card.name === 'duck.gif'       || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
@@ -2222,10 +2224,11 @@ const CardTextures = (() => {
       drawCorners(ctx, card.rarity, t);
     }
 
-    // The Emerald Serpent always renders as its ouroboros, independent of which
-    // pack type the player is currently on (the normal drawShape dispatch keys
-    // off activePackType, which would otherwise draw the nature Tree of Life).
-    if (card.name === 'Emerald Serpent') drawOuroboros(ctx, t);
+    // ouroboros.exe (the critter legendary-alpha) always renders as its
+    // ouroboros, independent of which pack type the player is currently on (the
+    // normal drawShape dispatch keys off activePackType, which would otherwise
+    // draw the nature Tree of Life).
+    if (card.name === 'ouroboros.exe') drawOuroboros(ctx, t);
     else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
     return canvas;
