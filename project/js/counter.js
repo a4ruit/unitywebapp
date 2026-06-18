@@ -241,6 +241,8 @@ window.getStarBalance = () => stars;
 // ─── SHOP ─────────────────────────────────────────────────────────────────────
 
 function openShop() {
+  // Door-bell jingle on entry (no-op unless "sound on" is ticked).
+  if (typeof Sound !== 'undefined') Sound.play('shopOpen');
   // Ensure page-pack is visible (in case nav had switched)
   document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
   document.getElementById('page-pack').classList.remove('hidden');
@@ -261,6 +263,8 @@ function openShop() {
 }
 
 function closeShop() {
+  // Reverse jingle on exit — the "leaving the milk bar" beat.
+  if (typeof Sound !== 'undefined') Sound.play('shopClose');
   if (typeof showScreen === 'function') {
     showScreen('screen-pack');
   } else {
