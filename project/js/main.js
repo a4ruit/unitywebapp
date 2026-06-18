@@ -413,8 +413,9 @@ let _wsHadOpenThisAttempt = false;
 //   - the floating tag when they inhabit a critter
 //   - (future) chat-log entries
 // Wire protocol:  set_name|<CLIENT_ID>|<NAME>|<#RRGGBB>
-let playerName  = '';
-let playerColor = '';   // set by selectPlayerColor() or randomly on submit
+let playerName   = '';
+let playerColor  = '';   // set by selectPlayerColor() or randomly on submit
+let soundEnabled = true; // name-screen "sound" toggle — gates all phone audio
 
 // Must match the swatches in index.html (and ideally Unity's palette).
 const PLAYER_COLORS = ['#7BE3FF', '#FFD96B', '#FF9BC9', '#6FE886', '#C28BFF', '#FFB070'];
@@ -425,6 +426,24 @@ function selectPlayerColor(el) {
   document.querySelectorAll('.name-color-swatch').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
   playerColor = hex;
+}
+
+// Name-screen sound toggle. Records the preference only — the AudioContext is
+// unlocked on the enter-world tap (a user gesture) in submitPlayerName().
+function toggleSound() {
+  soundEnabled = !soundEnabled;
+  if (typeof Sound !== 'undefined') Sound.setEnabled(soundEnabled);
+  _updateSoundToggle();
+}
+function _updateSoundToggle() {
+  const btn = document.getElementById('nameSoundToggle');
+  if (!btn) return;
+  btn.classList.toggle('name-sound-toggle--on', soundEnabled);
+  btn.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
+  const box = btn.querySelector('.name-sound-box');
+  const lbl = btn.querySelector('.name-sound-label');
+  if (box) box.textContent = soundEnabled ? '[x]' : '[ ]';
+  if (lbl) lbl.textContent = soundEnabled ? 'ON' : 'OFF';
 }
 
 function submitPlayerName() {
@@ -440,6 +459,9 @@ function submitPlayerName() {
   if (!playerColor) {
     playerColor = PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)];
   }
+  // The enter-world tap is a user gesture — unlock audio now so later sounds
+  // aren't blocked by mobile autoplay policy (no-op if sound is toggled off).
+  if (typeof Sound !== 'undefined') { Sound.setEnabled(soundEnabled); Sound.unlock(); }
   if (ws && ws.readyState === WebSocket.OPEN) {
     const prismatic = (typeof _prismaticOwned !== 'undefined' && _prismaticOwned) ? '|1' : '';
     ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}${prismatic}`);
