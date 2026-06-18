@@ -91,26 +91,25 @@ const Sound = (() => {
     _tone(1568.0, t + 0.32, 0.20, 'triangle', 0.10);           // shimmer on top
   }
 
-  // Shop open — milk-bar door bells: a bright ascending jingle.
+  // Shop open — a short, melodic door-chime motif (step then a leap up).
+  // Soft triangle bells, deliberately unlike the pack's square arpeggio.
   function _shopOpen() {
     const t = _ctx.currentTime + 0.01;
-    const notes = [659.25, 783.99, 987.77, 1318.51];   // E5 G5 B5 E6 (up)
+    const notes = [1046.50, 1174.66, 1567.98];   // C6 D6 G6 (do–re–sol, up)
     notes.forEach((f, i) => {
-      _tone(f,     t + i * 0.06, 0.22, 'triangle', 0.13);
-      _tone(f * 2, t + i * 0.06, 0.09, 'sine',     0.05);   // bell shimmer
+      _tone(f,     t + i * 0.07, 0.14, 'triangle', 0.14);
+      _tone(f * 2, t + i * 0.07, 0.05, 'sine',     0.04);   // bell shimmer
     });
-    _tone(1567.98, t + 0.27, 0.20, 'triangle', 0.10);        // final ting
   }
 
-  // Shop close — the reverse: a soft descending jingle that resolves low.
+  // Shop close — the same motif mirrored downward (leap then step, resolves low).
   function _shopClose() {
     const t = _ctx.currentTime + 0.01;
-    const notes = [1318.51, 987.77, 783.99, 659.25];   // E6 B5 G5 E5 (down)
+    const notes = [1567.98, 1174.66, 1046.50];   // G6 D6 C6 (sol–re–do, down)
     notes.forEach((f, i) => {
-      _tone(f,     t + i * 0.06, 0.20, 'triangle', 0.12);
-      _tone(f * 2, t + i * 0.06, 0.07, 'sine',     0.04);
+      _tone(f,     t + i * 0.07, 0.14, 'triangle', 0.12);
+      _tone(f * 2, t + i * 0.07, 0.05, 'sine',     0.03);
     });
-    _tone(523.25, t + 0.27, 0.24, 'triangle', 0.10);         // low resolve (C5)
   }
 
   // Play a named effect. No-op unless the gate is ready (sound on + unlocked).
