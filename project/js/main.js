@@ -441,7 +441,7 @@ function _updateSoundToggle() {
   btn.classList.toggle('name-sound-toggle--on', soundEnabled);
   btn.setAttribute('aria-pressed', soundEnabled ? 'true' : 'false');
   const box = btn.querySelector('.name-sound-box');
-  if (box) box.textContent = soundEnabled ? '[x]' : '[ ]';
+  if (box) box.textContent = soundEnabled ? '[✓]' : '[ ]';
 }
 
 function submitPlayerName() {
