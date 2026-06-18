@@ -21,6 +21,8 @@ const QUEST_STAR_REWARDS = {
 // ─── Stars ─────────────────────────────────────────────────────────────────────
 
 function addStars(amount, fromEl) {
+  // Reward ding (no-op unless "sound on"). Only on an actual gain.
+  if (typeof Sound !== 'undefined' && amount > 0) Sound.play('star');
   const prev = stars;
   stars += amount;
 
@@ -275,6 +277,7 @@ function closeShop() {
 
 function shopBuy(cost) {
   if (stars < cost) {
+    if (typeof Sound !== 'undefined') Sound.play('deny');
     // Can't afford — flash the balance red
     const el = document.getElementById('shopStarBalance');
     if (el) {
@@ -322,6 +325,7 @@ function _shopConfirm(btn, text) {
 
 // Red flash on the balance when a player can't afford something
 function _shopDenied() {
+  if (typeof Sound !== 'undefined') Sound.play('deny');
   const el = document.getElementById('shopStarBalance');
   if (el) { el.style.color = 'var(--red, #ff1414)'; setTimeout(() => el.style.color = '', 600); }
 }

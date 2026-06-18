@@ -112,6 +112,27 @@ const Sound = (() => {
     });
   }
 
+  // Card placement — a soft, rounded "plop" (pitch drops as it lands).
+  function _place() {
+    const t = _ctx.currentTime + 0.005;
+    _noise(t, 0.04, 0.06, 2200, 500);                 // contact tick
+    _tone(440, t, 0.13, 'triangle', 0.16, 170);       // glide down = plop
+  }
+
+  // Star earned — a quick bright ping that sparkles upward (reward cue).
+  function _star() {
+    const t = _ctx.currentTime + 0.005;
+    _tone(880, t, 0.14, 'sine', 0.13, 1760);          // A5 → A6 rising ping
+    _tone(2637.0, t + 0.05, 0.10, 'sine', 0.05);      // high sparkle
+  }
+
+  // Can't afford — a short low sawtooth "bzzt" (two descending blips).
+  function _deny() {
+    const t = _ctx.currentTime + 0.005;
+    _tone(196.00, t,        0.10, 'sawtooth', 0.13);  // G3
+    _tone(146.83, t + 0.10, 0.16, 'sawtooth', 0.13);  // D3 (lower)
+  }
+
   // Play a named effect. No-op unless the gate is ready (sound on + unlocked).
   function play(name) {
     if (!ready()) return;
@@ -119,6 +140,9 @@ const Sound = (() => {
       if      (name === 'packOpen')  _packOpen();
       else if (name === 'shopOpen')  _shopOpen();
       else if (name === 'shopClose') _shopClose();
+      else if (name === 'place')     _place();
+      else if (name === 'star')      _star();
+      else if (name === 'deny')      _deny();
     } catch (e) { /* never let audio break gameplay */ }
   }
 

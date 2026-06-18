@@ -949,9 +949,13 @@ function dropCard(card) {
   if (cost > 0 && !spendStars(cost)) {
     // Shouldn't normally reach here — the choice grid blocks the tap.
     // Defensively: shake the display and leave the player on the choose screen.
+    if (typeof Sound !== 'undefined') Sound.play('deny');
     shakeStarDisplay();
     return;
   }
+
+  // Card committed — soft placement "plop".
+  if (typeof Sound !== 'undefined') Sound.play('place');
 
   // Individual tasks: "Place 5 things" + "First legendary"
   if (typeof TaskTracker !== 'undefined') {
