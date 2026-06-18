@@ -119,11 +119,19 @@ const Sound = (() => {
     _tone(440, t, 0.13, 'triangle', 0.16, 170);       // glide down = plop
   }
 
-  // Star earned — a quick bright ping that sparkles upward (reward cue).
+  // Star earned — soft wind-chimes: a few high pentatonic bells, lightly
+  // randomised in pitch + timing so no two earns ring quite the same.
   function _star() {
-    const t = _ctx.currentTime + 0.005;
-    _tone(880, t, 0.14, 'sine', 0.13, 1760);          // A5 → A6 rising ping
-    _tone(2637.0, t + 0.05, 0.10, 'sine', 0.05);      // high sparkle
+    const t0 = _ctx.currentTime + 0.005;
+    // High major pentatonic — any subset is consonant, like tuned chimes.
+    const scale = [1046.50, 1174.66, 1318.51, 1567.98, 1760.00, 2093.00]; // C6 D6 E6 G6 A6 C7
+    const n = 3 + (Math.random() < 0.5 ? 0 : 1);        // 3 or 4 chimes
+    for (let i = 0; i < n; i++) {
+      const f     = scale[(Math.random() * scale.length) | 0];
+      const start = t0 + i * (0.05 + Math.random() * 0.05);   // gentle stagger
+      _tone(f,     start, 0.45, 'triangle', 0.10);      // soft bell with a ring-out
+      _tone(f * 2, start, 0.30, 'sine',     0.035);     // shimmer partial
+    }
   }
 
   // Can't afford — a short low sawtooth "bzzt" (two descending blips).
