@@ -91,24 +91,24 @@ const Sound = (() => {
     _tone(1568.0, t + 0.32, 0.20, 'triangle', 0.10);           // shimmer on top
   }
 
-  // Shop open — a short, melodic door-chime motif (step then a leap up).
-  // Soft triangle bells, deliberately unlike the pack's square arpeggio.
+  // Shop open — a 2-note "ding-dong" door chime, rising a fifth. Soft triangle
+  // bells, deliberately unlike the pack's square arpeggio.
   function _shopOpen() {
     const t = _ctx.currentTime + 0.01;
-    const notes = [1046.50, 1174.66, 1567.98];   // C6 D6 G6 (do–re–sol, up)
+    const notes = [1046.50, 1567.98];   // C6 → G6 (up a fifth)
     notes.forEach((f, i) => {
-      _tone(f,     t + i * 0.07, 0.14, 'triangle', 0.14);
-      _tone(f * 2, t + i * 0.07, 0.05, 'sine',     0.04);   // bell shimmer
+      _tone(f,     t + i * 0.08, 0.15, 'triangle', 0.14);
+      _tone(f * 2, t + i * 0.08, 0.05, 'sine',     0.04);   // bell shimmer
     });
   }
 
-  // Shop close — the same motif mirrored downward (leap then step, resolves low).
+  // Shop close — the same 2 notes mirrored, falling a fifth.
   function _shopClose() {
     const t = _ctx.currentTime + 0.01;
-    const notes = [1567.98, 1174.66, 1046.50];   // G6 D6 C6 (sol–re–do, down)
+    const notes = [1567.98, 1046.50];   // G6 → C6 (down a fifth)
     notes.forEach((f, i) => {
-      _tone(f,     t + i * 0.07, 0.14, 'triangle', 0.12);
-      _tone(f * 2, t + i * 0.07, 0.05, 'sine',     0.03);
+      _tone(f,     t + i * 0.08, 0.15, 'triangle', 0.12);
+      _tone(f * 2, t + i * 0.08, 0.05, 'sine',     0.03);
     });
   }
 
