@@ -2205,9 +2205,11 @@ const CardTextures = (() => {
                    : isNature && card.rarity === 'rare'     ? 'nature-rare'
                    : null;
     // White Mushroom (fungi common) and Sheep (critter common) reuse the
-    // common-card.png background ('nature-common' skin); their own symbol + name
-    // are still drawn on top by drawShape / drawLabels below.
-    if (card.name === 'White Mushroom' || card.name === 'Sheep') skinKey = 'nature-common';
+    // common-card.png background ('nature-common' skin); Duck (critter uncommon)
+    // and Fairy Cap (fungi uncommon) reuse uncommon-card.png ('nature-uncommon').
+    // Their own symbol + name are still drawn on top by drawShape / drawLabels.
+    if (card.name === 'White Mushroom' || card.name === 'Sheep')   skinKey = 'nature-common';
+    if (card.name === 'Duck'           || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
