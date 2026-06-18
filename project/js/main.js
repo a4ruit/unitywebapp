@@ -752,6 +752,9 @@ function adpackCancel() {
 }
 
 function doPackOpen(dir) {
+  // Pack-opening sound — no-op unless "sound on" was ticked on the name screen.
+  if (typeof Sound !== 'undefined') Sound.play('packOpen');
+
   // Roll the pack FIRST so we know the top card's rarity before we tell Unity.
   // Rarity is forwarded in the pack_opened message so CorruptionManager can
   // scale the damage: common pulls add less corruption, legendary pulls add more.
