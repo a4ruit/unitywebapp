@@ -997,8 +997,10 @@ function dropCard(card) {
 
   // Tag spawn commands with CLIENT_ID + personal pack type so Unity routes
   // this spawn to the correct object set (nature vs flesh etc.) for THIS player,
-  // independent of what other phones are currently sending.
-  send(`${card.command}|${CLIENT_ID}|${getUnityPackType()}`);
+  // independent of what other phones are currently sending. A holo finish rides
+  // as an optional 4th field so Unity can spawn a holographic object.
+  const finish = card.variant === 'holo' ? '|holo' : '';
+  send(`${card.command}|${CLIENT_ID}|${getUnityPackType()}${finish}`);
   resetToPackScreen();
 }
 
