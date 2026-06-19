@@ -328,8 +328,10 @@ function pick(tier) {
 
 let isGodPack = false;
 
-// Holographic finish — pilot is gated to the critter pool. ~10% per card.
-const HOLO_CHANCE = 0.10;
+// Holographic finish — pilot is gated to the critter pool. 40% of packs contain
+// exactly ONE holo, placed on a randomly chosen rarity present in the pack
+// (one per pack, one per rarity category).
+const HOLO_PACK_CHANCE = 0.40;
 
 function rollPack() {
   const cards = [];
@@ -370,10 +372,15 @@ function rollPack() {
   cards.push(pick('uncommon'));
   cards.push(topCard);
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
-  // Holographic finish roll — pilot: critter pool only. Tag per card; the
-  // variant rides the card object through the choice grid → dropCard → collection.
-  if (getActiveCardPool() === CRITTER_CARDS) {
-    cards.forEach(c => { if (Math.random() < HOLO_CHANCE) c.variant = 'holo'; });
+  // Holographic finish roll — pilot: critter pool only. 40% of packs get exactly
+  // one holo, on a randomly chosen rarity present (so the duplicate commons don't
+  // bias it): one per pack, one per rarity category. The variant rides the card
+  // object through the choice grid → dropCard → collection.
+  if (getActiveCardPool() === CRITTER_CARDS && Math.random() < HOLO_PACK_CHANCE) {
+    const rarities = [...new Set(cards.map(c => c.rarity))];
+    const r        = rarities[Math.floor(Math.random() * rarities.length)];
+    const pool     = cards.filter(c => c.rarity === r);
+    pool[Math.floor(Math.random() * pool.length)].variant = 'holo';
   }
   return cards;
 }

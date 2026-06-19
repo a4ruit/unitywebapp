@@ -2192,29 +2192,66 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
-  // Holographic foil — an animated rainbow wash + a sweeping shine band,
-  // composited over the finished card. Applied when card.variant === 'holo'.
+  // Deterministic pseudo-random in [0,1) — keeps sparkle positions stable frame-
+  // to-frame so they twinkle in place rather than jumping around.
+  function _hrand(i) { const x = Math.sin(i * 127.1 + 9.7) * 43758.5453; return x - Math.floor(x); }
+
+  // Holographic foil — loud, TCG-style (Pokémon/Yu-Gi-Oh): a rainbow wash, a
+  // cosmos of twinkling starlight, a glint sweeping the title ("shiny text"), and
+  // an iridescent rainbow border. Applied when card.variant === 'holo'.
   function drawHolo(ctx, t) {
     ctx.save();
-    // Rainbow wash, scrolling diagonally (overlay = tints without hiding art).
+
+    // 1. Rainbow wash, scrolling diagonally (overlay tints without hiding art).
     const off  = (t * 60) % 384;
-    const grad = ctx.createLinearGradient(-off, 0, 384 - off, 384);
-    for (let i = 0; i <= 6; i++) {
-      const h = ((i * 60) + t * 50) % 360;
-      grad.addColorStop(i / 6, `hsla(${h},100%,62%,0.30)`);
-    }
+    const wash = ctx.createLinearGradient(-off, 0, 384 - off, 384);
+    for (let i = 0; i <= 6; i++)
+      wash.addColorStop(i / 6, `hsla(${((i * 60) + t * 50) % 360},100%,62%,0.38)`);
     ctx.globalCompositeOperation = 'overlay';
-    ctx.fillStyle = grad;
+    ctx.fillStyle = wash;
     ctx.fillRect(0, 0, 256, 384);
-    // Bright shine band sweeping across (screen = adds a glint).
-    const x    = ((t * 130) % 460) - 130;
-    const band = ctx.createLinearGradient(x, 0, x + 110, 384);
-    band.addColorStop(0,   'rgba(255,255,255,0)');
-    band.addColorStop(0.5, 'rgba(255,255,255,0.25)');
-    band.addColorStop(1,   'rgba(255,255,255,0)');
+
+    // 2. Cosmos starlight — sparkles scattered across the card, twinkling in/out.
     ctx.globalCompositeOperation = 'screen';
-    ctx.fillStyle = band;
-    ctx.fillRect(0, 0, 256, 384);
+    for (let i = 0; i < 16; i++) {
+      const tw = Math.sin(t * 3 + i * 1.7);
+      if (tw <= 0) continue;                          // off ~half the time
+      const px = 10 + _hrand(i)      * 236;
+      const py = 12 + _hrand(i + 53) * 360;
+      const a  = 0.25 + 0.6 * tw;
+      const s  = 3 + 4 * tw;
+      ctx.strokeStyle = `rgba(255,255,255,${a})`;
+      ctx.lineWidth   = Math.max(1, s * 0.18);
+      ctx.beginPath();
+      ctx.moveTo(px - s, py); ctx.lineTo(px + s, py);
+      ctx.moveTo(px, py - s); ctx.lineTo(px, py + s);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.beginPath(); ctx.arc(px, py, s * 0.22, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // 3. Glint sweeping the title box → shiny text.
+    const tb = LAYOUT.titleBox;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(tb.x, tb.y, tb.w, tb.h); ctx.clip();
+    const gx = tb.x - 50 + ((t * 130) % (tb.w + 100));
+    const tg = ctx.createLinearGradient(gx, 0, gx + 46, 0);
+    tg.addColorStop(0,   'rgba(255,255,255,0)');
+    tg.addColorStop(0.5, 'rgba(255,255,255,0.65)');
+    tg.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.fillStyle = tg;
+    ctx.fillRect(tb.x, tb.y, tb.w, tb.h);
+    ctx.restore();
+
+    // 4. Iridescent rainbow border (solid, so it's unmistakably a foil).
+    ctx.globalCompositeOperation = 'source-over';
+    const bg = ctx.createLinearGradient(0, 0, 256, 384);
+    for (let i = 0; i <= 6; i++)
+      bg.addColorStop(i / 6, `hsla(${((i * 60) + t * 70) % 360},100%,66%,0.9)`);
+    ctx.lineWidth   = 5;
+    ctx.strokeStyle = bg;
+    ctx.strokeRect(3.5, 3.5, 249, 377);
+
     ctx.restore();
   }
 
