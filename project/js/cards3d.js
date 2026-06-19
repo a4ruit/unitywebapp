@@ -83,11 +83,15 @@ const Cards3D = (() => {
     const geo      = new THREE.BoxGeometry(1.6, 2.4, 0.04);
     const edgeMat  = new THREE.MeshStandardMaterial({ color:0x0f160f, roughness:0.9 });
     const frontMat = new THREE.MeshStandardMaterial({
-      map: faceTex,
+      // Self-illuminated face: show the card texture at its TRUE colours,
+      // unaffected by the scene's (green, dim) lighting — matches the flat
+      // collection render. color:black removes the lit/green diffuse tint.
+      color: 0x000000,
+      emissive: 0xffffff,
+      emissiveMap: faceTex,
+      emissiveIntensity: 1.0,
       roughness: 0.7,
       metalness: card.rarity === 'legendary-alpha' ? 0.5 : card.rarity === 'legendary' ? 0.3 : 0.05,
-      emissive: new THREE.Color(cfg.emissive),
-      emissiveIntensity: cfg.emissiveIntensity,
     });
     const backMat = new THREE.MeshStandardMaterial({ map:backTex, roughness:0.8, metalness:0.05 });
 
