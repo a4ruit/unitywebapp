@@ -2202,13 +2202,24 @@ const CardTextures = (() => {
   function drawHolo(ctx, t) {
     ctx.save();
 
-    // 1. Rainbow wash, scrolling diagonally (overlay tints without hiding art).
-    const off  = (t * 60) % 384;
-    const wash = ctx.createLinearGradient(-off, 0, 384 - off, 384);
-    for (let i = 0; i <= 6; i++)
-      wash.addColorStop(i / 6, `hsla(${((i * 60) + t * 50) % 360},100%,62%,0.38)`);
-    ctx.globalCompositeOperation = 'overlay';
-    ctx.fillStyle = wash;
+    // 1. Rainbow wash, scrolling diagonally. Two passes so the foil reads OVER
+    //    the rarity tint instead of being pulled toward it (the old 'overlay'
+    //    blend was base-dependent and went green over the common frame):
+    //      'color'  — imposes the rainbow HUE while keeping the art's light/shade,
+    //                 overriding the green/blue rarity tint.
+    //      'screen' — adds a rainbow glow on top (additive, tint-independent).
+    const off    = (t * 60) % 384;
+    const mkWash = (a) => {
+      const g = ctx.createLinearGradient(-off, 0, 384 - off, 384);
+      for (let i = 0; i <= 6; i++)
+        g.addColorStop(i / 6, `hsla(${((i * 60) + t * 50) % 360},100%,62%,${a})`);
+      return g;
+    };
+    ctx.globalCompositeOperation = 'color';
+    ctx.fillStyle = mkWash(0.55);
+    ctx.fillRect(0, 0, 256, 384);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = mkWash(0.20);
     ctx.fillRect(0, 0, 256, 384);
 
     // 2. Cosmos starlight — sparkles scattered across the card, twinkling in/out.
