@@ -77,6 +77,7 @@ const Collection = (() => {
   // ── State ────────────────────────────────────────────────────────────────────
   // Collected cards keyed by card.name (every card name is unique across pools).
   const _collected    = new Set();
+  const _holo         = new Set();   // names owned in a holographic finish
   const _tierClaimed  = new Set();   // "<rarity>:<phase>" set-bonuses already paid
   const _grandClaimed = new Set();   // phases whose full-collection bonus was paid
   let   _open         = false;
@@ -125,8 +126,14 @@ const Collection = (() => {
   // ── Public: record a claimed card ─────────────────────────────────────────────
   function record(card) {
     if (!card || !card.name) return;
-    if (_collected.has(card.name)) { return; }   // already owned — no-op
+    const isHolo = card.variant === 'holo';
+    if (_collected.has(card.name)) {
+      // Already owned — but a holo pull upgrades the slot's finish.
+      if (isHolo && !_holo.has(card.name)) { _holo.add(card.name); _render(); _pulseTab(); }
+      return;
+    }
     _collected.add(card.name);
+    if (isHolo) _holo.add(card.name);
     _checkRewards();
     _render();
     _pulseTab();
@@ -201,8 +208,10 @@ const Collection = (() => {
     const prevCorr = document.body.dataset.corruption;
     window.activePackType = entry.type;
     document.body.dataset.corruption = entry.corruption;
+    // Owned in holo? Render the slot with the foil finish.
+    const card = _holo.has(entry.card.name) ? { ...entry.card, variant: 'holo' } : entry.card;
     try {
-      CardTextures.buildFace(entry.card, cv, 0, { hideFlavor: true });
+      CardTextures.buildFace(card, cv, 0, { hideFlavor: true });
     } catch (e) {
       // ignore — falls back to a blank canvas
     } finally {
@@ -258,6 +267,13 @@ const Collection = (() => {
           cv.className = 'coll-card-face';
           cell.appendChild(cv);
           cell.title = entry.card.name;
+          if (_holo.has(entry.card.name)) {
+            cell.classList.add('coll-card--holo');
+            const badge = document.createElement('span');
+            badge.className = 'coll-holo-badge';
+            badge.textContent = '✦';
+            cell.appendChild(badge);
+          }
         } else {
           cell.classList.add('coll-card--locked');
           const slab = document.createElement('div');

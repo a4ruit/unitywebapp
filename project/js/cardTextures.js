@@ -2192,6 +2192,32 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
+  // Holographic foil — an animated rainbow wash + a sweeping shine band,
+  // composited over the finished card. Applied when card.variant === 'holo'.
+  function drawHolo(ctx, t) {
+    ctx.save();
+    // Rainbow wash, scrolling diagonally (overlay = tints without hiding art).
+    const off  = (t * 60) % 384;
+    const grad = ctx.createLinearGradient(-off, 0, 384 - off, 384);
+    for (let i = 0; i <= 6; i++) {
+      const h = ((i * 60) + t * 50) % 360;
+      grad.addColorStop(i / 6, `hsla(${h},100%,62%,0.30)`);
+    }
+    ctx.globalCompositeOperation = 'overlay';
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 256, 384);
+    // Bright shine band sweeping across (screen = adds a glint).
+    const x    = ((t * 130) % 460) - 130;
+    const band = ctx.createLinearGradient(x, 0, x + 110, 384);
+    band.addColorStop(0,   'rgba(255,255,255,0)');
+    band.addColorStop(0.5, 'rgba(255,255,255,0.25)');
+    band.addColorStop(1,   'rgba(255,255,255,0)');
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = band;
+    ctx.fillRect(0, 0, 256, 384);
+    ctx.restore();
+  }
+
   function buildFace(card, canvas, t = 0, opts = {}) {
     if (!canvas) {
       canvas = document.createElement('canvas');
@@ -2231,6 +2257,7 @@ const CardTextures = (() => {
     if (card.name === 'ouroboros.exe') drawOuroboros(ctx, t);
     else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
+    if (card.variant === 'holo') drawHolo(ctx, t);
     return canvas;
   }
 

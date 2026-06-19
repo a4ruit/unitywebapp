@@ -328,6 +328,9 @@ function pick(tier) {
 
 let isGodPack = false;
 
+// Holographic finish — pilot is gated to the critter pool. ~10% per card.
+const HOLO_CHANCE = 0.10;
+
 function rollPack() {
   const cards = [];
 
@@ -367,6 +370,11 @@ function rollPack() {
   cards.push(pick('uncommon'));
   cards.push(topCard);
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
+  // Holographic finish roll — pilot: critter pool only. Tag per card; the
+  // variant rides the card object through the choice grid → dropCard → collection.
+  if (getActiveCardPool() === CRITTER_CARDS) {
+    cards.forEach(c => { if (Math.random() < HOLO_CHANCE) c.variant = 'holo'; });
+  }
   return cards;
 }
 

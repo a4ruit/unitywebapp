@@ -3266,6 +3266,21 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   text-shadow: 0 0 6px rgba(120, 100, 160, 0.25);
 }
 
+/* Holographic finish — owned-in-holo slot: foil glow + a ✦ badge. */
+.coll-card--holo .coll-card-face {
+  box-shadow: 0 0 8px rgba(180, 140, 255, 0.6), 0 0 14px rgba(120, 200, 255, 0.35);
+}
+.coll-holo-badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 12px;
+  line-height: 1;
+  color: #fff;
+  text-shadow: 0 0 5px #b98cff, 0 0 9px #7be3ff, 0 1px 1px rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    ANNOUNCEMENT BANNER + BOSS HUD (see js/announce.js)
    Drop-down push-notification banners for shared moments (boss spawn/slain,
