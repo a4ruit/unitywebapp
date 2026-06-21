@@ -2274,6 +2274,18 @@ const CardTextures = (() => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,256,384);
 
+    // Corrupted cards always render in the flesh (garbage-horror) theme even when
+    // they appear in a pristine pack — they're the corruption seeping in. Swap
+    // the global phase context for this synchronous draw, then restore below.
+    const _corrupt = !!card.corrupted;
+    const _ptSave  = window.activePackType;
+    const _corSave = (document.body && document.body.dataset) ? document.body.dataset.corruption : undefined;
+    if (_corrupt) {
+      window.activePackType = 'garbage';
+      if (document.body && document.body.dataset)
+        document.body.dataset.corruption = String((window.HORROR_THRESHOLD ?? 8) + 1);
+    }
+
     // ── Card skin override: use PNG base when available ──────────────────────
     const isNature = cardIsNaturePhase();
     let skinKey    = isNature && card.rarity === 'common'   ? 'nature-common'
@@ -2306,6 +2318,13 @@ const CardTextures = (() => {
     else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
     if (card.variant === 'holo') drawHolo(ctx, t);
+
+    // Restore the phase context swapped in for corrupted cards above.
+    if (_corrupt) {
+      window.activePackType = _ptSave;
+      if (document.body && document.body.dataset && _corSave !== undefined)
+        document.body.dataset.corruption = _corSave;
+    }
     return canvas;
   }
 

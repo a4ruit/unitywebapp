@@ -52,7 +52,7 @@ const Collection = (() => {
   // The horror-phase pools (flesh/scourge/ritual) stay hidden until THIS phone
   // crosses into the horror phase, at which point the full collection reveals.
   function _isHorror() {
-    try { return personalPacksOpened >= HORROR_THRESHOLD; }
+    try { return corruptionLevel >= HORROR_THRESHOLD; }
     catch (e) { return false; }
   }
   function _phaseKey() { return _isHorror() ? 'h' : 'p'; }
