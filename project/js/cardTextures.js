@@ -83,6 +83,7 @@ const CardTextures = (() => {
   _loadSkin('symbol-critter',    'assets/critter-symbol.png');
   _loadSkin('symbol-duck',       'assets/duck-card.png');
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
+  _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -2266,6 +2267,37 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
+  // Glitchy corrupted-card border — a red frame with chromatic-split edges and
+  // flickering digital tear slivers. Animated via t (corrupted cards re-render
+  // each frame, like holo).
+  function drawGlitchBorder(ctx, t) {
+    ctx.save();
+    // Base corrupted frame.
+    ctx.lineWidth   = 4;
+    ctx.strokeStyle = 'rgba(204,28,38,0.8)';
+    ctx.strokeRect(4, 4, 248, 376);
+    // Chromatic split — cyan + magenta edges offset by a small jitter.
+    const j = Math.round(Math.sin(t * 18) * 2);
+    ctx.globalCompositeOperation = 'screen';
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(0,240,255,0.55)'; ctx.strokeRect(4 + j, 4, 248, 376);
+    ctx.strokeStyle = 'rgba(255,0,140,0.55)'; ctx.strokeRect(4 - j, 4, 248, 376);
+    // Flickering tear slivers hugging the left/right edges (re-roll ~8x/sec).
+    ctx.globalCompositeOperation = 'source-over';
+    const step = Math.floor(t * 8);
+    const cols = ['rgba(0,240,255,0.7)', 'rgba(255,0,140,0.7)', 'rgba(204,28,38,0.85)'];
+    for (let i = 0; i < 7; i++) {
+      if (_hrand(i + step * 0.5) < 0.45) continue;          // only some show each step
+      const y = 8 + _hrand(i * 1.3 + step) * 360;
+      const h = 2 + _hrand(i * 2.7) * 5;
+      const w = 6 + _hrand(i + 3) * 12;
+      const x = (_hrand(i + 7) < 0.5) ? 2 : 256 - 2 - w;    // left or right edge
+      ctx.fillStyle = cols[i % 3];
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.restore();
+  }
+
   function buildFace(card, canvas, t = 0, opts = {}) {
     if (!canvas) {
       canvas = document.createElement('canvas');
@@ -2274,16 +2306,27 @@ const CardTextures = (() => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,256,384);
 
-    // Corrupted cards always render in the flesh (garbage-horror) theme even when
-    // they appear in a pristine pack — they're the corruption seeping in. Swap
-    // the global phase context for this synchronous draw, then restore below.
-    const _corrupt = !!card.corrupted;
-    const _ptSave  = window.activePackType;
-    const _corSave = (document.body && document.body.dataset) ? document.body.dataset.corruption : undefined;
-    if (_corrupt) {
-      window.activePackType = 'garbage';
-      if (document.body && document.body.dataset)
-        document.body.dataset.corruption = String((window.HORROR_THRESHOLD ?? 8) + 1);
+    // Corrupted card: a normal common-card.png base with a flesh symbol and a
+    // glitchy border — a pristine card with corruption creeping in.
+    if (card.corrupted) {
+      const skin = _cardSkins['nature-common'];   // common-card.png
+      if (skin && skin.complete && skin.naturalWidth > 0) {
+        ctx.drawImage(skin, 0, 0, 256, 384);
+      } else {
+        drawBackground(ctx, 'common', t);
+        drawBorder(ctx, 'common', t);
+        drawCorners(ctx, 'common', t);
+      }
+      const fsym = _cardSkins['symbol-flesh'];
+      if (fsym && fsym.complete && fsym.naturalWidth > 0) {
+        ctx.imageSmoothingEnabled = false;
+        const targetH = LAYOUT.symbolHeight;
+        const targetW = targetH * (fsym.naturalWidth / fsym.naturalHeight);
+        ctx.drawImage(fsym, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      }
+      drawLabels(ctx, card, card.rarity, t, opts);
+      drawGlitchBorder(ctx, t);
+      return canvas;
     }
 
     // ── Card skin override: use PNG base when available ──────────────────────
@@ -2318,13 +2361,6 @@ const CardTextures = (() => {
     else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
     if (card.variant === 'holo') drawHolo(ctx, t);
-
-    // Restore the phase context swapped in for corrupted cards above.
-    if (_corrupt) {
-      window.activePackType = _ptSave;
-      if (document.body && document.body.dataset && _corSave !== undefined)
-        document.body.dataset.corruption = _corSave;
-    }
     return canvas;
   }
 

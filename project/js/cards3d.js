@@ -61,7 +61,7 @@ const Cards3D = (() => {
     if (rarityLight) { scene.remove(rarityLight); rarityLight = null; }
 
     currentCard = card;
-    animated    = CardTextures.isAnimated(card.rarity) || card.variant === 'holo';
+    animated    = CardTextures.isAnimated(card.rarity) || card.variant === 'holo' || card.corrupted;
     startTime   = performance.now() / 1000;
 
     const cfg = CardTextures.getCfg(card.rarity);

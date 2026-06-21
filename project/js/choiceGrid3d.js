@@ -112,7 +112,7 @@ const ChoiceGrid3D = (() => {
     mesh.rotation.y = Math.PI;
     scene.add(mesh);
 
-    const animated  = CardTextures.isAnimated(card.rarity) || card.variant === 'holo';
+    const animated  = CardTextures.isAnimated(card.rarity) || card.variant === 'holo' || card.corrupted;
     const startTime = performance.now() / 1000;
 
     const cell = {
