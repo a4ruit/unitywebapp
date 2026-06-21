@@ -150,6 +150,7 @@ const TaskTracker = (() => {
     if (panel) panel.classList.toggle('task-panel--open', _open);
     _render();
     if (_open) {
+      if (typeof Sound !== 'undefined') Sound.play('uiOpen');
       // Delay one tick so the click that opened doesn't immediately close
       setTimeout(() => document.addEventListener('pointerdown', _onOutsideClick, true), 0);
     } else {
@@ -255,7 +256,7 @@ const TaskTracker = (() => {
     const fill  = '█'.repeat(f);
     const empty = '░'.repeat(W - f);
     btn.innerHTML =
-      `<span class="task-trigger-label">Tasks</span>` +
+      `<span class="task-trigger-label">TASKS</span>` +
       `<span class="task-trigger-count">${done}/${total}</span>` +
       `<span class="task-trigger-bar"><span class="task-trigger-bar-fill">${fill}</span><span class="task-trigger-bar-empty">${empty}</span></span>`;
   }

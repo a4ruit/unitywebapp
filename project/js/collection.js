@@ -184,6 +184,7 @@ const Collection = (() => {
     const panel = document.getElementById('collPanel');
     if (panel) panel.classList.toggle('coll-panel--open', _open);
     if (_open) {
+      if (typeof Sound !== 'undefined') Sound.play('uiOpen');
       _render();
       setTimeout(() => document.addEventListener('pointerdown', _onOutsideClick, true), 0);
     } else {

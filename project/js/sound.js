@@ -141,6 +141,12 @@ const Sound = (() => {
     _tone(146.83, t + 0.10, 0.16, 'sawtooth', 0.13);  // D3 (lower)
   }
 
+  // Generic UI panel open — a single soft note (cards / tasks side panels).
+  function _uiOpen() {
+    const t = _ctx.currentTime + 0.005;
+    _tone(987.77, t, 0.13, 'triangle', 0.11);   // single soft B5 note
+  }
+
   // Play a named effect. No-op unless the gate is ready (sound on + unlocked).
   function play(name) {
     if (!ready()) return;
@@ -151,6 +157,7 @@ const Sound = (() => {
       else if (name === 'place')     _place();
       else if (name === 'star')      _star();
       else if (name === 'deny')      _deny();
+      else if (name === 'uiOpen')    _uiOpen();
     } catch (e) { /* never let audio break gameplay */ }
   }
 
