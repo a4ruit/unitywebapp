@@ -2267,33 +2267,55 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
-  // Glitchy corrupted-card border — a red frame with chromatic-split edges and
-  // flickering digital tear slivers. Animated via t (corrupted cards re-render
-  // each frame, like holo).
+  // Glitchy corrupted-card border — monochrome (white/grey), pulsating, with
+  // flickering ASCII characters strewn around the edges. Animated via t
+  // (corrupted cards re-render each frame, like holo).
   function drawGlitchBorder(ctx, t) {
     ctx.save();
-    // Base corrupted frame.
-    ctx.lineWidth   = 4;
-    ctx.strokeStyle = 'rgba(204,28,38,0.8)';
+    // Breathing intensity — the whole glitch pulses between ~40% and 100%.
+    const pulse = 0.40 + 0.60 * (0.5 + 0.5 * Math.sin(t * 4));
+
+    // Base frame + a jittered double for the "scan misalignment" look.
+    const j = Math.round(Math.sin(t * 22) * 2);
+    ctx.lineWidth   = 3;
+    ctx.strokeStyle = `rgba(255,255,255,${0.5 * pulse})`;
     ctx.strokeRect(4, 4, 248, 376);
-    // Chromatic split — cyan + magenta edges offset by a small jitter.
-    const j = Math.round(Math.sin(t * 18) * 2);
-    ctx.globalCompositeOperation = 'screen';
-    ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(0,240,255,0.55)'; ctx.strokeRect(4 + j, 4, 248, 376);
-    ctx.strokeStyle = 'rgba(255,0,140,0.55)'; ctx.strokeRect(4 - j, 4, 248, 376);
-    // Flickering tear slivers hugging the left/right edges (re-roll ~8x/sec).
-    ctx.globalCompositeOperation = 'source-over';
-    const step = Math.floor(t * 8);
-    const cols = ['rgba(0,240,255,0.7)', 'rgba(255,0,140,0.7)', 'rgba(204,28,38,0.85)'];
+    ctx.lineWidth   = 1;
+    ctx.strokeStyle = `rgba(255,255,255,${0.30 * pulse})`;
+    ctx.strokeRect(4 + j, 4, 248, 376);
+
+    // Monochrome tear slivers hugging the left/right edges (re-roll ~10x/sec).
+    const step = Math.floor(t * 10);
     for (let i = 0; i < 7; i++) {
-      if (_hrand(i + step * 0.5) < 0.45) continue;          // only some show each step
+      if (_hrand(i + step * 0.5) < 0.5) continue;
       const y = 8 + _hrand(i * 1.3 + step) * 360;
       const h = 2 + _hrand(i * 2.7) * 5;
       const w = 6 + _hrand(i + 3) * 12;
-      const x = (_hrand(i + 7) < 0.5) ? 2 : 256 - 2 - w;    // left or right edge
-      ctx.fillStyle = cols[i % 3];
+      const x = (_hrand(i + 7) < 0.5) ? 2 : 256 - 2 - w;
+      const g = 190 + Math.floor(_hrand(i) * 65);          // grey 190–255
+      ctx.fillStyle = `rgba(${g},${g},${g},${0.7 * pulse})`;
       ctx.fillRect(x, y, w, h);
+    }
+
+    // Flickering ASCII strewn around the perimeter — corrupted data leaking in.
+    const chars = '01#%@&*/\\|<>=+~:;';
+    const cstep = Math.floor(t * 6);
+    ctx.font = '15px "VT323", "Share Tech Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < 16; i++) {
+      if (_hrand(i * 3.1 + cstep) < 0.45) continue;        // only some show each step
+      const p    = _hrand(i + cstep * 0.3);
+      const edge = i % 4;
+      let cx, cy;
+      if      (edge === 0) { cx = 12 + p * 232; cy = 13;  }   // top
+      else if (edge === 1) { cx = 12 + p * 232; cy = 371; }   // bottom
+      else if (edge === 2) { cx = 11;  cy = 14 + p * 356; }   // left
+      else                 { cx = 245; cy = 14 + p * 356; }   // right
+      const ch = chars[Math.floor(_hrand(i * 7 + cstep) * chars.length)];
+      const a  = (0.45 + 0.5 * _hrand(i + 2)) * pulse;
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.fillText(ch, cx, cy);
     }
     ctx.restore();
   }
