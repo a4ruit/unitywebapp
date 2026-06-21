@@ -2461,6 +2461,24 @@ body.fungi-active #packTypeAdpack:not(.active) .pack-type-icon {
   color: #a07848 !important;
 }
 
+/* ── Unselected pristine tabs — each keeps its OWN pristine accent (dimmed),
+   regardless of which tab is currently selected. Gated on body.pristine-phase,
+   which is present for the whole pristine phase, so the horror-phase button
+   colours are never touched. Without this an unselected tab falls back to its
+   permanent default (e.g. the adpack purple) and reads as its horror colour.
+   !important beats that adpack-purple default + the legacy amber/pink rules. ── */
+body.pristine-phase #packTypeGarbage:not(.active) { border-color: rgba(129,212,250,0.40) !important; }
+body.pristine-phase #packTypeGarbage:not(.active) .pack-type-label,
+body.pristine-phase #packTypeGarbage:not(.active) .pack-type-icon { color: #4a8fb0 !important; }
+
+body.pristine-phase #packTypeEwaste:not(.active) { border-color: rgba(240,184,208,0.40) !important; }
+body.pristine-phase #packTypeEwaste:not(.active) .pack-type-label,
+body.pristine-phase #packTypeEwaste:not(.active) .pack-type-icon { color: #c490a8 !important; }
+
+body.pristine-phase #packTypeAdpack:not(.active) { border-color: rgba(109,187,85,0.40) !important; }
+body.pristine-phase #packTypeAdpack:not(.active) .pack-type-label,
+body.pristine-phase #packTypeAdpack:not(.active) .pack-type-icon { color: rgba(109,187,85,0.70) !important; }
+
 /* ── DEBUG: collapsible dropdown (temporary) ─────────────────────────────── */
 
 #debug-menu {
