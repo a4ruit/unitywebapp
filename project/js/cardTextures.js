@@ -2267,53 +2267,61 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
-  // Glitchy corrupted-card border — monochrome (white/grey), pulsating, with
-  // flickering ASCII characters strewn around the edges. Animated via t
+  // Glitchy corrupted-card border — a DISTINCT black frame that jitters and
+  // breaks up, with a monochrome pulse and flickering ASCII. Animated via t
   // (corrupted cards re-render each frame, like holo).
   function drawGlitchBorder(ctx, t) {
     ctx.save();
-    // Breathing intensity — the whole glitch pulses between ~40% and 100%.
+    // Breathing intensity for the glitch detail (the solid frame stays distinct).
     const pulse = 0.40 + 0.60 * (0.5 + 0.5 * Math.sin(t * 4));
+    const jx = Math.round(Math.sin(t * 22) * 2);          // horizontal jitter
+    const jy = Math.round(Math.sin(t * 15) * 1.5);        // vertical jitter
 
-    // Base frame + a jittered double for the "scan misalignment" look.
-    const j = Math.round(Math.sin(t * 22) * 2);
+    // ── Distinct black border (the dominant feature), whole frame jittering ──
+    ctx.lineWidth   = 6;
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+    ctx.strokeRect(5 + jx, 5, 246, 374);
+    // Offset black ghost-frame — the "scan misalignment" glitch double.
     ctx.lineWidth   = 3;
-    ctx.strokeStyle = `rgba(255,255,255,${0.5 * pulse})`;
-    ctx.strokeRect(4, 4, 248, 376);
-    ctx.lineWidth   = 1;
-    ctx.strokeStyle = `rgba(255,255,255,${0.30 * pulse})`;
-    ctx.strokeRect(4 + j, 4, 248, 376);
+    ctx.strokeStyle = `rgba(0,0,0,${0.6 * pulse})`;
+    ctx.strokeRect(5 - jx, 5 + jy, 246, 374);
 
-    // Monochrome tear slivers hugging the left/right edges (re-roll ~10x/sec).
-    const step = Math.floor(t * 10);
-    for (let i = 0; i < 7; i++) {
+    // ── Black tear segments — chunks of the border displacing/flickering ──
+    const step = Math.floor(t * 12);
+    ctx.fillStyle = 'rgba(0,0,0,0.92)';
+    for (let i = 0; i < 8; i++) {
       if (_hrand(i + step * 0.5) < 0.5) continue;
-      const y = 8 + _hrand(i * 1.3 + step) * 360;
-      const h = 2 + _hrand(i * 2.7) * 5;
-      const w = 6 + _hrand(i + 3) * 12;
-      const x = (_hrand(i + 7) < 0.5) ? 2 : 256 - 2 - w;
-      const g = 190 + Math.floor(_hrand(i) * 65);          // grey 190–255
-      ctx.fillStyle = `rgba(${g},${g},${g},${0.7 * pulse})`;
-      ctx.fillRect(x, y, w, h);
+      const d = Math.round((_hrand(i) - 0.5) * 7);         // displacement
+      if (i % 2 === 0) {                                    // left / right edge
+        const y = 6 + _hrand(i * 1.3 + step) * 360;
+        const h = 6 + _hrand(i * 2.7) * 20;
+        const x = (_hrand(i + 7) < 0.5) ? 3 : 248;
+        ctx.fillRect(x + d, y, 6, h);
+      } else {                                              // top / bottom edge
+        const x = 6 + _hrand(i * 1.7 + step) * 244;
+        const w = 6 + _hrand(i * 2.1) * 20;
+        const y = (_hrand(i + 5) < 0.5) ? 3 : 372;
+        ctx.fillRect(x, y + d, w, 6);
+      }
     }
 
-    // Flickering ASCII strewn around the perimeter — corrupted data leaking in.
+    // ── Flickering ASCII along the perimeter — white, legible on the black ──
     const chars = '01#%@&*/\\|<>=+~:;';
     const cstep = Math.floor(t * 6);
     ctx.font = '15px "VT323", "Share Tech Mono", monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     for (let i = 0; i < 16; i++) {
-      if (_hrand(i * 3.1 + cstep) < 0.45) continue;        // only some show each step
+      if (_hrand(i * 3.1 + cstep) < 0.45) continue;
       const p    = _hrand(i + cstep * 0.3);
       const edge = i % 4;
       let cx, cy;
-      if      (edge === 0) { cx = 12 + p * 232; cy = 13;  }   // top
-      else if (edge === 1) { cx = 12 + p * 232; cy = 371; }   // bottom
+      if      (edge === 0) { cx = 12 + p * 232; cy = 12;  }   // top
+      else if (edge === 1) { cx = 12 + p * 232; cy = 372; }   // bottom
       else if (edge === 2) { cx = 11;  cy = 14 + p * 356; }   // left
       else                 { cx = 245; cy = 14 + p * 356; }   // right
       const ch = chars[Math.floor(_hrand(i * 7 + cstep) * chars.length)];
-      const a  = (0.45 + 0.5 * _hrand(i + 2)) * pulse;
+      const a  = (0.5 + 0.5 * _hrand(i + 2)) * pulse;
       ctx.fillStyle = `rgba(255,255,255,${a})`;
       ctx.fillText(ch, cx, cy);
     }
