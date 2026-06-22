@@ -2328,10 +2328,36 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
-  // Flock o' Sheep — the starlight rare variant. epic-card.png frame, twinkling
-  // starlight, the sheep symbol floating over the frame, and a hovering flock of
-  // smaller sheep (spread wide so they peek over the frame, randomly mirrored,
-  // some drifting over the main symbol). Animated via t.
+  // Twinkling starlight along the card perimeter — a sparkle "border" layered
+  // over the epic-card frame. 4-point stars that twinkle in and out. Animated.
+  function drawStarlightBorder(ctx, t) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const star = (x, y, i) => {
+      const tw = Math.sin(t * 3 + i * 1.3);
+      if (tw <= 0) return;                               // twinkle off
+      const a = 0.45 + 0.55 * tw;
+      const s = 2.5 + 3 * tw;
+      ctx.strokeStyle = `rgba(235,240,255,${a})`;
+      ctx.lineWidth   = 1;
+      ctx.beginPath();
+      ctx.moveTo(x - s, y); ctx.lineTo(x + s, y);
+      ctx.moveTo(x, y - s); ctx.lineTo(x, y + s);
+      ctx.stroke();
+      ctx.fillStyle = `rgba(255,255,255,${a})`;
+      ctx.beginPath(); ctx.arc(x, y, s * 0.3, 0, Math.PI * 2); ctx.fill();
+    };
+    const inset = 9;
+    let i = 0;
+    for (let x = inset; x <= 256 - inset; x += 36) { star(x, inset, i++); star(x, 384 - inset, i++); }
+    for (let y = inset + 34; y <= 384 - inset - 34; y += 42) { star(inset, y, i++); star(256 - inset, y, i++); }
+    ctx.restore();
+  }
+
+  // Flock o' Sheep — the starlight rare variant. epic-card.png frame + a twinkling
+  // starlight border, the sheep symbol floating over the frame, and a flock of
+  // smaller sheep spilling over the edges (randomly mirrored, some over the main
+  // symbol). Animated via t.
   function drawFlockOSheep(ctx, card, t, opts) {
     // Background: epic-card.png (rare frame), fallback to a procedural rare frame.
     const skin = _cardSkins['nature-rare'];   // epic-card.png
@@ -2343,13 +2369,12 @@ const CardTextures = (() => {
       drawCorners(ctx, 'rare', t);
     }
 
-    // Starlight particles — twinkling dots across the card.
-    for (let i = 0; i < 40; i++) {
-      const sx = _hrand(i)      * 256;
-      const sy = _hrand(i + 60) * 384;
+    // Scattered interior starlight, behind the flock.
+    for (let i = 0; i < 22; i++) {
+      const sx = _hrand(i) * 256, sy = _hrand(i + 60) * 384;
       const tw = 0.5 + 0.5 * Math.sin(t * 2.2 + i * 1.3);
-      ctx.fillStyle = `rgba(220,230,255,${0.25 + 0.55 * tw})`;
-      ctx.beginPath(); ctx.arc(sx, sy, 0.6 + 1.5 * tw, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(220,230,255,${0.20 + 0.5 * tw})`;
+      ctx.beginPath(); ctx.arc(sx, sy, 0.6 + 1.4 * tw, 0, Math.PI * 2); ctx.fill();
     }
 
     const sheep = _cardSkins['symbol-critter'];
@@ -2369,20 +2394,19 @@ const CardTextures = (() => {
         ctx.restore();
       };
 
-      // Mini-flock BEHIND the main sheep — spread wide so they peek over the frame.
+      // Mini-flock spilling over the frame edges (pushed right to the border).
       const behind = [
-        { x: 16,  y: 150, s: 0.30, ph: 0.0 },   // far left, peeks off-edge
-        { x: 244, y: 168, s: 0.28, ph: 1.5 },   // far right, peeks off-edge
-        { x: 26,  y: 298, s: 0.34, ph: 3.0 },   // lower left
-        { x: 236, y: 286, s: 0.26, ph: 4.2 },   // lower right
-        { x: 128, y: 110, s: 0.22, ph: 5.4 },   // top centre, peeks over top frame
-        { x: 210, y: 108, s: 0.20, ph: 6.1 },   // upper right
+        { x: 8,   y: 152, s: 0.30, ph: 0.0 },   // left edge — over the frame
+        { x: 248, y: 170, s: 0.28, ph: 1.5 },   // right edge — over the frame
+        { x: 14,  y: 300, s: 0.34, ph: 3.0 },   // lower left
+        { x: 242, y: 288, s: 0.26, ph: 4.2 },   // lower right
+        { x: 128, y: 104, s: 0.22, ph: 5.4 },   // top centre — over the top frame
+        { x: 212, y: 104, s: 0.20, ph: 6.1 },   // upper right
       ];
       behind.forEach((m, i) => {
-        const h     = LAYOUT.symbolHeight * m.s;
-        const bob   = Math.sin(t * 1.3 + m.ph) * 6;
-        const drift = Math.cos(t * 0.9 + m.ph) * 6;
-        drawSheep(m.x + drift, m.y + bob, h, 0.85, _hrand(i * 5 + 1) < 0.5, 8);
+        const h = LAYOUT.symbolHeight * m.s;
+        drawSheep(m.x + Math.cos(t * 0.9 + m.ph) * 6, m.y + Math.sin(t * 1.3 + m.ph) * 6,
+                  h, 0.85, _hrand(i * 5 + 1) < 0.5, 8);
       });
 
       // Main sheep — larger, floating, glowing.
@@ -2395,12 +2419,14 @@ const CardTextures = (() => {
         { x: 168, y: 220, s: 0.18, ph: 3.7 },
       ];
       over.forEach((m, i) => {
-        const h     = LAYOUT.symbolHeight * m.s;
-        const bob   = Math.sin(t * 1.5 + m.ph) * 5;
-        const drift = Math.cos(t * 1.1 + m.ph) * 5;
-        drawSheep(m.x + drift, m.y + bob, h, 0.9, _hrand(i * 9 + 4) < 0.5, 6);
+        const h = LAYOUT.symbolHeight * m.s;
+        drawSheep(m.x + Math.cos(t * 1.1 + m.ph) * 5, m.y + Math.sin(t * 1.5 + m.ph) * 5,
+                  h, 0.9, _hrand(i * 9 + 4) < 0.5, 6);
       });
     }
+
+    // Starlight border on top — the sparkle frame twinkling over the epic frame.
+    drawStarlightBorder(ctx, t);
 
     // Labels on top so the name + rarity stay legible.
     drawLabels(ctx, card, 'rare', t, opts);
