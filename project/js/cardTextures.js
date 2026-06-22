@@ -2328,64 +2328,81 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
-  // Flock o' Sheep — the starlight rare variant. A cosmic starfield, twinkling
+  // Flock o' Sheep — the starlight rare variant. epic-card.png frame, twinkling
   // starlight, the sheep symbol floating over the frame, and a hovering flock of
-  // smaller sheep. Animated via t (card.flock added to the isAnimated checks).
+  // smaller sheep (spread wide so they peek over the frame, randomly mirrored,
+  // some drifting over the main symbol). Animated via t.
   function drawFlockOSheep(ctx, card, t, opts) {
-    // Cosmic background.
-    const bg = ctx.createRadialGradient(128, 190, 16, 128, 200, 260);
-    bg.addColorStop(0,   '#241c3c');
-    bg.addColorStop(0.6, '#0e0a1e');
-    bg.addColorStop(1,   '#05040c');
-    ctx.fillStyle = bg;
-    ctx.fillRect(0, 0, 256, 384);
+    // Background: epic-card.png (rare frame), fallback to a procedural rare frame.
+    const skin = _cardSkins['nature-rare'];   // epic-card.png
+    if (skin && skin.complete && skin.naturalWidth > 0) {
+      ctx.drawImage(skin, 0, 0, 256, 384);
+    } else {
+      drawBackground(ctx, 'rare', t);
+      drawBorder(ctx, 'rare', t);
+      drawCorners(ctx, 'rare', t);
+    }
 
     // Starlight particles — twinkling dots across the card.
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 40; i++) {
       const sx = _hrand(i)      * 256;
       const sy = _hrand(i + 60) * 384;
       const tw = 0.5 + 0.5 * Math.sin(t * 2.2 + i * 1.3);
-      ctx.fillStyle = `rgba(220,230,255,${0.25 + 0.6 * tw})`;
-      ctx.beginPath(); ctx.arc(sx, sy, 0.6 + 1.6 * tw, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = `rgba(220,230,255,${0.25 + 0.55 * tw})`;
+      ctx.beginPath(); ctx.arc(sx, sy, 0.6 + 1.5 * tw, 0, Math.PI * 2); ctx.fill();
     }
-
-    // Rare frame + corners drawn first, so the sheep float OVER the frame.
-    drawBorder(ctx, 'rare', t);
-    drawCorners(ctx, 'rare', t);
 
     const sheep = _cardSkins['symbol-critter'];
     if (sheep && sheep.complete && sheep.naturalWidth > 0) {
-      ctx.imageSmoothingEnabled = false;
       const aspect = sheep.naturalWidth / sheep.naturalHeight;
 
-      // Hovering mini-flock — drift + bob around the central sheep, over the frame.
-      const flock = [
-        { x: 50,  y: 162, s: 0.34, ph: 0.0 },
-        { x: 206, y: 150, s: 0.30, ph: 1.5 },
-        { x: 62,  y: 252, s: 0.36, ph: 3.0 },
-        { x: 198, y: 250, s: 0.28, ph: 4.2 },
-        { x: 128, y: 132, s: 0.24, ph: 5.4 },
-      ];
-      flock.forEach(m => {
-        const h = LAYOUT.symbolHeight * m.s, w = h * aspect;
-        const bob = Math.sin(t * 1.3 + m.ph) * 6, drift = Math.cos(t * 0.9 + m.ph) * 5;
+      // Draw one sheep, optionally horizontally flipped, with a soft glow.
+      const drawSheep = (cx, cy, h, alpha, flip, glow) => {
+        const w = h * aspect;
         ctx.save();
-        ctx.globalAlpha = 0.85;
-        ctx.shadowColor = 'rgba(180,200,255,0.7)'; ctx.shadowBlur = 8;
-        ctx.drawImage(sheep, m.x - w / 2 + drift, m.y - h / 2 + bob, w, h);
+        ctx.imageSmoothingEnabled = false;
+        ctx.globalAlpha = alpha;
+        if (glow) { ctx.shadowColor = 'rgba(190,205,255,0.8)'; ctx.shadowBlur = glow; }
+        ctx.translate(cx, cy);
+        if (flip) ctx.scale(-1, 1);
+        ctx.drawImage(sheep, -w / 2, -h / 2, w, h);
         ctx.restore();
+      };
+
+      // Mini-flock BEHIND the main sheep — spread wide so they peek over the frame.
+      const behind = [
+        { x: 16,  y: 150, s: 0.30, ph: 0.0 },   // far left, peeks off-edge
+        { x: 244, y: 168, s: 0.28, ph: 1.5 },   // far right, peeks off-edge
+        { x: 26,  y: 298, s: 0.34, ph: 3.0 },   // lower left
+        { x: 236, y: 286, s: 0.26, ph: 4.2 },   // lower right
+        { x: 128, y: 110, s: 0.22, ph: 5.4 },   // top centre, peeks over top frame
+        { x: 210, y: 108, s: 0.20, ph: 6.1 },   // upper right
+      ];
+      behind.forEach((m, i) => {
+        const h     = LAYOUT.symbolHeight * m.s;
+        const bob   = Math.sin(t * 1.3 + m.ph) * 6;
+        const drift = Math.cos(t * 0.9 + m.ph) * 6;
+        drawSheep(m.x + drift, m.y + bob, h, 0.85, _hrand(i * 5 + 1) < 0.5, 8);
       });
 
       // Main sheep — larger, floating, glowing.
-      const h = LAYOUT.symbolHeight * 0.95, w = h * aspect;
-      const bob = Math.sin(t * 1.6) * 9;
-      ctx.save();
-      ctx.shadowColor = 'rgba(190,205,255,0.9)'; ctx.shadowBlur = 18;
-      ctx.drawImage(sheep, 128 - w / 2, LAYOUT.symbolCenterY - h / 2 + bob, w, h);
-      ctx.restore();
+      drawSheep(128, LAYOUT.symbolCenterY + Math.sin(t * 1.6) * 9,
+                LAYOUT.symbolHeight * 0.95, 1.0, false, 18);
+
+      // A couple of mini sheep OVER the main symbol.
+      const over = [
+        { x: 92,  y: 206, s: 0.20, ph: 2.1 },
+        { x: 168, y: 220, s: 0.18, ph: 3.7 },
+      ];
+      over.forEach((m, i) => {
+        const h     = LAYOUT.symbolHeight * m.s;
+        const bob   = Math.sin(t * 1.5 + m.ph) * 5;
+        const drift = Math.cos(t * 1.1 + m.ph) * 5;
+        drawSheep(m.x + drift, m.y + bob, h, 0.9, _hrand(i * 9 + 4) < 0.5, 6);
+      });
     }
 
-    // Labels on top so the name + rarity stay legible over the starfield.
+    // Labels on top so the name + rarity stay legible.
     drawLabels(ctx, card, 'rare', t, opts);
   }
 

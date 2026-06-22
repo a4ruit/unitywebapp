@@ -413,12 +413,13 @@ function rollPack() {
     pool[Math.floor(Math.random() * pool.length)].variant = 'holo';
   }
 
-  // Flock o' Sheep — a starlight rare that occasionally takes the uncommon slot
-  // in a pristine critter pack (a special sheep variant to choose).
+  // Flock o' Sheep — a starlight rare that occasionally replaces a common in a
+  // pristine critter pack (keeping the uncommon Duck). Re-sorted below to its
+  // rare position, so it appears to the RIGHT of the Duck.
   if (getActiveCardPool() === CRITTER_CARDS && corruptionLevel < HORROR_THRESHOLD
       && Math.random() < FLOCK_CHANCE) {
-    const ui = cards.findIndex(c => c.rarity === 'uncommon');
-    if (ui >= 0) cards[ui] = { ...FLOCK_O_SHEEP };
+    const fi = cards.findIndex(c => c.rarity === 'common');
+    if (fi >= 0) cards[fi] = { ...FLOCK_O_SHEEP };
   }
 
   // Choice-driven corruption — a pristine pack occasionally hides a corrupted
@@ -428,6 +429,10 @@ function rollPack() {
     const ci = cards.findIndex(c => c.rarity === 'common');
     if (ci >= 0) cards[ci] = { ...CORRUPTED_FLESHLING };
   }
+
+  // Re-sort so injected specials land in rarity order (the rare Flock o' Sheep
+  // sits to the right of the uncommon Duck; the common corrupted card stays left).
+  cards.sort((a, b) => a.rarityRank - b.rarityRank);
   return cards;
 }
 
