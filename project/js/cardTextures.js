@@ -2067,8 +2067,8 @@ const CardTextures = (() => {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = nameColor;
     if (rarity !== 'legendary-alpha') { ctx.shadowColor = nameColor; ctx.shadowBlur = 6; }
-    // Render the name exactly as stored — existing names are already Title Case,
-    // and this preserves file-style names like "sheep.png" / "fox.exe".
+    // Render the name exactly as stored — names are already display-ready
+    // (Title Case, or styled like "Flock o' Sheep"), so no re-casing.
     const displayName = card.name;
     ctx.fillText(displayName, 128, ty + th / 2 + 1);
     ctx.shadowBlur = 0;
@@ -2328,6 +2328,67 @@ const CardTextures = (() => {
     ctx.restore();
   }
 
+  // Flock o' Sheep — the starlight rare variant. A cosmic starfield, twinkling
+  // starlight, the sheep symbol floating over the frame, and a hovering flock of
+  // smaller sheep. Animated via t (card.flock added to the isAnimated checks).
+  function drawFlockOSheep(ctx, card, t, opts) {
+    // Cosmic background.
+    const bg = ctx.createRadialGradient(128, 190, 16, 128, 200, 260);
+    bg.addColorStop(0,   '#241c3c');
+    bg.addColorStop(0.6, '#0e0a1e');
+    bg.addColorStop(1,   '#05040c');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, 256, 384);
+
+    // Starlight particles — twinkling dots across the card.
+    for (let i = 0; i < 46; i++) {
+      const sx = _hrand(i)      * 256;
+      const sy = _hrand(i + 60) * 384;
+      const tw = 0.5 + 0.5 * Math.sin(t * 2.2 + i * 1.3);
+      ctx.fillStyle = `rgba(220,230,255,${0.25 + 0.6 * tw})`;
+      ctx.beginPath(); ctx.arc(sx, sy, 0.6 + 1.6 * tw, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // Rare frame + corners drawn first, so the sheep float OVER the frame.
+    drawBorder(ctx, 'rare', t);
+    drawCorners(ctx, 'rare', t);
+
+    const sheep = _cardSkins['symbol-critter'];
+    if (sheep && sheep.complete && sheep.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const aspect = sheep.naturalWidth / sheep.naturalHeight;
+
+      // Hovering mini-flock — drift + bob around the central sheep, over the frame.
+      const flock = [
+        { x: 50,  y: 162, s: 0.34, ph: 0.0 },
+        { x: 206, y: 150, s: 0.30, ph: 1.5 },
+        { x: 62,  y: 252, s: 0.36, ph: 3.0 },
+        { x: 198, y: 250, s: 0.28, ph: 4.2 },
+        { x: 128, y: 132, s: 0.24, ph: 5.4 },
+      ];
+      flock.forEach(m => {
+        const h = LAYOUT.symbolHeight * m.s, w = h * aspect;
+        const bob = Math.sin(t * 1.3 + m.ph) * 6, drift = Math.cos(t * 0.9 + m.ph) * 5;
+        ctx.save();
+        ctx.globalAlpha = 0.85;
+        ctx.shadowColor = 'rgba(180,200,255,0.7)'; ctx.shadowBlur = 8;
+        ctx.drawImage(sheep, m.x - w / 2 + drift, m.y - h / 2 + bob, w, h);
+        ctx.restore();
+      });
+
+      // Main sheep — larger, floating, glowing.
+      const h = LAYOUT.symbolHeight * 0.95, w = h * aspect;
+      const bob = Math.sin(t * 1.6) * 9;
+      ctx.save();
+      ctx.shadowColor = 'rgba(190,205,255,0.9)'; ctx.shadowBlur = 18;
+      ctx.drawImage(sheep, 128 - w / 2, LAYOUT.symbolCenterY - h / 2 + bob, w, h);
+      ctx.restore();
+    }
+
+    // Labels on top so the name + rarity stay legible over the starfield.
+    drawLabels(ctx, card, 'rare', t, opts);
+  }
+
   function buildFace(card, canvas, t = 0, opts = {}) {
     if (!canvas) {
       canvas = document.createElement('canvas');
@@ -2359,6 +2420,12 @@ const CardTextures = (() => {
       return canvas;
     }
 
+    // Flock o' Sheep — starlight rare variant with its own cosmic render.
+    if (card.flock) {
+      drawFlockOSheep(ctx, card, t, opts);
+      return canvas;
+    }
+
     // ── Card skin override: use PNG base when available ──────────────────────
     const isNature = cardIsNaturePhase();
     let skinKey    = isNature && card.rarity === 'common'   ? 'nature-common'
@@ -2369,8 +2436,8 @@ const CardTextures = (() => {
     // common-card.png background ('nature-common' skin); Duck (critter uncommon)
     // and Fairy Cap (fungi uncommon) reuse uncommon-card.png ('nature-uncommon').
     // Their own symbol + name are still drawn on top by drawShape / drawLabels.
-    if (card.name === 'White Mushroom' || card.name === 'sheep.png') skinKey = 'nature-common';
-    if (card.name === 'duck.gif'       || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
+    if (card.name === 'White Mushroom' || card.name === 'Sheep') skinKey = 'nature-common';
+    if (card.name === 'Duck'           || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
@@ -2383,11 +2450,11 @@ const CardTextures = (() => {
       drawCorners(ctx, card.rarity, t);
     }
 
-    // ouroboros.exe (the critter legendary-alpha) always renders as its
+    // The Emerald Serpent (critter legendary-alpha) always renders as its
     // ouroboros, independent of which pack type the player is currently on (the
     // normal drawShape dispatch keys off activePackType, which would otherwise
     // draw the nature Tree of Life).
-    if (card.name === 'ouroboros.exe') drawOuroboros(ctx, t);
+    if (card.name === 'Emerald Serpent') drawOuroboros(ctx, t);
     else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
     if (card.variant === 'holo') drawHolo(ctx, t);

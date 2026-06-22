@@ -50,13 +50,13 @@ const FLESH_CARDS = [
 
 // ─── CRITTER (ewaste / pristine) ──────────────────────────────────────────────
 const CRITTER_CARDS = [
-  { id:'small_cube', name:'sheep.png',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Static bitmap. Harmless.' },
-  { id:'large_cube', name:'duck.gif',      rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Loops forever. Never buffers.' },
-  { id:'sphere',     name:'gull.svg',      rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Vector. Scales clean.' },
-  { id:'triangle',   name:'fox.exe',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Runs on sight.' },
-  { id:'octagon',    name:'stag.sys',      rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'A driver. Do not delete.' },
-  { id:'triad',      name:'swarm.bat',     rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Batch job. Thousands of instances.' },
-  { id:'star',       name:'ouroboros.exe', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'while(true){}. Never returns.' },
+  { id:'small_cube', name:'Sheep',           rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
+  { id:'large_cube', name:'Duck',            rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
+  { id:'sphere',     name:'Seagull',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
+  { id:'triangle',   name:'Red Fox',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
+  { id:'octagon',    name:'Great Stag',      rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The forest holds its breath.' },
+  { id:'triad',      name:'The Migration',   rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Thousands. No map. Right on time.' },
+  { id:'star',       name:'Emerald Serpent', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
 ];
 
 // ─── SCOURGE (ewaste / horror) ────────────────────────────────────────────────
@@ -102,11 +102,23 @@ const RITUAL_CARDS = [
 // Fleshling (SpawnByType uncommon in the flesh phase). Rendered in the flesh
 // theme by cardTextures.buildFace via the `corrupted` flag.
 const CORRUPTED_FLESHLING = {
-  id:'large_cube', name:'fleshling.exe', rarity:'common', rarityRank:0,
+  id:'large_cube', name:'Fleshling', rarity:'common', rarityRank:0,
   command:'spawn_large_cube', corrupted:true,
-  desc:'Unknown process. It found you first.',
+  desc:'Small. Hungry. It found you first.',
 };
 const CORRUPTED_CARD_CHANCE = 0.4;   // chance a pristine pack hides a corrupted card
+
+// ─── Flock o' Sheep — rare "starlight" sheep variant ──────────────────────────
+// A special rare that occasionally appears in pristine critter packs: its symbol
+// floats over a starlit frame with a hovering flock of smaller sheep (rendered
+// by cardTextures.buildFace via the `flock` flag). Placing it releases a small
+// flock (multiple sheep) — see dropCard.
+const FLOCK_O_SHEEP = {
+  id:'sphere', name:"Flock o' Sheep", rarity:'rare', rarityRank:2,
+  command:'spawn_small_cube', flock:true,
+  desc:'A drifting constellation. It counts itself to sleep.',
+};
+const FLOCK_CHANCE = 0.25;   // chance a pristine critter pack offers the Flock o' Sheep
 
 // ─── Placement star costs ──────────────────────────────────────────────────────
 // Common and uncommon are always free — lower rarities must remain accessible
@@ -399,6 +411,14 @@ function rollPack() {
     const r        = rarities[Math.floor(Math.random() * rarities.length)];
     const pool     = cards.filter(c => c.rarity === r);
     pool[Math.floor(Math.random() * pool.length)].variant = 'holo';
+  }
+
+  // Flock o' Sheep — a starlight rare that occasionally takes the uncommon slot
+  // in a pristine critter pack (a special sheep variant to choose).
+  if (getActiveCardPool() === CRITTER_CARDS && corruptionLevel < HORROR_THRESHOLD
+      && Math.random() < FLOCK_CHANCE) {
+    const ui = cards.findIndex(c => c.rarity === 'uncommon');
+    if (ui >= 0) cards[ui] = { ...FLOCK_O_SHEEP };
   }
 
   // Choice-driven corruption — a pristine pack occasionally hides a corrupted
@@ -1017,6 +1037,15 @@ function dropCard(card) {
 
   // Session collection — the card is now claimed
   if (typeof Collection !== 'undefined') Collection.record(card);
+
+  // Flock o' Sheep — releases a small flock (several sheep) instead of one.
+  if (card.flock) {
+    if (typeof CLIENT_ID !== 'undefined') {
+      for (let n = 0; n < 3; n++) send(`spawn_small_cube|${CLIENT_ID}|critter`);
+    }
+    resetToPackScreen();
+    return;
+  }
 
   // Placement cards get their own modal regardless of phase
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
