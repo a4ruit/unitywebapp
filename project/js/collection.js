@@ -47,6 +47,19 @@ const Collection = (() => {
     }
   }
 
+  // Special variant cards that live OUTSIDE the six theme pools (injected into
+  // packs as bonus pulls) but still earn a collection slot. Read lazily like the
+  // pools, since main.js defines them after this file loads.
+  function _extras() {
+    try {
+      return [
+        { card: FLOCK_O_SHEEP, poolKey: 'critter', type: 'ewaste', corruption: 0 },
+      ];
+    } catch (e) {
+      return [];
+    }
+  }
+
   // ── Phase gating ──────────────────────────────────────────────────────────────
   // Pristine phase shows only the three pristine pools (nature/critter/fungi).
   // The horror-phase pools (flesh/scourge/ritual) stay hidden until THIS phone
@@ -100,6 +113,13 @@ const Collection = (() => {
         const tier = byTier.find(t => t.rarity === card.rarity);
         if (tier) tier.cards.push({ card, poolKey: pool.key, type: pool.type, corruption: pool.corruption });
       });
+    });
+    // Out-of-pool bonus pulls (e.g. Flock o' Sheep) — slotted into their rarity
+    // tier, respecting phase visibility (corruption:0 = pristine-visible).
+    _extras().forEach(entry => {
+      if (!horror && entry.corruption !== 0) return;
+      const tier = byTier.find(t => t.rarity === entry.card.rarity);
+      if (tier) tier.cards.push(entry);
     });
     return byTier;
   }
