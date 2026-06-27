@@ -2331,6 +2331,22 @@ const CardTextures = (() => {
   // Twinkling starlight along the card perimeter — a sparkle "border" layered
   // over the epic-card frame. 4-point stars that twinkle in and out. Animated.
   function drawStarlightBorder(ctx, t) {
+    // Radiant frame accent — a glowing bluish-white edge that pulses, so the
+    // border itself reads as luminous (matches the radiant overlay flock).
+    const fp = 0.55 + 0.45 * Math.sin(t * 2.2);
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.shadowColor = `rgba(170,200,255,${0.9 * fp})`;
+    ctx.shadowBlur  = 6 + 14 * fp;
+    ctx.strokeStyle = `rgba(200,220,255,${0.50 * fp})`;
+    ctx.lineWidth   = 3;
+    ctx.strokeRect(6, 6, 244, 372);
+    ctx.shadowBlur  = 6;
+    ctx.strokeStyle = `rgba(245,250,255,${0.65 * fp})`;
+    ctx.lineWidth   = 1.5;
+    ctx.strokeRect(9, 9, 238, 366);
+    ctx.restore();
+
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     const star = (x, y, i) => {
