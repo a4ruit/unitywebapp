@@ -443,7 +443,12 @@ const ChoiceGrid3D = (() => {
           if (!flockCell.displayCanvas) return null;
           if (flockCell.state !== 'idle' && flockCell.state !== 'pulse') return null;
           const r = flockCell.displayCanvas.getBoundingClientRect();
-          return (r.width > 2 && r.height > 2) ? r : null;
+          if (r.width <= 2 || r.height <= 2) return null;
+          // Mirror the card's affordability so the flock greys with it; colour
+          // (and the radiant glow) only kick in when the player can afford it.
+          const locked = !!(flockCell.el &&
+            flockCell.el.classList.contains('choice-cell-3d--locked'));
+          return { left: r.left, top: r.top, width: r.width, height: r.height, locked };
         });
       } else {
         FlockFX.stop();

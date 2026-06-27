@@ -69,6 +69,14 @@ const FlockFX = (() => {
     const t      = performance.now() / 1000 - t0;
     const aspect = (img.naturalWidth / img.naturalHeight) || 1;
     const orbit  = r.width * 0.028;
+    const locked = !!r.locked;
+
+    // Match the card's locked treatment — grey + dim the whole flock so colour
+    // and the radiant glow only appear once the player can afford the card.
+    const wantFilter  = locked ? 'grayscale(1) brightness(0.55)' : 'none';
+    const wantOpacity = locked ? '0.55' : '1';
+    if (canvas.style.filter  !== wantFilter)  canvas.style.filter  = wantFilter;
+    if (canvas.style.opacity !== wantOpacity) canvas.style.opacity = wantOpacity;
 
     FLOCK.forEach((m) => {
       const cx = r.left + m.nx * r.width  + Math.cos(t * 0.9 + m.ph) * orbit;
@@ -79,32 +87,43 @@ const FlockFX = (() => {
       const pulse = 0.6 + 0.4 * Math.sin(t * 2.2 + m.ph);   // twinkle 0.2..1.0
 
       // Radiant halo — additive bluish-white starlight glow behind the sheep.
-      const glowR = hh * 1.6;
-      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
-      g.addColorStop(0,    `rgba(205,220,255,${0.50 * pulse * fade})`);
-      g.addColorStop(0.45, `rgba(150,180,255,${0.20 * pulse * fade})`);
-      g.addColorStop(1,    'rgba(150,180,255,0)');
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      // Suppressed while locked so there's no colour bleed on an unaffordable card.
+      if (!locked) {
+        const glowR = hh * 1.6;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+        g.addColorStop(0,    `rgba(205,220,255,${0.50 * pulse * fade})`);
+        g.addColorStop(0.45, `rgba(150,180,255,${0.20 * pulse * fade})`);
+        g.addColorStop(1,    'rgba(150,180,255,0)');
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
 
-      // The sheep — luminous rim glow first, then a crisp pass on top.
+      // The sheep — luminous bluish rim when affordable, a plain drop shadow
+      // (greyed by the canvas filter) when locked.
       ctx.save();
       ctx.globalAlpha = fade;
       ctx.imageSmoothingEnabled = false;
       ctx.translate(cx, cy);
       if (m.fl) ctx.scale(-1, 1);
-      ctx.shadowColor   = `rgba(215,230,255,${0.85 * pulse})`;
-      ctx.shadowBlur    = hh * 0.7;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
-      ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);   // glow pass
-      ctx.shadowBlur    = 0;
-      ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);   // crisp pass
+      if (locked) {
+        ctx.shadowColor   = 'rgba(0,0,0,0.45)';
+        ctx.shadowBlur    = 4;
+        ctx.shadowOffsetY = 3;
+        ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);
+      } else {
+        ctx.shadowColor   = `rgba(215,230,255,${0.85 * pulse})`;
+        ctx.shadowBlur    = hh * 0.7;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+        ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);   // glow pass
+        ctx.shadowBlur    = 0;
+        ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);   // crisp pass
+      }
       ctx.restore();
     });
   }
@@ -121,7 +140,7 @@ const FlockFX = (() => {
     getRect = null;
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     if (ctx && canvas) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (canvas) canvas.style.display = 'none';
+    if (canvas) { canvas.style.display = 'none'; canvas.style.filter = 'none'; canvas.style.opacity = '1'; }
     fade = 0; lastRect = null;
   }
 
