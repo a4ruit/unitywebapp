@@ -433,6 +433,23 @@ const ChoiceGrid3D = (() => {
       .sort((a, b) => a.rank - b.rank)
       .map(x => x.i);
 
+    // Flock o' Sheep — float its flock as overlay particles anchored to the
+    // card's live screen rect, so the sheep drift BEYOND the card edges without
+    // being clipped by the card texture. Only draws while the card is face-up.
+    if (typeof FlockFX !== 'undefined') {
+      const flockCell = cells.find(c => c && c.card && c.card.flock);
+      if (flockCell) {
+        FlockFX.start(() => {
+          if (!flockCell.displayCanvas) return null;
+          if (flockCell.state !== 'idle' && flockCell.state !== 'pulse') return null;
+          const r = flockCell.displayCanvas.getBoundingClientRect();
+          return (r.width > 2 && r.height > 2) ? r : null;
+        });
+      } else {
+        FlockFX.stop();
+      }
+    }
+
     sortedIndices.forEach((cardIndex, staggerPos) => {
       const cell = cells[cardIndex];
       if (!cell) return;
@@ -451,6 +468,7 @@ const ChoiceGrid3D = (() => {
 
   function destroy() {
     if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
+    if (typeof FlockFX !== 'undefined') FlockFX.stop();
 
     cells.forEach(cell => {
       if (!cell) return;
