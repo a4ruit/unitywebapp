@@ -106,7 +106,7 @@ const CORRUPTED_FLESHLING = {
   command:'spawn_large_cube', corrupted:true,
   desc:'Small. Hungry. It found you first.',
 };
-const CORRUPTED_CARD_CHANCE = 0.4;   // chance a pristine pack hides a corrupted card
+const CORRUPTED_CARD_CHANCE = 0.5;   // chance a pristine pack hides a corrupted card
 
 // ─── Flock o' Sheep — rare "starlight" sheep variant ──────────────────────────
 // A special rare that occasionally appears in pristine critter packs: its symbol

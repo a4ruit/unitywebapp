@@ -450,6 +450,22 @@ const ChoiceGrid3D = (() => {
       }
     }
 
+    // Fleshling (corrupted) — subtle glitch particles anchored to the card,
+    // same overlay system as the flock. Only draws while the card is face-up.
+    if (typeof GlitchFX !== 'undefined') {
+      const corruptCell = cells.find(c => c && c.card && c.card.corrupted);
+      if (corruptCell) {
+        GlitchFX.start(() => {
+          if (!corruptCell.displayCanvas) return null;
+          if (corruptCell.state !== 'idle' && corruptCell.state !== 'pulse') return null;
+          const r = corruptCell.displayCanvas.getBoundingClientRect();
+          return (r.width > 2 && r.height > 2) ? r : null;
+        });
+      } else {
+        GlitchFX.stop();
+      }
+    }
+
     sortedIndices.forEach((cardIndex, staggerPos) => {
       const cell = cells[cardIndex];
       if (!cell) return;
@@ -469,6 +485,7 @@ const ChoiceGrid3D = (() => {
   function destroy() {
     if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
     if (typeof FlockFX !== 'undefined') FlockFX.stop();
+    if (typeof GlitchFX !== 'undefined') GlitchFX.stop();
 
     cells.forEach(cell => {
       if (!cell) return;
