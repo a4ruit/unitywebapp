@@ -2381,47 +2381,54 @@ const CardTextures = (() => {
     if (sheep && sheep.complete && sheep.naturalWidth > 0) {
       const aspect = sheep.naturalWidth / sheep.naturalHeight;
 
-      // Draw one sheep, optionally horizontally flipped, with a soft glow.
-      const drawSheep = (cx, cy, h, alpha, flip, glow) => {
-        const w = h * aspect;
+      // Draw one sheep, optionally mirrored, lifted off the card with a soft drop
+      // shadow so it reads as floating ABOVE the surface. Position is clamped so
+      // the body always stays fully on the 256x384 face (never cut off by the edge).
+      const drawSheep = (cx, cy, h, alpha, flip) => {
+        const w = h * aspect, m = 3;
+        cx = Math.max(w / 2 + m, Math.min(256 - w / 2 - m, cx));
+        cy = Math.max(h / 2 + m, Math.min(384 - h / 2 - m, cy));
         ctx.save();
         ctx.imageSmoothingEnabled = false;
-        ctx.globalAlpha = alpha;
-        if (glow) { ctx.shadowColor = 'rgba(190,205,255,0.8)'; ctx.shadowBlur = glow; }
+        ctx.globalAlpha   = alpha;
+        ctx.shadowColor   = 'rgba(0,0,0,0.4)';
+        ctx.shadowBlur    = 5;
+        ctx.shadowOffsetY = 5;
         ctx.translate(cx, cy);
         if (flip) ctx.scale(-1, 1);
         ctx.drawImage(sheep, -w / 2, -h / 2, w, h);
         ctx.restore();
       };
 
-      // Mini-flock spilling over the frame edges (pushed right to the border).
+      // Mini-flock hovering over the frame — bodies stay on the card (overlapping
+      // the frame border) so they're never clipped; the drop shadow sells "above".
       const behind = [
-        { x: 8,   y: 152, s: 0.30, ph: 0.0 },   // left edge — over the frame
-        { x: 248, y: 170, s: 0.28, ph: 1.5 },   // right edge — over the frame
-        { x: 14,  y: 300, s: 0.34, ph: 3.0 },   // lower left
-        { x: 242, y: 288, s: 0.26, ph: 4.2 },   // lower right
-        { x: 128, y: 104, s: 0.22, ph: 5.4 },   // top centre — over the top frame
-        { x: 212, y: 104, s: 0.20, ph: 6.1 },   // upper right
+        { x: 40,  y: 150, s: 0.30, ph: 0.0 },   // left, over the frame
+        { x: 216, y: 166, s: 0.28, ph: 1.5 },   // right, over the frame
+        { x: 44,  y: 296, s: 0.32, ph: 3.0 },   // lower left
+        { x: 214, y: 286, s: 0.26, ph: 4.2 },   // lower right
+        { x: 128, y: 120, s: 0.22, ph: 5.4 },   // top centre
+        { x: 196, y: 120, s: 0.20, ph: 6.1 },   // upper right
       ];
       behind.forEach((m, i) => {
         const h = LAYOUT.symbolHeight * m.s;
-        drawSheep(m.x + Math.cos(t * 0.9 + m.ph) * 6, m.y + Math.sin(t * 1.3 + m.ph) * 6,
-                  h, 0.85, _hrand(i * 5 + 1) < 0.5, 8);
+        drawSheep(m.x + Math.cos(t * 0.9 + m.ph) * 5, m.y + Math.sin(t * 1.3 + m.ph) * 5,
+                  h, 0.9, _hrand(i * 5 + 1) < 0.5);
       });
 
-      // Main sheep — larger, floating, glowing.
+      // Main sheep — larger, floating above the card.
       drawSheep(128, LAYOUT.symbolCenterY + Math.sin(t * 1.6) * 9,
-                LAYOUT.symbolHeight * 0.95, 1.0, false, 18);
+                LAYOUT.symbolHeight * 0.95, 1.0, false);
 
       // A couple of mini sheep OVER the main symbol.
       const over = [
-        { x: 92,  y: 206, s: 0.20, ph: 2.1 },
-        { x: 168, y: 220, s: 0.18, ph: 3.7 },
+        { x: 96,  y: 206, s: 0.20, ph: 2.1 },
+        { x: 164, y: 218, s: 0.18, ph: 3.7 },
       ];
       over.forEach((m, i) => {
         const h = LAYOUT.symbolHeight * m.s;
         drawSheep(m.x + Math.cos(t * 1.1 + m.ph) * 5, m.y + Math.sin(t * 1.5 + m.ph) * 5,
-                  h, 0.9, _hrand(i * 9 + 4) < 0.5, 6);
+                  h, 0.95, _hrand(i * 9 + 4) < 0.5);
       });
     }
 
