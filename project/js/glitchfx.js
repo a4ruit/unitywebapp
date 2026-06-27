@@ -73,36 +73,39 @@ const GlitchFX = (() => {
     ctx.textBaseline = 'middle';
 
     BITS.forEach((b, i) => {
-      // Flicker: each bit blinks on/off sporadically so it reads as glitchy and
-      // subtle rather than a steady particle.
-      if (Math.random() > 0.45) return;
-      const jx = (Math.random() - 0.5) * sz * 0.9;
-      const jy = (Math.random() - 0.5) * sz * 0.5;
-      const cx = r.left + b.nx * r.width  + jx;
-      const cy = r.top  + b.ny * r.height + jy;
-      const a  = fade * (0.22 + Math.random() * 0.35);
-      const ch = GLYPHS[(i + (Math.random() * GLYPHS.length | 0)) % GLYPHS.length];
+      // Slow, deterministic breathe — each glyph eases in and out on its own
+      // phase instead of random per-frame flicker. Off for half its cycle.
+      const cyc = Math.sin(t * 0.7 + b.ph);
+      if (cyc <= 0) return;
+      const vis = cyc * cyc;                          // smooth ramp 0..1
 
-      // Occasional chromatic-aberration split.
-      if (Math.random() < 0.4) {
-        ctx.globalCompositeOperation = 'screen';
-        ctx.fillStyle = `rgba(255,40,40,${a * 0.7})`;
-        ctx.fillText(ch, cx - 1.5, cy);
-        ctx.fillStyle = `rgba(40,255,255,${a * 0.7})`;
-        ctx.fillText(ch, cx + 1.5, cy);
-        ctx.globalCompositeOperation = 'source-over';
-      }
+      // Gentle controlled drift, not jitter.
+      const cx = r.left + b.nx * r.width  + Math.cos(t * 0.5 + b.ph) * sz * 0.16;
+      const cy = r.top  + b.ny * r.height + Math.sin(t * 0.4 + b.ph) * sz * 0.16;
+      const a  = fade * (0.16 + 0.32 * vis);
+
+      // Glyph swaps on a slow stepped cadence (~1/s), not every frame.
+      const ch = GLYPHS[(i + Math.floor(t * 0.9 + b.ph)) % GLYPHS.length];
+
+      // Steady, subtle chromatic split.
+      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = `rgba(255,55,55,${a * 0.5})`;
+      ctx.fillText(ch, cx - 1.2, cy);
+      ctx.fillStyle = `rgba(55,255,255,${a * 0.5})`;
+      ctx.fillText(ch, cx + 1.2, cy);
+      ctx.globalCompositeOperation = 'source-over';
       ctx.fillStyle = `rgba(232,232,232,${a})`;
       ctx.fillText(ch, cx, cy);
     });
 
-    // Sparse tear shards — thin dark/bright bars that snap in occasionally.
-    if (Math.random() < 0.5) {
-      const ty = r.top + Math.random() * r.height;
-      const tw = r.width * (0.2 + Math.random() * 0.5);
-      const tx = r.left - r.width * 0.05 + Math.random() * r.width * 0.6;
-      ctx.fillStyle = `rgba(${Math.random() < 0.5 ? '0,0,0' : '235,235,235'},${fade * 0.25})`;
-      ctx.fillRect(tx, ty, tw, 1 + Math.random() * 2);
+    // One slow tear shard that drifts down the card and fades in/out on a slow
+    // cycle — controlled, not random per-frame.
+    const shard = Math.sin(t * 0.45);
+    if (shard > 0.4) {
+      const sv = (shard - 0.4) / 0.6;                 // 0..1 within the window
+      const ty = r.top + ((t * 0.1) % 1) * r.height;
+      ctx.fillStyle = `rgba(20,20,20,${fade * 0.22 * sv})`;
+      ctx.fillRect(r.left + r.width * 0.1, ty, r.width * 0.5, 2);
     }
 
     ctx.restore();
