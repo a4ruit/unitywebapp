@@ -25,14 +25,14 @@ const FlockFX = (() => {
   // Each sheep is anchored by a fraction of the card rect: nx/ny in [0,1] is
   // inside the card; values < 0 or > 1 float BEYOND the edges. fl mirrors it.
   const FLOCK = [
-    { nx: -0.20, ny: 0.28, s: 0.26, ph: 0.0, fl: false },
-    { nx:  1.18, ny: 0.40, s: 0.24, ph: 1.3, fl: true  },
-    { nx: -0.14, ny: 0.74, s: 0.30, ph: 2.6, fl: false },
-    { nx:  1.12, ny: 0.66, s: 0.22, ph: 3.9, fl: true  },
-    { nx:  0.42, ny: -0.20, s: 0.20, ph: 5.2, fl: false },
-    { nx:  0.84, ny: -0.12, s: 0.18, ph: 0.7, fl: true  },
-    { nx:  0.20, ny: 1.16, s: 0.24, ph: 2.0, fl: false },
-    { nx:  0.72, ny: 1.18, s: 0.20, ph: 3.3, fl: true  },
+    { nx: -0.06, ny: 0.30, s: 0.19, ph: 0.0, fl: false },
+    { nx:  1.05, ny: 0.44, s: 0.09, ph: 1.3, fl: true  },
+    { nx: -0.02, ny: 0.70, s: 0.21, ph: 2.6, fl: false },
+    { nx:  1.02, ny: 0.62, s: 0.08, ph: 3.9, fl: true  },
+    { nx:  0.40, ny: -0.06, s: 0.13, ph: 5.2, fl: false },
+    { nx:  0.82, ny: -0.02, s: 0.07, ph: 0.7, fl: true  },
+    { nx:  0.22, ny: 1.05, s: 0.16, ph: 2.0, fl: false },
+    { nx:  0.70, ny: 1.07, s: 0.11, ph: 3.3, fl: true  },
   ];
 
   function _ensure() {
@@ -68,12 +68,12 @@ const FlockFX = (() => {
     const r      = lastRect;
     const t      = performance.now() / 1000 - t0;
     const aspect = (img.naturalWidth / img.naturalHeight) || 1;
-    const orbit  = r.width * 0.045;
+    const orbit  = r.width * 0.028;
 
     FLOCK.forEach((m) => {
       const cx = r.left + m.nx * r.width  + Math.cos(t * 0.9 + m.ph) * orbit;
       const cy = r.top  + m.ny * r.height + Math.sin(t * 1.3 + m.ph) * orbit
-                        + Math.sin(t * 1.6 + m.ph) * 4;
+                        + Math.sin(t * 1.6 + m.ph) * 3;
       const hh = m.s * r.height;
       const ww = hh * aspect;
       ctx.save();
