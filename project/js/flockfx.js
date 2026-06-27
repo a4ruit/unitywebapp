@@ -76,15 +76,35 @@ const FlockFX = (() => {
                         + Math.sin(t * 1.6 + m.ph) * 3;
       const hh = m.s * r.height;
       const ww = hh * aspect;
+      const pulse = 0.6 + 0.4 * Math.sin(t * 2.2 + m.ph);   // twinkle 0.2..1.0
+
+      // Radiant halo — additive bluish-white starlight glow behind the sheep.
+      const glowR = hh * 1.6;
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+      g.addColorStop(0,    `rgba(205,220,255,${0.50 * pulse * fade})`);
+      g.addColorStop(0.45, `rgba(150,180,255,${0.20 * pulse * fade})`);
+      g.addColorStop(1,    'rgba(150,180,255,0)');
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // The sheep — luminous rim glow first, then a crisp pass on top.
       ctx.save();
       ctx.globalAlpha = fade;
       ctx.imageSmoothingEnabled = false;
-      ctx.shadowColor   = 'rgba(0,0,0,0.4)';
-      ctx.shadowBlur    = 5;
-      ctx.shadowOffsetY = 4;
       ctx.translate(cx, cy);
       if (m.fl) ctx.scale(-1, 1);
-      ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);
+      ctx.shadowColor   = `rgba(215,230,255,${0.85 * pulse})`;
+      ctx.shadowBlur    = hh * 0.7;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);   // glow pass
+      ctx.shadowBlur    = 0;
+      ctx.drawImage(img, -ww / 2, -hh / 2, ww, hh);   // crisp pass
       ctx.restore();
     });
   }
