@@ -21,6 +21,11 @@ const QUEST_STAR_REWARDS = {
 // ─── Stars ─────────────────────────────────────────────────────────────────────
 
 function addStars(amount, fromEl) {
+  // Player progression — the Vigor attribute multiplies star gains.
+  if (amount > 0) {
+    const _mult = (window.PlayerMods && window.PlayerMods.starGainMult) || 1;
+    amount = Math.round(amount * _mult);
+  }
   // Reward ding (no-op unless "sound on"). Only on an actual gain.
   if (typeof Sound !== 'undefined' && amount > 0) Sound.play('star');
   const prev = stars;

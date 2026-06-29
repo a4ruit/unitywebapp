@@ -2375,6 +2375,9 @@ function _confirmPlace() {
 function _onFungiSporeReady(budget, worldW, worldH, mushNx, mushNz) {
   _sporeOwned     = true;
   _sporeBudget    = budget > 0 ? budget : 50;
+  // Player progression — the Dexterity attribute grants a bigger spore budget.
+  const _budgetMult = (window.PlayerMods && window.PlayerMods.sporeBudgetMult) || 1;
+  _sporeBudget    = _sporeBudget * _budgetMult;
   _sporeRemaining = _sporeBudget;
   _sporeWorldW    = worldW > 0 ? worldW : 1;
   _sporeWorldH    = worldH > 0 ? worldH : 1;
@@ -2428,6 +2431,8 @@ function _sporePointerMove(e) {
   _sporeLastNorm  = n;
   _sporeTrail.push(n);
   send(`spore_paint|${CLIENT_ID}|${n.x.toFixed(3)}|${n.y.toFixed(3)}`);
+  // Player progression — dispersing spores feeds Dexterity.
+  if (typeof Player !== 'undefined') Player.gainXP('dexterity', 1);
   _updateSporeBar();
   _drawSporeMinimap();
 

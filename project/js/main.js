@@ -589,6 +589,9 @@ function connect() {
     ws.onerror = () => ws.close();
     ws.onmessage = (e) => {
       if (WS_DEBUG) console.log('[WS]', e.data);
+      // Player progression watches the raw stream for "playing in Unity" signals
+      // (possession ticks → Vigor XP). Runs before routing returns short-circuit.
+      if (typeof Player !== 'undefined') Player.observe(e.data);
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
@@ -1043,10 +1046,15 @@ function dropCard(card) {
   // Session collection — the card is now claimed
   if (typeof Collection !== 'undefined') Collection.record(card);
 
+  // Player progression — releasing a critter into the world feeds Presence.
+  if (typeof Player !== 'undefined') Player.gainXP('presence', 12);
+
   // Flock o' Sheep — releases a small flock (several sheep) instead of one.
+  // The flock size scales with the Presence attribute (PlayerMods.flockCount).
   if (card.flock) {
     if (typeof CLIENT_ID !== 'undefined') {
-      for (let n = 0; n < 3; n++) send(`spawn_small_cube|${CLIENT_ID}|critter`);
+      const flockN = (window.PlayerMods && window.PlayerMods.flockCount) || 3;
+      for (let n = 0; n < flockN; n++) send(`spawn_small_cube|${CLIENT_ID}|critter`);
     }
     resetToPackScreen();
     return;
