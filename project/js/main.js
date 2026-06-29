@@ -537,6 +537,9 @@ function submitPlayerName() {
     tag.style.color     = playerColor;
     tag.style.display   = 'block';
   }
+  // Reveal the persistent LV badge above the tag + make the tag open the stats
+  // window, both tinted to the player's colour.
+  if (typeof Player !== 'undefined' && Player.reveal) Player.reveal(playerColor);
   document.getElementById('screen-name').classList.add('hidden');
   document.getElementById('screen-pack').classList.remove('hidden');
 }
