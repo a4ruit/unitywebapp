@@ -52,6 +52,17 @@ const Announce = (() => {
       _onBossSpawned(maxHP, spawnId, colorHex, name);
       return true;
     }
+    // Late-join sync: Unity replies with this when a client says hello while a boss
+    // is already alive. Restores the live HP bar WITHOUT replaying the spawn banner
+    // — a player who just joined shouldn't be told the boss "has manifested" when
+    // the fight has been underway for minutes.
+    if (msg.startsWith('boss_state|')) {
+      const p   = msg.split('|');
+      const hp  = parseInt(p[1]);
+      const max = parseInt(p[2]);
+      _onBossStateSync(hp, max);
+      return true;
+    }
     if (msg.startsWith('boss_damaged|')) {
       const p   = msg.split('|');
       const hp  = parseInt(p[2]);
@@ -152,6 +163,22 @@ const Announce = (() => {
       // When the banner retracts, drop the compact live HP bar into place.
       onDismiss: () => { if (_bossActive) _showHud(); },
     });
+  }
+
+  // Silent restore of the live HP bar for a client that joined mid-fight.
+  // Deliberately does NOT enqueue a banner — see the boss_state note above.
+  function _onBossStateSync(hp, max) {
+    if (isNaN(hp) || isNaN(max) || max <= 0 || hp <= 0) {
+      // No live boss (or a malformed sync) — make sure no stale bar is showing.
+      _bossActive = false;
+      _hideHud();
+      return;
+    }
+    _bossActive = true;
+    _bossMaxHP  = max;
+    _bossHP     = Math.max(0, hp);
+    _setHudData();
+    _showHud();
   }
 
   function _onBossDamaged(hp, max) {
