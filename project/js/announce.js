@@ -70,6 +70,15 @@ const Announce = (() => {
       _onBossDamaged(hp, max);
       return true;
     }
+    // Glitchlings channelling health back into the boss. Same payload shape as
+    // boss_damaged — the bar just goes up instead of down.
+    if (msg.startsWith('boss_healed|')) {
+      const p   = msg.split('|');
+      const hp  = parseInt(p[2]);
+      const max = parseInt(p[3]);
+      _onBossDamaged(hp, max);   // pure HP-bar sync; direction doesn't matter here
+      return true;
+    }
     if (msg === 'boss_slain' || msg.startsWith('boss_slain|')) {
       _onBossSlain();
       return true;
