@@ -71,12 +71,13 @@ const Announce = (() => {
       return true;
     }
     // Glitchlings channelling health back into the boss. Same payload shape as
-    // boss_damaged — the bar just goes up instead of down.
+    // boss_damaged, but it gets its own visual treatment — see _onBossHealed.
     if (msg.startsWith('boss_healed|')) {
-      const p   = msg.split('|');
-      const hp  = parseInt(p[2]);
-      const max = parseInt(p[3]);
-      _onBossDamaged(hp, max);   // pure HP-bar sync; direction doesn't matter here
+      const p      = msg.split('|');
+      const amount = parseInt(p[1]);
+      const hp     = parseInt(p[2]);
+      const max    = parseInt(p[3]);
+      _onBossHealed(amount, hp, max);
       return true;
     }
     if (msg === 'boss_slain' || msg.startsWith('boss_slain|')) {
@@ -194,6 +195,42 @@ const Announce = (() => {
     if (!isNaN(max) && max > 0) _bossMaxHP = max;
     if (!isNaN(hp)) _bossHP = Math.max(0, hp);
     _updateHud();
+  }
+
+  // Boss regained HP. Beyond syncing the bar this needs to READ as healing —
+  // otherwise players just see the bar creep up with no explanation. White-hot
+  // flash on the fill + a green rim on the HUD + a floating "+N", mirroring the
+  // in-world green heal numbers Unity pops above the boss itself.
+  function _onBossHealed(amount, hp, max) {
+    _onBossDamaged(hp, max);      // shared HP-bar sync (direction-agnostic)
+
+    const fill = _el('bossHudFill');
+    const hud  = _el('bossHud');
+
+    // Restart the animations even if a previous heal is still playing — without
+    // the reflow the class is already present and the animation won't re-fire.
+    if (fill) {
+      fill.classList.remove('boss-hud-fill--heal');
+      void fill.offsetWidth;
+      fill.classList.add('boss-hud-fill--heal');
+    }
+    if (hud) {
+      hud.classList.remove('boss-hud--heal');
+      void hud.offsetWidth;
+      hud.classList.add('boss-hud--heal');
+    }
+
+    // Floating "+N" tick — self-removing so ticks can't accumulate in the DOM.
+    if (hud && !isNaN(amount) && amount > 0) {
+      const tick = document.createElement('span');
+      tick.className   = 'boss-heal-tick';
+      tick.textContent = `+${amount}`;
+      hud.appendChild(tick);
+      tick.addEventListener('animationend', () => tick.remove(), { once: true });
+      // Belt-and-braces: if the animationend event is missed (tab backgrounded
+      // mid-animation), still clean up.
+      setTimeout(() => tick.remove(), 1600);
+    }
   }
 
   function _onBossSlain() {
