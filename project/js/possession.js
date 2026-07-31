@@ -97,7 +97,11 @@ let _placing        = false;  // true while user is moving a placement preview
 const TAP_PLACE_CARDS = ['thornwire'];
 let _placeCardType  = '';     // cardType of the active placement session
 let _placeTapMode   = false;  // true when the active card uses tap-to-drop
-let _placeTapSent   = false;  // one drop per session — ignore double-taps
+// Charges available this session. Unity is authoritative and sends the count on
+// placement_granted; the common Thornwire is 1, but the whole path is written
+// for N so multi-charge cards need no rework later.
+let _placeAmmoTotal = 1;
+let _placeAmmoLeft  = 1;
 let _placePos       = null;   // {x,y} 0..1 normalized preview pos for the mini-map
 let _placementInputInterval = null;
 // Duration of the current possession session — captured at _onGranted time so
@@ -361,9 +365,13 @@ function handlePossessionMessage(data) {
   // ── Placement lifecycle ──────────────────────────────────────────────────
   if (msg.startsWith('placement_granted|')) {
     const parts = msg.split('|');     // [1]=clientId [2]=duration [3]=cardName
-    // parts: [1]=clientId [2]=duration [3]=cardName [4]=cardType (optional —
-    // older Unity builds omit it, in which case we fall back to joystick mode)
-    if (parts[1] === CLIENT_ID) { _onPlacementGranted(parts[3], parts[4]); return true; }
+    // parts: [1]=clientId [2]=duration [3]=cardName [4]=cardType [5]=ammo
+    // (4 and 5 are optional — older Unity builds omit them, in which case we
+    // fall back to joystick mode with a single charge)
+    if (parts[1] === CLIENT_ID) {
+      _onPlacementGranted(parts[3], parts[4], parts[5]);
+      return true;
+    }
   }
   if (msg.startsWith('placement_denied|')) {
     const parts = msg.split('|');
@@ -1140,6 +1148,61 @@ function _buildUI() {
       line-height: 1.4;
       padding-top: 4%;
     }
+    /* ── Tap-to-drop placement (thornwire) ──────────────────────────────────
+       The map IS the control here, so it needs to be as big and legible as the
+       fungi spore interface. With the joystick and PLACE button hidden there's
+       free vertical space, so the card widens and the map fills it.          */
+    #poss-place-overlay.place-tap #poss-place-card {
+      width: min(94vw, 420px);
+    }
+    #poss-place-overlay.place-tap #poss-place-minimap {
+      height: 74%;
+      max-height: none;
+      border-color: rgba(255,176,48,0.6);
+      box-shadow: 0 0 10px rgba(255,176,48,0.25), inset 0 0 10px rgba(0,0,0,0.5);
+      cursor: crosshair;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Controls row collapses so it doesn't reserve space for hidden buttons */
+    #poss-place-overlay.place-tap #poss-place-controls { display: none; }
+
+    /* ── Ammo pips ──────────────────────────────────────────────────────────
+       One circle per charge. Filled = still available, hollow = spent. Hidden
+       entirely outside tap mode, since steered cards aren't charge-based.   */
+    #poss-place-ammo { display: none; }
+    #poss-place-overlay.place-tap #poss-place-ammo {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      margin-top: 2px;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 200, 120, 0.9);
+    }
+    .poss-ammo-pip {
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      box-sizing: border-box;
+      border: 2px solid rgba(255, 176, 48, 0.85);
+      background: #ffb030;
+      box-shadow: 0 0 7px rgba(255, 176, 48, 0.65);
+      transition: background 0.18s steps(3), box-shadow 0.18s steps(3);
+    }
+    /* Spent — hollow ring, no glow */
+    .poss-ammo-pip.spent {
+      background: transparent;
+      border-color: rgba(255, 176, 48, 0.35);
+      box-shadow: none;
+    }
+    .poss-ammo-label { opacity: 0.75; }
+
     /* ── Placement mini-map — live top-down with an X tracking the preview ── */
     #poss-place-minimap {
       width: auto;
@@ -1627,7 +1690,10 @@ function _buildUI() {
         <div id="poss-place-card-content">
           <div id="poss-place-card-header">WILDFLOWER<br>PLACEMENT</div>
           <!-- live mini-map of the Unity world; X tracks the preview in real time -->
-          <canvas id="poss-place-minimap" width="108" height="148"></canvas>
+          <canvas id="poss-place-minimap" width="162" height="222"></canvas>
+          <!-- ammo pips — one circle per charge; filled = available, hollow = spent.
+               Only shown for tap-to-drop cards, which are the ones with charges. -->
+          <div id="poss-place-ammo"></div>
           <!-- nudge the player to look up at the projection while they steer -->
           <div id="poss-place-hint">▲ look up at installation screen</div>
           <!-- controls row: joystick appended LEFT, PLACE button appended RIGHT -->
@@ -1687,6 +1753,7 @@ function _buildUI() {
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
     placeMinimap:     root.querySelector('#poss-place-minimap'),
     placeHint:        root.querySelector('#poss-place-hint'),
+    placeAmmo:        root.querySelector('#poss-place-ammo'),
     placeControls:    root.querySelector('#poss-place-controls'),
     blockOverlay:     root.querySelector('#poss-block-overlay'),
     // Fungi spore-paint panel
@@ -2303,13 +2370,19 @@ function _drawSporeMinimap() {
   }
 }
 
-function _onPlacementGranted(cardName, cardType) {
+function _onPlacementGranted(cardName, cardType, ammo) {
   _placing = true;
   _placePos = { x: 0.5, y: 0.5 };   // start centred until Unity sends the first pos
   _placeCardType = (cardType || '').toLowerCase();
   // Thornwire is AIMED, not steered: the player taps the map and the charge is
   // dropped there. Everything else uses the joystick + PLACE button.
   _placeTapMode = TAP_PLACE_CARDS.indexOf(_placeCardType) !== -1;
+
+  const parsedAmmo = parseInt(ammo, 10);
+  _placeAmmoTotal  = (isFinite(parsedAmmo) && parsedAmmo > 0) ? parsedAmmo : 1;
+  _placeAmmoLeft   = _placeAmmoTotal;
+  _renderPlaceAmmo();
+
   _drawPlaceMinimap();
 
   // Update the card header dynamically — e.g. "WILDFLOWER PLACEMENT" vs "FLOWER BUSH PLACEMENT"
@@ -2321,6 +2394,8 @@ function _onPlacementGranted(cardName, cardType) {
   if (_placeTapMode) {
     // Tap-to-drop: the map IS the control, so the joystick and PLACE button
     // would only be dead weight. Hide them and arm the minimap for taps.
+    // The .place-tap class enlarges the card + map to spore-panel legibility.
+    _ui.placeOverlay.classList.add('place-tap');
     _ui.joyZone.style.display = 'none';
     _ui.place.style.display   = 'none';
     if (_ui.placeMinimap) {
@@ -2329,6 +2404,7 @@ function _onPlacementGranted(cardName, cardType) {
     }
     if (_ui.placeHint) _ui.placeHint.textContent = '✛ tap the map to drop';
   } else {
+    _ui.placeOverlay.classList.remove('place-tap');
     // Move joystick (left) + PLACE button (right) into the controls row so
     // they sit side-by-side Game Boy-style inside the framed placement modal.
     // They retain all existing event listeners after the DOM move.
@@ -2373,13 +2449,15 @@ function _onPlacementDone() {
   _placing = false;
   _placePos = null;
   // Re-arm tap mode for the next session and disarm the map.
-  _placeTapSent  = false;
-  _placeTapMode  = false;
-  _placeCardType = '';
+  _placeTapMode   = false;
+  _placeCardType  = '';
+  _placeAmmoTotal = 1;
+  _placeAmmoLeft  = 1;
   if (_ui && _ui.placeMinimap) {
     _ui.placeMinimap.style.cursor        = '';
     _ui.placeMinimap.style.pointerEvents = '';
   }
+  if (_ui && _ui.placeOverlay) _ui.placeOverlay.classList.remove('place-tap');
   clearInterval(_placementInputInterval);
   _placementInputInterval = null;
   _joyX = 0; _joyY = 0;
@@ -2438,12 +2516,29 @@ function _onFungiSporeReady(budget, worldW, worldH, mushNx, mushNz) {
   console.log('[possession.js] Fungi placed — spore-paint panel shown (budget:', _sporeBudget + ' units)');
 }
 
+// Draw one pip per charge — filled while available, hollow once spent. Built
+// from N so a future multi-charge card renders correctly with no changes.
+function _renderPlaceAmmo() {
+  const el = _ui && _ui.placeAmmo;
+  if (!el) return;
+
+  let html = '';
+  for (let i = 0; i < _placeAmmoTotal; i++) {
+    const spent = i >= _placeAmmoLeft;
+    html += `<span class="poss-ammo-pip${spent ? ' spent' : ''}"></span>`;
+  }
+  html += `<span class="poss-ammo-label">x${_placeAmmoLeft}</span>`;
+  el.innerHTML = html;
+}
+
 // ── Tap-to-drop placement (thornwire) ───────────────────────────────────────
 // Converts a tap anywhere on the placement minimap into a world drop point and
 // commits it immediately. One gesture = aim + confirm, which suits a thrown
 // charge far better than steering it there with a stick.
 function _placeMinimapTap(e) {
-  if (!_placing || !_placeTapMode || _placeTapSent) return;
+  // Ammo IS the tap gate — this also covers the old one-drop-per-session rule,
+  // since the common thornwire grants exactly one charge.
+  if (!_placing || !_placeTapMode || _placeAmmoLeft <= 0) return;
   e.preventDefault();
 
   const cv = _ui && _ui.placeMinimap;
@@ -2458,10 +2553,12 @@ function _placeMinimapTap(e) {
   const py = (src.clientY - r.top)  * (cv.height / r.height);
   const n  = _mapXYToNorm(px, py, cv.width, cv.height);
 
-  _placeTapSent = true;
+  // Spend a charge and empty its pip immediately — waiting on Unity would put
+  // the feedback a round-trip behind the gesture.
+  _placeAmmoLeft = Math.max(0, _placeAmmoLeft - 1);
+  _renderPlaceAmmo();
 
-  // Show the marker where they tapped straight away — Unity's placement_pos
-  // echo would otherwise be a round-trip behind the gesture.
+  // Same for the marker position.
   _placePos = { x: n.x, y: n.y };
   _drawPlaceMinimap();
 
