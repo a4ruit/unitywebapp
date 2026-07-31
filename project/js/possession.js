@@ -385,8 +385,13 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('placement_pos|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) {
-      _placePos = { x: parseFloat(parts[2]), y: parseFloat(parts[3]) };
-      _drawPlaceMinimap();
+      // Ignored in tap mode: Unity streams the hovering preview's position, but
+      // the player never steered it there, so echoing it would plant a marker on
+      // a spot they didn't choose. In tap mode the marker comes from the tap.
+      if (!_placeTapMode) {
+        _placePos = { x: parseFloat(parts[2]), y: parseFloat(parts[3]) };
+        _drawPlaceMinimap();
+      }
       return true;
     }
   }
@@ -2314,19 +2319,69 @@ function _drawPlaceMinimap() {
   const W = cv.width, H = cv.height;
   _drawMapBase(ctx, W, H);
 
-  // ── Live X marker — teal, glowing. Orientation via MINIMAP_ORIENT. ──
-  if (_placePos) {
-    const { px, py } = _normToMapXY(_placePos.x, _placePos.y, W, H);
+  if (!_placePos) return;
+
+  const { px, py } = _normToMapXY(_placePos.x, _placePos.y, W, H);
+  const cx = Math.round(px), cy = Math.round(py);
+
+  if (_placeTapMode) {
+    // ── Tap mode: impact marker at the chosen drop point ──
+    // Only drawn AFTER a tap. Before that there's nothing being steered, so a
+    // marker sitting in the middle of the map would be meaningless — the player
+    // would be looking at a position they never chose.
     ctx.save();
-    ctx.shadowColor = 'rgba(0,224,200,0.9)';
-    ctx.shadowBlur = 6;
-    ctx.fillStyle = '#3effe0';
-    for (let i = -3; i <= 3; i++) {
-      ctx.fillRect(Math.round(px) + i, Math.round(py) + i, 2, 2);
-      ctx.fillRect(Math.round(px) + i, Math.round(py) - i, 2, 2);
-    }
+    ctx.strokeStyle = '#ffb030';
+    ctx.shadowColor = 'rgba(255,176,48,0.9)';
+    ctx.shadowBlur  = 7;
+    ctx.lineWidth   = 2;
+    // Target reticle — a ring with tick marks, unmistakably "impact here"
+    ctx.beginPath();
+    ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - 11, cy); ctx.lineTo(cx - 4, cy);
+    ctx.moveTo(cx + 4,  cy); ctx.lineTo(cx + 11, cy);
+    ctx.moveTo(cx, cy - 11); ctx.lineTo(cx, cy - 4);
+    ctx.moveTo(cx, cy + 4);  ctx.lineTo(cx, cy + 11);
+    ctx.stroke();
+    ctx.fillStyle = '#ffb030';
+    ctx.fillRect(cx - 1, cy - 1, 2, 2);
     ctx.restore();
+    _drawMapMarkerLabel(ctx, 'DROP', cx, cy, W, '#ffd28a');
+    return;
   }
+
+  // ── Joystick mode: live X tracking the object you're steering ──
+  // Labelled so it's clear the marker IS the thing under your control, rather
+  // than an unexplained X on a map.
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,224,200,0.9)';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = '#3effe0';
+  for (let i = -3; i <= 3; i++) {
+    ctx.fillRect(cx + i, cy + i, 2, 2);
+    ctx.fillRect(cx + i, cy - i, 2, 2);
+  }
+  ctx.restore();
+  _drawMapMarkerLabel(ctx, 'YOU', cx, cy, W, '#8ffff0');
+}
+
+// Small caption above a minimap marker, clamped so it can't run off the edges.
+function _drawMapMarkerLabel(ctx, text, cx, cy, W, colour) {
+  ctx.save();
+  ctx.font         = 'bold 10px "Pixelify Sans", monospace';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'bottom';
+  const half = ctx.measureText(text).width / 2 + 2;
+  const x    = Math.max(half, Math.min(W - half, cx));
+  const y    = Math.max(12, cy - 12);
+  ctx.fillStyle   = 'rgba(0,0,0,0.75)';
+  ctx.fillText(text, x + 1, y + 1);
+  ctx.shadowColor = colour;
+  ctx.shadowBlur  = 5;
+  ctx.fillStyle   = colour;
+  ctx.fillText(text, x, y);
+  ctx.restore();
 }
 
 // Draw the spore-paint mini-map: site-plan base + the mushroom marker + the
@@ -2372,11 +2427,13 @@ function _drawSporeMinimap() {
 
 function _onPlacementGranted(cardName, cardType, ammo) {
   _placing = true;
-  _placePos = { x: 0.5, y: 0.5 };   // start centred until Unity sends the first pos
   _placeCardType = (cardType || '').toLowerCase();
   // Thornwire is AIMED, not steered: the player taps the map and the charge is
   // dropped there. Everything else uses the joystick + PLACE button.
   _placeTapMode = TAP_PLACE_CARDS.indexOf(_placeCardType) !== -1;
+  // Tap mode starts with NO marker — one only appears where the player taps.
+  // Steered cards start centred until Unity sends the first real position.
+  _placePos = _placeTapMode ? null : { x: 0.5, y: 0.5 };
 
   const parsedAmmo = parseInt(ammo, 10);
   _placeAmmoTotal  = (isFinite(parsedAmmo) && parsedAmmo > 0) ? parsedAmmo : 1;
