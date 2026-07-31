@@ -92,6 +92,12 @@ let _ui             = null;   // DOM refs, built once on load
 let _peerConnection = null;   // RTCPeerConnection for the sheep-cam video stream
 let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDescription
 let _placing        = false;  // true while user is moving a placement preview
+// Cards that are AIMED by tapping the minimap rather than steered with the
+// joystick. The tap sets the drop point directly and commits it in one gesture.
+const TAP_PLACE_CARDS = ['thornwire'];
+let _placeCardType  = '';     // cardType of the active placement session
+let _placeTapMode   = false;  // true when the active card uses tap-to-drop
+let _placeTapSent   = false;  // one drop per session — ignore double-taps
 let _placePos       = null;   // {x,y} 0..1 normalized preview pos for the mini-map
 let _placementInputInterval = null;
 // Duration of the current possession session — captured at _onGranted time so
@@ -355,7 +361,9 @@ function handlePossessionMessage(data) {
   // ── Placement lifecycle ──────────────────────────────────────────────────
   if (msg.startsWith('placement_granted|')) {
     const parts = msg.split('|');     // [1]=clientId [2]=duration [3]=cardName
-    if (parts[1] === CLIENT_ID) { _onPlacementGranted(parts[3]); return true; }
+    // parts: [1]=clientId [2]=duration [3]=cardName [4]=cardType (optional —
+    // older Unity builds omit it, in which case we fall back to joystick mode)
+    if (parts[1] === CLIENT_ID) { _onPlacementGranted(parts[3], parts[4]); return true; }
   }
   if (msg.startsWith('placement_denied|')) {
     const parts = msg.split('|');
@@ -1678,6 +1686,7 @@ function _buildUI() {
     placeCardContent: root.querySelector('#poss-place-card-content'),
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
     placeMinimap:     root.querySelector('#poss-place-minimap'),
+    placeHint:        root.querySelector('#poss-place-hint'),
     placeControls:    root.querySelector('#poss-place-controls'),
     blockOverlay:     root.querySelector('#poss-block-overlay'),
     // Fungi spore-paint panel
@@ -1712,6 +1721,14 @@ function _buildUI() {
   _ui.sporeMinimap.addEventListener('pointerdown', _sporePointerDown);
   window.addEventListener('pointermove', _sporePointerMove);
   window.addEventListener('pointerup',   _sporePointerUp);
+  // Placement minimap — tap-to-drop for aimed cards (thornwire). The handler
+  // no-ops unless the active session is in tap mode, so joystick cards are
+  // unaffected by these listeners always being attached.
+  if (_ui.placeMinimap) {
+    _ui.placeMinimap.addEventListener('pointerdown', _placeMinimapTap);
+    _ui.placeMinimap.addEventListener('touchend',
+      e => { e.preventDefault(); _placeMinimapTap(e); }, { passive: false });
+  }
   _setupJoystick();
 
   // Hide all Inhabit buttons until the matching creature has been pulled.
@@ -2286,9 +2303,13 @@ function _drawSporeMinimap() {
   }
 }
 
-function _onPlacementGranted(cardName) {
+function _onPlacementGranted(cardName, cardType) {
   _placing = true;
   _placePos = { x: 0.5, y: 0.5 };   // start centred until Unity sends the first pos
+  _placeCardType = (cardType || '').toLowerCase();
+  // Thornwire is AIMED, not steered: the player taps the map and the charge is
+  // dropped there. Everything else uses the joystick + PLACE button.
+  _placeTapMode = TAP_PLACE_CARDS.indexOf(_placeCardType) !== -1;
   _drawPlaceMinimap();
 
   // Update the card header dynamically — e.g. "WILDFLOWER PLACEMENT" vs "FLOWER BUSH PLACEMENT"
@@ -2297,14 +2318,27 @@ function _onPlacementGranted(cardName) {
     _ui.placeCardHeader.innerHTML = label + '<br>PLACEMENT';
   }
 
-  // Move joystick (left) + PLACE button (right) into the controls row so
-  // they sit side-by-side Game Boy-style inside the framed placement modal.
-  // They retain all existing event listeners after the DOM move.
-  const _placeTarget = _ui.placeControls || _ui.placeCardContent;
-  _placeTarget.appendChild(_ui.joyZone);
-  _placeTarget.appendChild(_ui.place);
-  _ui.joyZone.style.display = 'flex';
-  _ui.place.style.display   = 'flex';
+  if (_placeTapMode) {
+    // Tap-to-drop: the map IS the control, so the joystick and PLACE button
+    // would only be dead weight. Hide them and arm the minimap for taps.
+    _ui.joyZone.style.display = 'none';
+    _ui.place.style.display   = 'none';
+    if (_ui.placeMinimap) {
+      _ui.placeMinimap.style.cursor        = 'crosshair';
+      _ui.placeMinimap.style.pointerEvents = 'auto';
+    }
+    if (_ui.placeHint) _ui.placeHint.textContent = '✛ tap the map to drop';
+  } else {
+    // Move joystick (left) + PLACE button (right) into the controls row so
+    // they sit side-by-side Game Boy-style inside the framed placement modal.
+    // They retain all existing event listeners after the DOM move.
+    const _placeTarget = _ui.placeControls || _ui.placeCardContent;
+    _placeTarget.appendChild(_ui.joyZone);
+    _placeTarget.appendChild(_ui.place);
+    _ui.joyZone.style.display = 'flex';
+    _ui.place.style.display   = 'flex';
+    if (_ui.placeHint) _ui.placeHint.textContent = '▲ look up at installation screen';
+  }
 
   // Show the overlay — pointer-events:all means the entire background
   // (pack carousel, shop, stars, everything) is now uninteractable
@@ -2314,15 +2348,18 @@ function _onPlacementGranted(cardName) {
   // Hide the inhabit button while placing
   _ui.btn.classList.add('poss-hidden');
 
-  // Stream joystick to Unity as placement_move at up to 20 fps — gated by
-  // the dirty-flag helpers so idle ticks don't waste WS bandwidth.
-  _resetInputSendTracking();  // first tick always fires
-  _placementInputInterval = setInterval(() => {
-    if (_shouldSendInput()) {
-      send(`placement_move|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
-      _markInputSent();
-    }
-  }, 50);
+  // Joystick streaming is pointless in tap mode — there's no stick to read.
+  if (!_placeTapMode) {
+    // Stream joystick to Unity as placement_move at up to 20 fps — gated by
+    // the dirty-flag helpers so idle ticks don't waste WS bandwidth.
+    _resetInputSendTracking();  // first tick always fires
+    _placementInputInterval = setInterval(() => {
+      if (_shouldSendInput()) {
+        send(`placement_move|${CLIENT_ID}|${_joyX.toFixed(3)}|${_joyY.toFixed(3)}`);
+        _markInputSent();
+      }
+    }, 50);
+  }
 
   console.log('[possession.js] Placement started — UI modal active, background blocked');
 }
@@ -2335,6 +2372,14 @@ function _onPlacementDenied() {
 function _onPlacementDone() {
   _placing = false;
   _placePos = null;
+  // Re-arm tap mode for the next session and disarm the map.
+  _placeTapSent  = false;
+  _placeTapMode  = false;
+  _placeCardType = '';
+  if (_ui && _ui.placeMinimap) {
+    _ui.placeMinimap.style.cursor        = '';
+    _ui.placeMinimap.style.pointerEvents = '';
+  }
   clearInterval(_placementInputInterval);
   _placementInputInterval = null;
   _joyX = 0; _joyY = 0;
@@ -2391,6 +2436,38 @@ function _onFungiSporeReady(budget, worldW, worldH, mushNx, mushNz) {
   _drawSporeMinimap();
 
   console.log('[possession.js] Fungi placed — spore-paint panel shown (budget:', _sporeBudget + ' units)');
+}
+
+// ── Tap-to-drop placement (thornwire) ───────────────────────────────────────
+// Converts a tap anywhere on the placement minimap into a world drop point and
+// commits it immediately. One gesture = aim + confirm, which suits a thrown
+// charge far better than steering it there with a stick.
+function _placeMinimapTap(e) {
+  if (!_placing || !_placeTapMode || _placeTapSent) return;
+  e.preventDefault();
+
+  const cv = _ui && _ui.placeMinimap;
+  if (!cv) return;
+
+  const r  = cv.getBoundingClientRect();
+  // touchend carries coords on changedTouches rather than the event itself.
+  const src = (e.changedTouches && e.changedTouches[0]) || e;
+  if (src.clientX === undefined) return;
+
+  const px = (src.clientX - r.left) * (cv.width  / r.width);
+  const py = (src.clientY - r.top)  * (cv.height / r.height);
+  const n  = _mapXYToNorm(px, py, cv.width, cv.height);
+
+  _placeTapSent = true;
+
+  // Show the marker where they tapped straight away — Unity's placement_pos
+  // echo would otherwise be a round-trip behind the gesture.
+  _placePos = { x: n.x, y: n.y };
+  _drawPlaceMinimap();
+
+  if (typeof Sound !== 'undefined') Sound.play('place');
+  send(`placement_tap|${CLIENT_ID}|${n.x.toFixed(3)}|${n.y.toFixed(3)}`);
+  console.log('[possession.js] Thornwire drop requested at', n);
 }
 
 // Convert a pointer event to a raw normalized {x,y} world point on the minimap.
