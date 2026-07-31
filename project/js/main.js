@@ -28,7 +28,7 @@ let WS_URL = _wsOverride || WS_PRIMARY;
 
 // ─── NATURE (garbage / pristine) ──────────────────────────────────────────────
 const NATURE_CARDS = [
-  { id:'small_cube', name:'Fallen Leaf',     rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Still green. Give it time.' },
+  { id:'small_cube', name:'Thornwire',       rarity:'common',          rarityRank:0, command:'spawn_small_cube', placement:'thornwire', desc:'Barbed and coiled. It only defends.' },
   { id:'large_cube', name:'Wildflowers',     rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
   { id:'sphere',     name:'Flower Bush',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'In bloom. Spreading beyond the path.' },
   { id:'triangle',   name:'Ancient Yew',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   placement:'ancientyew', desc:'It watched the forest grow. It will watch it fall.' },
