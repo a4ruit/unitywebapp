@@ -49,6 +49,10 @@ const CardTextures = (() => {
     'legendary-alpha':{ border:'#ffffff', emissive:0x101010, emissiveIntensity:0.8,  light:{ color:0xffffff, intensity:4.0, dist:8 } },
   };
 
+  // Label colour for corrupted cards — matches the grey of flesh_card_common.png
+  // rather than the green their 'common' rarity would otherwise give them.
+  const CORRUPTED_LABEL_COLOR = '#9a9a9a';
+
   const ANIMATED = new Set(['mythical','luck-maxxing','legendary-alpha']);
 
   function isAnimated(rarity) { return ANIMATED.has(rarity); }
@@ -77,6 +81,7 @@ const CardTextures = (() => {
   _loadSkin('nature-common',   'assets/common-card.png');
   _loadSkin('nature-uncommon', 'assets/uncommon-card.png');
   _loadSkin('nature-rare',     'assets/epic-card.png');
+  _loadSkin('flesh-common',    'assets/flesh_card_common.png');
   // Custom symbol art — loaded once, reused as the central illustration for
   // its respective card. Add new symbols here as they're made.
   _loadSkin('symbol-leaf',       'assets/leaf-symbol.png');
@@ -2040,8 +2045,14 @@ const CardTextures = (() => {
   function drawLabels(ctx, card, rarity, t, opts = {}) {
     const cfg = getCfg(rarity);
 
+    // opts.labelColor overrides the rarity-derived colour. Used by cards whose
+    // frame doesn't match their rarity tier (e.g. corrupted Fleshlings, which are
+    // rarity 'common' but wear the grey flesh frame instead of the green one).
     let nameColor, rarityColor;
-    if (rarity === 'legendary-alpha') {
+    if (opts.labelColor) {
+      nameColor   = opts.labelColor;
+      rarityColor = `rgba(${hexToRgb(opts.labelColor)},0.7)`;
+    } else if (rarity === 'legendary-alpha') {
       nameColor   = rainbow(t, 30);
       rarityColor = rainbow(t, 90);
     } else {
@@ -2053,11 +2064,28 @@ const CardTextures = (() => {
     // Tweak position/size via LAYOUT.titleBox at the top of this file.
     const { x: tx, y: ty, w: tw, h: th } = LAYOUT.titleBox;
 
-    // Subtle dark backdrop inside the title box so the text reads
-    // independently of whatever the skin painted underneath
-    ctx.fillStyle = 'rgba(10,16,10,0.55)';
-    ctx.fillRect(tx + LAYOUT.titleBevel, ty + LAYOUT.titleBevel,
-                 tw - LAYOUT.titleBevel * 2, th - LAYOUT.titleBevel * 2);
+    // Dark backdrop filling the title box interior so the text reads
+    // independently of whatever the skin painted underneath. Traced as a
+    // bevelled octagon matching the border shape — insetting by the bevel depth
+    // instead would leave a strip far shorter than the text, letting the frame
+    // art show through the top and bottom of every glyph.
+    {
+      const i = LAYOUT.titleBorderThick;
+      const b = LAYOUT.titleBevel;
+      const x0 = tx + i, y0 = ty + i, x1 = tx + tw - i, y1 = ty + th - i;
+      ctx.beginPath();
+      ctx.moveTo(x0 + b, y0);
+      ctx.lineTo(x1 - b, y0);
+      ctx.lineTo(x1,     y0 + b);
+      ctx.lineTo(x1,     y1 - b);
+      ctx.lineTo(x1 - b, y1);
+      ctx.lineTo(x0 + b, y1);
+      ctx.lineTo(x0,     y1 - b);
+      ctx.lineTo(x0,     y0 + b);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(10,16,10,0.88)';
+      ctx.fill();
+    }
 
     drawBeveledBorder(ctx, tx, ty, tw, th, nameColor, LAYOUT.titleBorderThick, LAYOUT.titleBevel);
 
@@ -2066,7 +2094,17 @@ const CardTextures = (() => {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = nameColor;
-    if (rarity !== 'legendary-alpha') { ctx.shadowColor = nameColor; ctx.shadowBlur = 6; }
+    // A soft glow (shadowBlur) reads fine for saturated rarity colours, but a
+    // flat grey glow on the corrupted-card title just breaks into pixelated
+    // noise once the canvas is upscaled — use a crisp dark outline there instead.
+    if (opts.labelColor) {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+      const displayNameOutline = card.name;
+      ctx.strokeText(displayNameOutline, 128, ty + th / 2 + 1);
+    } else if (rarity !== 'legendary-alpha') {
+      ctx.shadowColor = nameColor; ctx.shadowBlur = 6;
+    }
     // Render the name exactly as stored — names are already display-ready
     // (Title Case, or styled like "Flock o' Sheep"), so no re-casing.
     const displayName = card.name;
@@ -2085,7 +2123,9 @@ const CardTextures = (() => {
     if (opts.hideFlavor) return;
 
     // Separator line between rarity and description
-    ctx.strokeStyle = `rgba(${rarity === 'legendary-alpha' ? '255,255,255' : hexToRgb(cfg.border)},0.3)`;
+    ctx.strokeStyle = `rgba(${opts.labelColor        ? hexToRgb(opts.labelColor)
+                             : rarity === 'legendary-alpha' ? '255,255,255'
+                             : hexToRgb(cfg.border)},0.3)`;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(LAYOUT.separatorPad,         LAYOUT.separatorY);
@@ -2463,10 +2503,11 @@ const CardTextures = (() => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0,0,256,384);
 
-    // Corrupted card: a normal common-card.png base with a flesh symbol and a
-    // glitchy border — a pristine card with corruption creeping in.
+    // Corrupted card: flesh frame + flesh symbol + glitchy border. Fleshlings are
+    // seeded into pristine packs (~60%) as the temptation pull, so this frame has
+    // to read as corrupted in BOTH phases — hence the flesh base, not a nature one.
     if (card.corrupted) {
-      const skin = _cardSkins['nature-common'];   // common-card.png
+      const skin = _cardSkins['flesh-common'];   // flesh_card_common.png
       if (skin && skin.complete && skin.naturalWidth > 0) {
         ctx.drawImage(skin, 0, 0, 256, 384);
       } else {
@@ -2481,7 +2522,7 @@ const CardTextures = (() => {
         const targetW = targetH * (fsym.naturalWidth / fsym.naturalHeight);
         ctx.drawImage(fsym, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
       }
-      drawLabels(ctx, card, card.rarity, t, opts);
+      drawLabels(ctx, card, card.rarity, t, { ...opts, labelColor: CORRUPTED_LABEL_COLOR });
       drawGlitchBorder(ctx, t);
       return canvas;
     }
@@ -2494,9 +2535,13 @@ const CardTextures = (() => {
 
     // ── Card skin override: use PNG base when available ──────────────────────
     const isNature = cardIsNaturePhase();
+    const packType = typeof window !== 'undefined' ? window.activePackType : 'garbage';
+    const isHorror = parseInt(document.body?.dataset?.corruption || '0') >= (window.HORROR_THRESHOLD ?? 15);
+    const isFlesh  = packType === 'garbage' && isHorror;
     let skinKey    = isNature && card.rarity === 'common'   ? 'nature-common'
                    : isNature && card.rarity === 'uncommon' ? 'nature-uncommon'
                    : isNature && card.rarity === 'rare'     ? 'nature-rare'
+                   : isFlesh  && card.rarity === 'common'   ? 'flesh-common'
                    : null;
     // White Mushroom (fungi common) and Sheep (critter common) reuse the
     // common-card.png background ('nature-common' skin); Duck (critter uncommon)
