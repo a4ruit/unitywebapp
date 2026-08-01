@@ -38,6 +38,10 @@ const Combo = (() => {
     spiky_sheep: 'SPIKY SHEEP',
   };
 
+  // Pixel-art card frame for earned synergy cards — violet, since that's the
+  // colour reserved for a landed combo (nature blue + critter pink).
+  const COMBO_FRAME = 'assets/combo_card_violet.png';
+
   let _active   = null;   // { comboId, primerId, primerName, colorHex, needCard, endsAt, windowSecs }
   let _rafId    = null;
   let _flashT   = null;
@@ -264,10 +268,16 @@ const Combo = (() => {
       return;
     }
 
+    // Built like the game's other cards: a dark art window with the frame PNG
+    // laid over it, so the pixel border sits ON the card edge rather than the
+    // content being boxed inside a plain rectangle.
     tray.innerHTML = _earned.map((c, i) =>
       `<button class="combo-card" data-idx="${i}" title="${_esc(c.label)}">` +
-        `<span class="combo-card-sym">✦</span>` +
-        `<span class="combo-card-label">${_esc(c.label)}</span>` +
+        `<span class="combo-card-window">` +
+          `<span class="combo-card-sym">✦</span>` +
+          `<span class="combo-card-label">${_esc(c.label)}</span>` +
+        `</span>` +
+        `<img class="combo-card-frame" src="${COMBO_FRAME}" alt="">` +
       `</button>`
     ).join('');
     tray.classList.add('combo-tray--open');
@@ -285,8 +295,15 @@ const Combo = (() => {
 
     modal.innerHTML =
       `<div class="combo-prompt-card">` +
-        `<div class="combo-prompt-sym">✦</div>` +
-        `<div class="combo-prompt-title">${_esc(card.label)}</div>` +
+        // The actual card, shown large — the player should see the thing they're
+        // about to spend, not just read its name.
+        `<div class="combo-prompt-art">` +
+          `<span class="combo-card-window">` +
+            `<span class="combo-prompt-sym">✦</span>` +
+            `<span class="combo-prompt-title">${_esc(card.label)}</span>` +
+          `</span>` +
+          `<img class="combo-card-frame" src="${COMBO_FRAME}" alt="">` +
+        `</div>` +
         `<div class="combo-prompt-sub">` +
           (card.withName ? `forged with &lt;${_esc(card.withName)}&gt;` : 'ability card') +
         `</div>` +

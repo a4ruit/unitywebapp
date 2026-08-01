@@ -3672,30 +3672,53 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 }
 .combo-tray--open { display: flex; }
 
+/* Built like the game's other cards: a dark art window with the pixel frame PNG
+   laid OVER it, so the border decoration sits on the card's edge. */
 .combo-card {
   pointer-events: auto;
-  width: 46px;
-  padding: 5px 3px 4px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
+  position: relative;
+  width: 52px;
+  aspect-ratio: 2 / 3;          /* matches combo_card_violet.png */
+  padding: 0;
+  background: none;
+  border: none;
   cursor: pointer;
   font-family: 'Pixelify Sans', 'lo-res', sans-serif;
   color: #e8d5ff;
-  background: linear-gradient(160deg, rgba(48, 22, 74, 0.97), rgba(24, 12, 40, 0.97));
-  border: 2px solid rgba(200, 150, 255, 0.9);
-  border-radius: 5px;
-  box-shadow: 0 0 12px -2px rgba(190, 130, 255, 0.8);
+  filter: drop-shadow(0 0 7px rgba(190, 130, 255, 0.75));
   animation: comboCardIdle 2.4s steps(4) infinite;
   -webkit-tap-highlight-color: transparent;
 }
 .combo-card:active { transform: scale(0.94); }
-.combo-card-sym   { font-size: 17px; text-shadow: 0 0 8px rgba(220, 160, 255, 0.95); }
-.combo-card-label { font-size: 6px; letter-spacing: 0.04em; line-height: 1.1; text-align: center; opacity: 0.85; }
+
+/* Art window — inset so it sits inside the frame's visible border */
+.combo-card-window {
+  position: absolute;
+  inset: 9%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  background: linear-gradient(160deg, rgba(48, 22, 74, 0.97), rgba(20, 10, 34, 0.97));
+  border-radius: 2px;
+}
+/* Frame LAST so it draws on top of the window */
+.combo-card-frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.combo-card-sym   { font-size: 16px; line-height: 1; text-shadow: 0 0 8px rgba(220, 160, 255, 0.95); }
+.combo-card-label { font-size: 5.5px; letter-spacing: 0.03em; line-height: 1.15; text-align: center; opacity: 0.9; padding: 0 2px; }
 @keyframes comboCardIdle {
-  0%, 100% { box-shadow: 0 0 10px -3px rgba(190, 130, 255, 0.7); }
-  50%      { box-shadow: 0 0 16px -1px rgba(210, 160, 255, 1); }
+  0%, 100% { filter: drop-shadow(0 0 6px rgba(190, 130, 255, 0.6)); }
+  50%      { filter: drop-shadow(0 0 11px rgba(210, 160, 255, 0.95)); }
 }
 
 /* ── Activate / later prompt ─────────────────────────────────────────────────
@@ -3721,8 +3744,16 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   border-radius: 12px;
   box-shadow: 0 0 28px -4px rgba(190, 130, 255, 0.75);
 }
-.combo-prompt-sym   { font-size: 34px; color: #e8ccff; text-shadow: 0 0 14px rgba(210, 150, 255, 0.95); }
-.combo-prompt-title { font-size: 16px; letter-spacing: 0.12em; color: #f0dcff; margin-top: 4px; }
+/* The card itself, shown large — the player should see what they're spending */
+.combo-prompt-art {
+  position: relative;
+  width: 118px;
+  aspect-ratio: 2 / 3;
+  margin: 0 auto 12px;
+  filter: drop-shadow(0 0 12px rgba(190, 130, 255, 0.8));
+}
+.combo-prompt-sym   { font-size: 40px; line-height: 1; color: #e8ccff; text-shadow: 0 0 14px rgba(210, 150, 255, 0.95); }
+.combo-prompt-title { font-size: 11px; letter-spacing: 0.1em; color: #f0dcff; margin-top: 6px; text-align: center; padding: 0 6px; }
 .combo-prompt-sub   { font-size: 10px; letter-spacing: 0.06em; color: rgba(220, 200, 255, 0.7); margin-bottom: 16px; }
 .combo-prompt-btn {
   display: block;
