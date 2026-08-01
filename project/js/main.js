@@ -362,6 +362,10 @@ let isGodPack = false;
 // exactly ONE holo, placed on a randomly chosen rarity present in the pack
 // (one per pack, one per rarity category).
 const HOLO_PACK_CHANCE = 0.40;
+// How much likelier a COMMON is to receive the pack's holo than any other rarity.
+// Tuned so a prismatic Thornwire (3 charges instead of 1) lands about 1 pack in
+// 3.5 — see the holo roll at the end of rollPack(). 1 = uniform across rarities.
+const HOLO_COMMON_WEIGHT = 4.0;
 
 function rollPack() {
   const cards = [];
@@ -402,23 +406,6 @@ function rollPack() {
   cards.push(pick('uncommon'));
   cards.push(topCard);
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
-  // Holographic finish roll — critter + nature pools. 40% of packs get exactly
-  // one holo, on a randomly chosen rarity present (so the duplicate commons don't
-  // bias it): one per pack, one per rarity category. The variant rides the card
-  // object through the choice grid → dropCard → collection.
-  //
-  // Nature was added so Thornwire can roll PRISMATIC, which is a real mechanical
-  // upgrade rather than just a finish: Unity grants it three charges instead of
-  // one (PlacementManager.thornwirePrismaticAmmo).
-  const _holoPool = getActiveCardPool();
-  if ((_holoPool === CRITTER_CARDS || _holoPool === NATURE_CARDS) &&
-      Math.random() < HOLO_PACK_CHANCE) {
-    const rarities = [...new Set(cards.map(c => c.rarity))];
-    const r        = rarities[Math.floor(Math.random() * rarities.length)];
-    const pool     = cards.filter(c => c.rarity === r);
-    pool[Math.floor(Math.random() * pool.length)].variant = 'holo';
-  }
-
   // Flock o' Sheep — a starlight rare that occasionally replaces a common in a
   // pristine critter pack (keeping the uncommon Duck). Re-sorted below to its
   // rare position, so it appears to the RIGHT of the Duck.
@@ -434,6 +421,35 @@ function rollPack() {
   if (corruptionLevel < HORROR_THRESHOLD && Math.random() < CORRUPTED_CARD_CHANCE) {
     const ci = cards.findIndex(c => c.rarity === 'common');
     if (ci >= 0) cards[ci] = { ...CORRUPTED_FLESHLING };
+  }
+
+  // ── Holographic finish roll — critter + nature pools ────────────────────────
+  // Runs LAST, after the Flock and corrupted injections. It used to run before
+  // them, which silently destroyed prismatic pulls: both injections REPLACE a
+  // common, and Thornwire is the only common in the nature pool, so a 50%
+  // corrupted roll was frequently overwriting the holo that had just been
+  // assigned to it.
+  //
+  // The holo lands on one randomly chosen rarity present in the pack, but the
+  // draw is WEIGHTED toward commons (HOLO_COMMON_WEIGHT). A prismatic Thornwire
+  // is a genuine mechanical upgrade — three charges instead of one — so it needs
+  // to show up often enough to be part of the game rather than a curiosity.
+  // Injected specials (Flock, corrupted) are excluded: they already have their
+  // own distinct treatment and shouldn't be double-skinned.
+  const _holoPool = getActiveCardPool();
+  if ((_holoPool === CRITTER_CARDS || _holoPool === NATURE_CARDS) &&
+      Math.random() < HOLO_PACK_CHANCE) {
+    const eligible = cards.filter(c => !c.corrupted && !c.flock);
+    const rarities = [...new Set(eligible.map(c => c.rarity))];
+    if (rarities.length) {
+      const weights = rarities.map(r => (r === 'common' ? HOLO_COMMON_WEIGHT : 1));
+      const total   = weights.reduce((a, b) => a + b, 0);
+      let roll = Math.random() * total;
+      let ri = 0;
+      while (ri < rarities.length - 1 && roll >= weights[ri]) { roll -= weights[ri]; ri++; }
+      const pool = eligible.filter(c => c.rarity === rarities[ri]);
+      pool[Math.floor(Math.random() * pool.length)].variant = 'holo';
+    }
   }
 
   // Re-sort so injected specials land in rarity order (the rare Flock o' Sheep
