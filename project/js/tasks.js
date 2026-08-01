@@ -48,6 +48,17 @@ const TaskTracker = (() => {
       count:  0,
       done:   false,
     },
+    {
+      // Cross-player synergy. Deliberately the highest individual reward: it's
+      // the only task that CANNOT be completed alone, so it needs to be worth
+      // approaching a stranger for.
+      id:    'combo',
+      label: 'Combo with another player',
+      reward: 12,
+      goal:   1,
+      count:  0,
+      done:   false,
+    },
   ];
 
   // ── Community task state (driven by WS from Unity's QuestManager) ────────────
@@ -97,6 +108,13 @@ const TaskTracker = (() => {
 
     if (type === 'creature_full_duration') {
       const t = _i('full_possession');
+      if (t && !t.done) { t.count = 1; dirty = true; _maybeComplete(t); }
+    }
+
+    // Fired by combo.js when a cross-player synergy completes and THIS phone was
+    // one of the two participants.
+    if (type === 'combo') {
+      const t = _i('combo');
       if (t && !t.done) { t.count = 1; dirty = true; _maybeComplete(t); }
     }
 

@@ -13,6 +13,9 @@
   <div class="flash-overlay" id="flashOverlay"></div>
   <div class="quest-toast" id="questToast" style="display:none"></div>
 
+  <!-- Synergy ability-card prompt — asks before spending a one-shot co-op reward -->
+  <div class="combo-prompt" id="comboPrompt"></div>
+
   <!-- DEBUG: collapsible dropdown (temporary — remove before production) -->
   <div id="debug-menu">
     <button id="debug-menu-trigger" onclick="debugMenuToggle(event)">⚙</button>
@@ -99,6 +102,9 @@
         <!-- Cross-player combo strip — sits just below the card. Empty until a
              synergy is primed; see js/combo.js. -->
         <div id="comboStrip" class="combo-strip"></div>
+
+        <!-- Earned synergy ability cards — persist for the session until spent -->
+        <div id="comboTray" class="combo-tray"></div>
 
         <!-- Pack type selector -->
         <div class="pack-type-row">

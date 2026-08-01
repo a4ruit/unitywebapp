@@ -22,15 +22,29 @@
 
 const Combo = (() => {
 
-  // Symbol drawn inside the dashed slot as the hint. Keyed by the card Unity
-  // says is needed, so adding a recipe later only needs an entry here.
-  const HINT_ART = {
-    sheep: 'assets/critter-symbol.png',
+  // Art for each half of a recipe. Adding a combo later only needs entries here.
+  const CARD_ART = {
+    thornwire: 'assets/leaf-symbol.png',     // placeholder until the thorn art lands
+    sheep:     'assets/critter-symbol.png',
+  };
+
+  // What each recipe's PRIMING card is, so the strip can show what was actually
+  // played rather than an anonymous box.
+  const RECIPE_PRIMER = {
+    spiky_sheep: 'thornwire',
+  };
+
+  const COMBO_LABEL = {
+    spiky_sheep: 'SPIKY SHEEP',
   };
 
   let _active   = null;   // { comboId, primerId, primerName, colorHex, needCard, endsAt, windowSecs }
   let _rafId    = null;
   let _flashT   = null;
+
+  // Ability cards earned this session and not yet spent. Session-only, matching
+  // stars and the collection — a refresh clears them.
+  let _earned   = [];     // [{ comboId, label, withName, colorHex }]
 
   function _el(id) { return document.getElementById(id); }
 
@@ -54,7 +68,10 @@ const Combo = (() => {
     if (msg.startsWith('combo_complete|')) {
       const p = msg.split('|');
       _onComplete({
+        comboId:       p[1] || '',
+        primerId:      p[2] || '',
         primerName:    p[3] || '',
+        completerId:   p[4] || '',
         completerName: p[5] || '',
         colorHex:      p[6] ? ('#' + p[6].replace('#', '')) : '#c8a0ff',
       });
@@ -78,10 +95,18 @@ const Combo = (() => {
     // Is this MY combo? The primer sees "waiting for someone"; everyone else
     // sees an invitation naming who to help.
     const mine = (typeof CLIENT_ID !== 'undefined') && _active.primerId === CLIENT_ID;
-    const hint = HINT_ART[_active.needCard] || '';
+    const hint = CARD_ART[_active.needCard] || '';
+
+    // Show the card that was actually PLAYED, not an anonymous box — otherwise
+    // the strip states a rule ("something + sheep") without saying what the
+    // something was, which is the part a bystander needs in order to act.
+    const primerCard = RECIPE_PRIMER[_active.comboId] || '';
+    const primerArt  = CARD_ART[primerCard] || '';
 
     strip.innerHTML =
-      `<span class="combo-played"></span>` +
+      `<span class="combo-played">` +
+        (primerArt ? `<img class="combo-played-art" src="${primerArt}" alt="">` : '') +
+      `</span>` +
       `<span class="combo-plus">+</span>` +
       `<span class="combo-slot">` +
         (hint ? `<img class="combo-slot-hint" src="${hint}" alt="">` : `<span class="combo-slot-q">?</span>`) +
@@ -142,6 +167,27 @@ const Combo = (() => {
     _stopTicking();
     _active = null;
 
+    const label = COMBO_LABEL[data.comboId] || 'SYNERGY';
+
+    // Only the two players who actually performed it are rewarded. Everyone else
+    // just sees the announcement — the card is earned, not broadcast loot.
+    const me    = (typeof CLIENT_ID !== 'undefined') ? CLIENT_ID : null;
+    const mine  = me && (data.primerId === me || data.completerId === me);
+    const partner = !me ? '' :
+      (data.primerId === me ? data.completerName : data.primerName);
+
+    if (mine) {
+      _earned.push({
+        comboId:  data.comboId,
+        label,
+        withName: partner,
+        colorHex: data.colorHex,
+      });
+      _renderEarned();
+      if (typeof TaskTracker !== 'undefined' && TaskTracker.recordEvent)
+        TaskTracker.recordEvent('combo');
+    }
+
     const strip = _el('comboStrip');
     if (!strip) return;
 
@@ -152,7 +198,7 @@ const Combo = (() => {
       `<span class="combo-caption combo-caption--done">` +
         `<span class="combo-name">&lt;${_esc(data.primerName)}&gt;</span> + ` +
         `<span class="combo-name">&lt;${_esc(data.completerName)}&gt;</span><br>` +
-        `<b>SPIKY SHEEP</b> forged` +
+        `<b>${_esc(label)}</b> ${mine ? 'earned' : 'forged'}` +
       `</span>`;
     strip.querySelectorAll('.combo-name').forEach(n => { n.style.color = data.colorHex; });
 
@@ -161,6 +207,78 @@ const Combo = (() => {
 
     clearTimeout(_flashT);
     _flashT = setTimeout(_clear, 4000);
+  }
+
+  // ── Earned ability cards ────────────────────────────────────────────────────
+  // Persist for the session beside the combo strip until spent. Tapping one asks
+  // for confirmation rather than firing immediately: it's a one-shot resource,
+  // and an accidental tap that burns a co-op reward would feel awful.
+  function _renderEarned() {
+    const tray = _el('comboTray');
+    if (!tray) return;
+
+    if (!_earned.length) {
+      tray.innerHTML = '';
+      tray.classList.remove('combo-tray--open');
+      return;
+    }
+
+    tray.innerHTML = _earned.map((c, i) =>
+      `<button class="combo-card" data-idx="${i}" title="${_esc(c.label)}">` +
+        `<span class="combo-card-sym">✦</span>` +
+        `<span class="combo-card-label">${_esc(c.label)}</span>` +
+      `</button>`
+    ).join('');
+    tray.classList.add('combo-tray--open');
+
+    tray.querySelectorAll('.combo-card').forEach(btn => {
+      btn.addEventListener('click', () => _promptUse(parseInt(btn.dataset.idx, 10)));
+    });
+  }
+
+  function _promptUse(idx) {
+    const card = _earned[idx];
+    if (!card) return;
+    const modal = _el('comboPrompt');
+    if (!modal) return;
+
+    modal.innerHTML =
+      `<div class="combo-prompt-card">` +
+        `<div class="combo-prompt-sym">✦</div>` +
+        `<div class="combo-prompt-title">${_esc(card.label)}</div>` +
+        `<div class="combo-prompt-sub">` +
+          (card.withName ? `forged with &lt;${_esc(card.withName)}&gt;` : 'ability card') +
+        `</div>` +
+        `<button class="combo-prompt-btn combo-prompt-btn--go" id="comboPromptUse">ACTIVATE ABILITY CARD</button>` +
+        `<button class="combo-prompt-btn" id="comboPromptLater">USE LATER</button>` +
+      `</div>`;
+    modal.classList.add('combo-prompt--open');
+    if (typeof Sound !== 'undefined') Sound.play('uiOpen');
+
+    _el('comboPromptUse').addEventListener('click', () => {
+      _closePrompt();
+      _activate(idx);
+    });
+    _el('comboPromptLater').addEventListener('click', _closePrompt);
+    modal.addEventListener('click', e => { if (e.target === modal) _closePrompt(); });
+  }
+
+  function _closePrompt() {
+    const modal = _el('comboPrompt');
+    if (modal) { modal.classList.remove('combo-prompt--open'); modal.innerHTML = ''; }
+  }
+
+  function _activate(idx) {
+    const card = _earned[idx];
+    if (!card) return;
+    _earned.splice(idx, 1);   // one-shot — spent on use
+    _renderEarned();
+
+    if (typeof CLIENT_ID !== 'undefined')
+      send(`combo_activate|${CLIENT_ID}|${card.comboId}`);
+
+    if (typeof Sound !== 'undefined') Sound.play('place');
+    console.log('[combo.js] Activated', card.comboId);
   }
 
   // ── Teardown ────────────────────────────────────────────────────────────────
