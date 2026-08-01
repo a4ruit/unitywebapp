@@ -3515,3 +3515,118 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   25%  { opacity: 1; transform: translateY(-10px) scale(1.15); }
   100% { opacity: 0; transform: translateY(-26px) scale(1); }
 }
+/* ── Cross-player combo strip ────────────────────────────────────────────────
+   Sits just below the card on the pack screen. Hidden until Unity broadcasts a
+   primed synergy. Deliberately a persistent SLOT rather than a dismissible
+   banner: in a gallery two strangers have no way to be told about each other, so
+   an open question sitting under your card is what actually prompts action.
+   Violet = nature (sky blue) + critter (pastel pink), so the colour itself
+   teaches which pools combined.                                              */
+.combo-strip {
+  position: fixed;
+  bottom: 104px;
+  left: 50%;
+  transform: translateX(-50%) translateY(8px);
+  z-index: 6;
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border: 1px solid rgba(190, 150, 255, 0.55);
+  border-radius: 10px;
+  background: rgba(14, 8, 22, 0.92);
+  box-shadow: 0 0 14px -4px rgba(190, 150, 255, 0.75);
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  color: #d9c2ff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s steps(4), transform 0.25s steps(4);
+}
+.combo-strip--open {
+  display: flex;
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* The card already played — solid, to contrast with the empty slot */
+.combo-played {
+  width: 20px;
+  height: 28px;
+  border: 2px solid rgba(190, 150, 255, 0.9);
+  border-radius: 3px;
+  background: rgba(190, 150, 255, 0.18);
+  flex-shrink: 0;
+}
+.combo-plus { font-size: 13px; opacity: 0.8; }
+
+/* The MISSING card — dashed outline + the symbol being asked for */
+.combo-slot {
+  position: relative;
+  width: 26px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 2px dashed rgba(120, 255, 170, 0.9);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: comboSlotPulse 1.5s steps(3) infinite;
+}
+.combo-slot-hint {
+  width: 16px;
+  height: 16px;
+  image-rendering: pixelated;
+  opacity: 0.75;
+  filter: drop-shadow(0 0 3px rgba(120, 255, 170, 0.8));
+}
+.combo-slot-q { font-size: 15px; color: rgba(120, 255, 170, 0.9); }
+@keyframes comboSlotPulse {
+  0%, 100% { border-color: rgba(120, 255, 170, 0.45); }
+  50%      { border-color: rgba(120, 255, 170, 1); }
+}
+
+/* Cooldown ring around the slot — the drama, so the window itself can stay
+   long enough to actually be completable */
+.combo-ring {
+  position: absolute;
+  inset: -7px;
+  width: calc(100% + 14px);
+  height: calc(100% + 14px);
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+.combo-ring-bg   { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 2.5; }
+.combo-ring-fill { fill: none; stroke: #78ffaa; stroke-width: 2.5; stroke-linecap: round; }
+
+.combo-caption { font-size: 10px; letter-spacing: 0.05em; line-height: 1.35; white-space: nowrap; }
+.combo-caption b { color: #78ffaa; }
+.combo-name { font-weight: bold; }
+
+/* Last few seconds — urgency without shortening the window */
+.combo-strip--urgent { border-color: rgba(255, 170, 90, 0.9); }
+.combo-strip--urgent .combo-ring-fill { stroke: #ffaa5a; }
+.combo-strip--urgent .combo-slot { border-color: rgba(255, 170, 90, 0.95); animation-duration: 0.5s; }
+
+/* Completed — both players credited */
+.combo-strip--complete {
+  border-color: rgba(214, 170, 255, 1);
+  box-shadow: 0 0 22px -2px rgba(200, 140, 255, 0.9);
+  animation: comboComplete 0.5s steps(4);
+}
+.combo-caption--done { text-align: center; font-size: 10px; }
+.combo-caption--done b { color: #e0c0ff; letter-spacing: 0.1em; }
+.combo-burst {
+  font-size: 20px;
+  color: #e8ccff;
+  text-shadow: 0 0 10px rgba(210, 150, 255, 0.95);
+  animation: comboBurst 0.6s steps(4);
+}
+@keyframes comboComplete {
+  0%   { transform: translateX(-50%) scale(1.12); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+@keyframes comboBurst {
+  0%   { transform: scale(0.4) rotate(-25deg); opacity: 0; }
+  60%  { transform: scale(1.3) rotate(8deg);  opacity: 1; }
+  100% { transform: scale(1) rotate(0deg);    opacity: 1; }
+}

@@ -96,6 +96,10 @@
         <div id="playerNametag"></div>
         <div id="packStack" class="pack-stack-behind"></div>
 
+        <!-- Cross-player combo strip — sits just below the card. Empty until a
+             synergy is primed; see js/combo.js. -->
+        <div id="comboStrip" class="combo-strip"></div>
+
         <!-- Pack type selector -->
         <div class="pack-type-row">
           <button class="pack-type-btn active" id="packTypeGarbage" onclick="setPackType('garbage')">
@@ -470,6 +474,7 @@
   <script src="js/tasks.js"></script><!-- must be before main.js -->
   <script src="js/collection.js"></script><!-- must be before main.js -->
   <script src="js/announce.js"></script><!-- must be before main.js -->
+  <script src="js/combo.js"></script><!-- must be before main.js -->
   <script src="js/player.js"></script><!-- must be before main.js -->
   <!-- corruption-bar.js shelved — bar removed for now
   <script src="js/corruption-bar.js"></script> -->

@@ -622,6 +622,7 @@ function connect() {
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleQuestMessage(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
+      if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       handlePossessionMessage(e.data);
     };
   } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
