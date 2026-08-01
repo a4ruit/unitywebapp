@@ -102,6 +102,9 @@ let _placeTapMode   = false;  // true when the active card uses tap-to-drop
 // for N so multi-charge cards need no rework later.
 let _placeAmmoTotal = 1;
 let _placeAmmoLeft  = 1;
+// Minimum gap between accepted taps, so one gesture can't spend two charges.
+const PLACE_TAP_DEBOUNCE_MS = 250;
+let _placeTapLastT  = 0;
 let _placePos       = null;   // {x,y} 0..1 normalized preview pos for the mini-map
 let _placementInputInterval = null;
 // Duration of the current possession session — captured at _onGranted time so
@@ -1796,10 +1799,12 @@ function _buildUI() {
   // Placement minimap — tap-to-drop for aimed cards (thornwire). The handler
   // no-ops unless the active session is in tap mode, so joystick cards are
   // unaffected by these listeners always being attached.
+  // pointerdown ALONE covers touch, mouse and pen. A separate touchend listener
+  // used to be bound as well, which fired the handler TWICE per physical tap —
+  // harmless while a one-drop-per-session flag existed, but once ammo became the
+  // gate it silently consumed two charges (and dropped two overlapping ones).
   if (_ui.placeMinimap) {
     _ui.placeMinimap.addEventListener('pointerdown', _placeMinimapTap);
-    _ui.placeMinimap.addEventListener('touchend',
-      e => { e.preventDefault(); _placeMinimapTap(e); }, { passive: false });
   }
   _setupJoystick();
 
@@ -2438,6 +2443,7 @@ function _onPlacementGranted(cardName, cardType, ammo) {
   const parsedAmmo = parseInt(ammo, 10);
   _placeAmmoTotal  = (isFinite(parsedAmmo) && parsedAmmo > 0) ? parsedAmmo : 1;
   _placeAmmoLeft   = _placeAmmoTotal;
+  _placeTapLastT   = 0;   // don't let a stale timestamp block the first tap
   _renderPlaceAmmo();
 
   _drawPlaceMinimap();
@@ -2593,9 +2599,17 @@ function _renderPlaceAmmo() {
 // commits it immediately. One gesture = aim + confirm, which suits a thrown
 // charge far better than steering it there with a stick.
 function _placeMinimapTap(e) {
-  // Ammo IS the tap gate — this also covers the old one-drop-per-session rule,
-  // since the common thornwire grants exactly one charge.
+  // Ammo is the tap gate — one charge spent per tap.
   if (!_placing || !_placeTapMode || _placeAmmoLeft <= 0) return;
+
+  // Debounce. Ammo alone can't dedup a doubled event the way the old
+  // one-drop-per-session flag did: two events in the same gesture would each
+  // pass the ammo check and spend a charge. Also stops an impatient
+  // double-tap burning two charges on one intended throw.
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  if (now - _placeTapLastT < PLACE_TAP_DEBOUNCE_MS) return;
+  _placeTapLastT = now;
+
   e.preventDefault();
 
   const cv = _ui && _ui.placeMinimap;
