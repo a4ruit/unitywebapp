@@ -3524,7 +3524,9 @@ body:has(#screen-horror-spin:not(.hidden))::before {
    teaches which pools combined.                                              */
 .combo-strip {
   position: fixed;
-  bottom: 104px;
+  /* Clears the pack-type row, which sits at bottom:34px and is ~70px tall — so
+     its top edge is ~104px up. Anything at or below that overlaps the buttons. */
+  bottom: 122px;
   left: 50%;
   transform: translateX(-50%) translateY(8px);
   z-index: 6;
