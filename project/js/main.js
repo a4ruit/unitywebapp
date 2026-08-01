@@ -402,11 +402,17 @@ function rollPack() {
   cards.push(pick('uncommon'));
   cards.push(topCard);
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
-  // Holographic finish roll — pilot: critter pool only. 40% of packs get exactly
+  // Holographic finish roll — critter + nature pools. 40% of packs get exactly
   // one holo, on a randomly chosen rarity present (so the duplicate commons don't
   // bias it): one per pack, one per rarity category. The variant rides the card
   // object through the choice grid → dropCard → collection.
-  if (getActiveCardPool() === CRITTER_CARDS && Math.random() < HOLO_PACK_CHANCE) {
+  //
+  // Nature was added so Thornwire can roll PRISMATIC, which is a real mechanical
+  // upgrade rather than just a finish: Unity grants it three charges instead of
+  // one (PlacementManager.thornwirePrismaticAmmo).
+  const _holoPool = getActiveCardPool();
+  if ((_holoPool === CRITTER_CARDS || _holoPool === NATURE_CARDS) &&
+      Math.random() < HOLO_PACK_CHANCE) {
     const rarities = [...new Set(cards.map(c => c.rarity))];
     const r        = rarities[Math.floor(Math.random() * rarities.length)];
     const pool     = cards.filter(c => c.rarity === r);
@@ -1063,9 +1069,12 @@ function dropCard(card) {
     return;
   }
 
-  // Placement cards get their own modal regardless of phase
+  // Placement cards get their own modal regardless of phase.
+  // The finish rides along as a 6th field so Unity can make the placed object
+  // shimmer — and, for Thornwire, grant a prismatic pull its extra charges.
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
-    send(`placement_request|${CLIENT_ID}|${card.placement}|${card.rarity}|${card.name}`);
+    const placeFinish = card.variant === 'holo' ? 'holo' : '';
+    send(`placement_request|${CLIENT_ID}|${card.placement}|${card.rarity}|${card.name}|${placeFinish}`);
     resetToPackScreen();
     return;
   }
