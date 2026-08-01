@@ -3600,18 +3600,27 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   50%      { border-color: rgba(120, 255, 170, 1); }
 }
 
-/* Cooldown ring around the slot — the drama, so the window itself can stay
-   long enough to actually be completable */
-.combo-ring {
+/* Cooldown drawn as the strip's OWN border, so it doesn't crowd the slot art.
+   The static border underneath acts as the track; this strokes away over the
+   window. Sized in JS to match the strip's rendered width. */
+.combo-border {
   position: absolute;
-  inset: -7px;
-  width: calc(100% + 14px);
-  height: calc(100% + 14px);
-  transform: rotate(-90deg);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
 }
-.combo-ring-bg   { fill: none; stroke: rgba(255,255,255,0.10); stroke-width: 2.5; }
-.combo-ring-fill { fill: none; stroke: #78ffaa; stroke-width: 2.5; stroke-linecap: round; }
+.combo-border-fill {
+  fill: none;
+  stroke: #78ffaa;          /* recoloured inline by combo.js as it drains */
+  stroke-width: 2;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 4px rgba(120, 255, 170, 0.85));
+  /* No transition on stroke: it held the rendered colour behind the inline
+     value the tick sets, so the urgency colour never actually appeared. A hard
+     snap also matches the stepped, pixel-art feel used elsewhere. */
+}
 
 .combo-caption { font-size: 10px; letter-spacing: 0.05em; line-height: 1.35; white-space: nowrap; }
 .combo-caption b { color: #78ffaa; }
@@ -3619,7 +3628,8 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 
 /* Last few seconds — urgency without shortening the window */
 .combo-strip--urgent { border-color: rgba(255, 170, 90, 0.9); }
-.combo-strip--urgent .combo-ring-fill { stroke: #ffaa5a; }
+/* The border stroke colour is driven inline from combo.js's tick (it already
+   knows the remaining time), so there's no urgent rule for it here. */
 .combo-strip--urgent .combo-slot { border-color: rgba(255, 170, 90, 0.95); animation-duration: 0.5s; }
 
 /* Completed — both players credited */

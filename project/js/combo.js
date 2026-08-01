@@ -110,22 +110,51 @@ const Combo = (() => {
       `<span class="combo-plus">+</span>` +
       `<span class="combo-slot">` +
         (hint ? `<img class="combo-slot-hint" src="${hint}" alt="">` : `<span class="combo-slot-q">?</span>`) +
-        `<svg class="combo-ring" viewBox="0 0 40 40">` +
-          `<circle class="combo-ring-bg" cx="20" cy="20" r="17"></circle>` +
-          `<circle class="combo-ring-fill" cx="20" cy="20" r="17"></circle>` +
-        `</svg>` +
       `</span>` +
       `<span class="combo-caption">${
         mine ? 'waiting for a <b>sheep</b>'
              : `play a <b>sheep</b> for <span class="combo-name">&lt;${_esc(_active.primerName)}&gt;</span>`
-      }</span>`;
+      }</span>` +
+      // The strip's OWN border is the countdown — a separate ring competed with
+      // the sheep symbol for the same small space and made both harder to read.
+      // Drawn as an SVG outline over the strip so it can be stroked away.
+      `<svg class="combo-border" preserveAspectRatio="none">` +
+        `<rect class="combo-border-fill" x="1" y="1" rx="9" ry="9"></rect>` +
+      `</svg>`;
 
     const nameEl = strip.querySelector('.combo-name');
     if (nameEl) nameEl.style.color = _active.colorHex;
 
     strip.classList.add('combo-strip--open');
     strip.classList.toggle('combo-strip--mine', mine);
+
+    _sizeBorder();
   }
+
+  // Match the SVG outline to the strip's current pixel size. Done after render
+  // (and on the first ticks) because the strip's width depends on its caption.
+  function _sizeBorder() {
+    const strip = _el('comboStrip');
+    if (!strip) return;
+    const svg  = strip.querySelector('.combo-border');
+    const rect = strip.querySelector('.combo-border-fill');
+    if (!svg || !rect) return;
+
+    const w = strip.offsetWidth, h = strip.offsetHeight;
+    if (w < 4 || h < 4) return;
+
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    rect.setAttribute('width',  Math.max(0, w - 2));
+    rect.setAttribute('height', Math.max(0, h - 2));
+
+    // getTotalLength handles the rounded corners exactly, rather than
+    // approximating the perimeter by hand.
+    let len = 0;
+    try { len = rect.getTotalLength(); } catch (e) { len = 2 * (w + h); }
+    _borderLen = len || 2 * (w + h);
+    rect.style.strokeDasharray = `${_borderLen}`;
+  }
+  let _borderLen = 0;
 
   // Drive the cooldown ring.
   //
@@ -141,16 +170,27 @@ const Combo = (() => {
       const remain = Math.max(0, _active.endsAt - Date.now());
       const frac   = remain / (_active.windowSecs * 1000);
 
-      const ring = document.querySelector('#comboStrip .combo-ring-fill');
-      if (ring) {
-        const C = 2 * Math.PI * 17;
-        ring.style.strokeDasharray  = `${C}`;
-        ring.style.strokeDashoffset = `${C * (1 - frac)}`;
+      // Urgency in the last few seconds — the draining border does the drama, so
+      // the window itself can stay generous enough to actually be completable.
+      const urgent = remain < 6000 && remain > 0;
+
+      const border = document.querySelector('#comboStrip .combo-border-fill');
+      if (border) {
+        // Re-measure until the layout settles — fonts and the hint image can
+        // change the strip's width a frame or two after it first renders.
+        if (!_borderLen) _sizeBorder();
+        border.style.strokeDashoffset = `${_borderLen * (1 - frac)}`;
+        // Set the stroke inline rather than via a CSS class. The tick already
+        // knows the remaining time, so keeping the threshold in one place here
+        // avoids splitting it between JS class-toggling and a cascade rule.
+        border.style.stroke = urgent ? '#ffaa5a' : '#78ffaa';
+        border.style.filter = urgent
+          ? 'drop-shadow(0 0 5px rgba(255,170,90,0.9))'
+          : 'drop-shadow(0 0 4px rgba(120,255,170,0.85))';
       }
-      // Urgency in the last few seconds — the ring does the drama so the window
-      // itself can stay generous enough to actually be completable.
+
       const strip = _el('comboStrip');
-      if (strip) strip.classList.toggle('combo-strip--urgent', remain < 6000 && remain > 0);
+      if (strip) strip.classList.toggle('combo-strip--urgent', urgent);
 
       // Local fallback only — Unity's combo_expired is authoritative. This just
       // stops a slot lingering if that broadcast is missed or delayed.
@@ -160,6 +200,7 @@ const Combo = (() => {
 
   function _stopTicking() {
     if (_rafId) { clearInterval(_rafId); _rafId = null; }
+    _borderLen = 0;   // force a re-measure for the next combo
   }
 
   // ── Completed ───────────────────────────────────────────────────────────────
