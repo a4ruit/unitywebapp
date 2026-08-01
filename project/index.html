@@ -16,6 +16,20 @@
   <!-- Synergy ability-card prompt — asks before spending a one-shot co-op reward -->
   <div class="combo-prompt" id="comboPrompt"></div>
 
+  <!-- Path drawing for an activated ability — drag a route the spiky sheep runs -->
+  <div class="combo-path" id="comboPath">
+    <div class="combo-path-card">
+      <div class="combo-path-title">DRAW THE CHARGE</div>
+      <canvas id="comboPathMap" width="162" height="222"></canvas>
+      <div class="combo-path-hint" id="comboPathHint">drag a path across the map</div>
+      <div class="combo-path-cancel">tap outside to keep the card</div>
+      <div class="combo-path-btns">
+        <button class="combo-path-btn" id="comboPathClear">CLEAR</button>
+        <button class="combo-path-btn combo-path-btn--go" id="comboPathGo" disabled>RELEASE</button>
+      </div>
+    </div>
+  </div>
+
   <!-- DEBUG: collapsible dropdown (temporary — remove before production) -->
   <div id="debug-menu">
     <button id="debug-menu-trigger" onclick="debugMenuToggle(event)">⚙</button>

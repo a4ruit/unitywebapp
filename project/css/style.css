@@ -3777,3 +3777,89 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   border-color: rgba(230, 190, 255, 0.95);
   box-shadow: 0 0 14px -3px rgba(200, 140, 255, 0.9);
 }
+
+/* ── Ability path drawing ────────────────────────────────────────────────────
+   Opened by ACTIVATE. The player drags the route the spiky sheep will charge
+   along. Drawing rather than picking a target is deliberate: it's the most
+   active input in the piece, which is what a co-op reward should feel like.  */
+.combo-path {
+  position: fixed;
+  inset: 0;
+  z-index: 10075;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 4, 12, 0.88);
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+}
+.combo-path--open { display: flex; }
+
+.combo-path-card {
+  width: min(90vw, 340px);
+  padding: 16px 16px 14px;
+  text-align: center;
+  background: linear-gradient(160deg, rgba(40, 18, 64, 0.98), rgba(16, 9, 28, 0.98));
+  border: 2px solid rgba(200, 150, 255, 0.7);
+  border-radius: 12px;
+  box-shadow: 0 0 26px -4px rgba(190, 130, 255, 0.7);
+}
+.combo-path-title {
+  font-size: 14px;
+  letter-spacing: 0.14em;
+  color: #f0dcff;
+  margin-bottom: 10px;
+}
+#comboPathMap {
+  width: auto;
+  height: min(46vh, 300px);
+  aspect-ratio: 162 / 222;
+  image-rendering: pixelated;
+  border: 2px solid rgba(200, 150, 255, 0.5);
+  box-shadow: 0 0 10px rgba(190, 130, 255, 0.25), inset 0 0 10px rgba(0, 0, 0, 0.5);
+  background: #0a160e;
+  touch-action: none;          /* so a drag draws instead of scrolling */
+  cursor: crosshair;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.combo-path-hint {
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: rgba(220, 200, 255, 0.75);
+}
+.combo-path-btns { display: flex; gap: 8px; margin-top: 12px; }
+.combo-path-btn {
+  flex: 1;
+  padding: 11px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: rgba(225, 210, 245, 0.85);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(200, 150, 255, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.combo-path-btn:active { transform: scale(0.98); }
+.combo-path-btn--go {
+  color: #16081f;
+  background: linear-gradient(180deg, #e0b8ff, #c084fc);
+  border-color: rgba(230, 190, 255, 0.95);
+  box-shadow: 0 0 14px -3px rgba(200, 140, 255, 0.9);
+}
+.combo-path-btn--go:disabled {
+  color: rgba(225, 210, 245, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(200, 150, 255, 0.25);
+  box-shadow: none;
+  cursor: default;
+}
+.combo-path-cancel {
+  margin-top: 4px;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+  color: rgba(200, 180, 230, 0.45);
+}

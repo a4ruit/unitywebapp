@@ -329,14 +329,178 @@ const Combo = (() => {
   function _activate(idx) {
     const card = _earned[idx];
     if (!card) return;
-    _earned.splice(idx, 1);   // one-shot — spent on use
+
+    // The card isn't spent yet — it's consumed only once a path is actually
+    // released. Cancelling out of the drawing step must not burn the reward.
+    _pending = { idx, card };
+    _openPathDraw(card);
+  }
+
+  // ── Path drawing ────────────────────────────────────────────────────────────
+  // The player drags a route across the map and the spiky sheep charges along
+  // it. Drawing (rather than picking a target) is the point: it's the most
+  // active input in the piece, which is what the co-op reward should feel like.
+
+  let _pending  = null;   // { idx, card } awaiting a path
+  let _path     = [];     // [{x,y}] normalised drop-zone points
+  let _drawing  = false;
+
+  const PATH_MAX_POINTS = 24;    // keep the WS message small
+  const PATH_MIN_STEP   = 0.02;  // normalised distance between kept samples
+  const PATH_MIN_POINTS = 2;
+
+  function _openPathDraw(card) {
+    const panel = _el('comboPath');
+    if (!panel) return;
+    _path    = [];
+    _drawing = false;
+    panel.classList.add('combo-path--open');
+    _updatePathUI();
+    _drawPathMap();
+    if (typeof Sound !== 'undefined') Sound.play('uiOpen');
+  }
+
+  function _closePathDraw() {
+    const panel = _el('comboPath');
+    if (panel) panel.classList.remove('combo-path--open');
+    _path    = [];
+    _drawing = false;
+    _pending = null;
+  }
+
+  function _pathEventNorm(e) {
+    const cv = _el('comboPathMap');
+    if (!cv) return null;
+    const r   = cv.getBoundingClientRect();
+    const src = (e.changedTouches && e.changedTouches[0]) || e;
+    if (src.clientX === undefined) return null;
+    const px = (src.clientX - r.left) * (cv.width  / r.width);
+    const py = (src.clientY - r.top)  * (cv.height / r.height);
+    // Reuses possession.js's calibrated mapping so a drawn path lands where the
+    // player drew it, matching the placement marker and spore trail.
+    return _mapXYToNorm(px, py, cv.width, cv.height);
+  }
+
+  function _pathDown(e) {
+    if (!_pending) return;
+    e.preventDefault();
+    _drawing = true;
+    _path = [];
+    const n = _pathEventNorm(e);
+    if (n) _path.push(n);
+    _updatePathUI();
+    _drawPathMap();
+  }
+
+  function _pathMove(e) {
+    if (!_drawing || !_pending) return;
+    const n = _pathEventNorm(e);
+    if (!n) return;
+    const last = _path[_path.length - 1];
+    // Sample by distance, not by event: raw pointermove floods the array and
+    // would blow out the WS message on a fast drag.
+    if (last && Math.hypot(n.x - last.x, n.y - last.y) < PATH_MIN_STEP) return;
+    if (_path.length >= PATH_MAX_POINTS) return;
+    _path.push(n);
+    _updatePathUI();
+    _drawPathMap();
+  }
+
+  function _pathUp() {
+    if (!_drawing) return;
+    _drawing = false;
+    _updatePathUI();
+  }
+
+  function _updatePathUI() {
+    const go   = _el('comboPathGo');
+    const hint = _el('comboPathHint');
+    const ok   = _path.length >= PATH_MIN_POINTS;
+    if (go)   go.disabled = !ok;
+    if (hint) hint.textContent = ok
+      ? `${_path.length} points — release to charge`
+      : 'drag a path across the map';
+  }
+
+  function _drawPathMap() {
+    const cv = _el('comboPathMap');
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height;
+    if (typeof _drawMapBase === 'function') _drawMapBase(ctx, W, H);
+    else { ctx.fillStyle = '#0a160e'; ctx.fillRect(0, 0, W, H); }
+
+    if (!_path.length) return;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(200,150,255,0.95)';
+    ctx.lineWidth   = 3;
+    ctx.lineJoin    = 'round';
+    ctx.lineCap     = 'round';
+    ctx.shadowColor = 'rgba(200,150,255,0.9)';
+    ctx.shadowBlur  = 6;
+    ctx.beginPath();
+    _path.forEach((p, i) => {
+      const { px, py } = _normToMapXY(p.x, p.y, W, H);
+      if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    });
+    ctx.stroke();
+
+    // Start marker, so the direction of travel is unambiguous
+    const s = _normToMapXY(_path[0].x, _path[0].y, W, H);
+    ctx.fillStyle = '#e8ccff';
+    ctx.beginPath(); ctx.arc(s.px, s.py, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  function _releasePath() {
+    if (!_pending || _path.length < PATH_MIN_POINTS) return;
+
+    const card = _pending.card;
+    const pts  = _path.map(p => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(';');
+    if (typeof CLIENT_ID !== 'undefined')
+      send(`combo_path|${CLIENT_ID}|${card.comboId}|${pts}`);
+
+    // Spend the card only now that the ability has actually been used.
+    const i = _earned.indexOf(card);
+    if (i >= 0) _earned.splice(i, 1);
     _renderEarned();
 
-    if (typeof CLIENT_ID !== 'undefined')
-      send(`combo_activate|${CLIENT_ID}|${card.comboId}`);
-
     if (typeof Sound !== 'undefined') Sound.play('place');
-    console.log('[combo.js] Activated', card.comboId);
+    if (navigator.vibrate) { try { navigator.vibrate([30, 30, 60]); } catch (e) {} }
+    console.log('[combo.js] Released', card.comboId, 'along', _path.length, 'points');
+    _closePathDraw();
+  }
+
+  // Bound once on load. Move/up live on window so a drag that leaves the canvas
+  // still tracks and releases cleanly.
+  function _bindPathEvents() {
+    const cv = _el('comboPathMap');
+    if (cv) cv.addEventListener('pointerdown', _pathDown);
+    window.addEventListener('pointermove', _pathMove);
+    window.addEventListener('pointerup',   _pathUp);
+    const go = _el('comboPathGo');
+    if (go) go.addEventListener('click', _releasePath);
+    const clr = _el('comboPathClear');
+    if (clr) clr.addEventListener('click', () => { _path = []; _updatePathUI(); _drawPathMap(); });
+
+    // Tapping the backdrop backs out WITHOUT spending the card. Activating is a
+    // two-step commitment (activate → draw → release); a player who changes
+    // their mind mid-draw must not lose a one-shot co-op reward.
+    const panel = _el('comboPath');
+    if (panel) {
+      panel.addEventListener('pointerdown', e => {
+        if (e.target !== panel) return;   // ignore taps on the card itself
+        _closePathDraw();
+        _renderEarned();                  // card is still held — redraw the tray
+      });
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    if (document.readyState === 'loading')
+      window.addEventListener('DOMContentLoaded', _bindPathEvents);
+    else _bindPathEvents();
   }
 
   // ── Teardown ────────────────────────────────────────────────────────────────
