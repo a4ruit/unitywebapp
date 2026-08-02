@@ -2511,6 +2511,10 @@ function _onPlacementDenied() {
 function _onPlacementDone() {
   _placing = false;
   _placePos = null;
+  // The modal is about to be removed from under the pointer — shield the pack
+  // canvas so the closing gesture can't also open a pack. Covers the joystick
+  // PLACE button as well as the tap-to-drop path.
+  window.suppressPackOpenUntil = Date.now() + 600;
   // Re-arm tap mode for the next session and disarm the map.
   _placeTapMode   = false;
   _placeCardType  = '';
@@ -2632,6 +2636,11 @@ function _placeMinimapTap(e) {
   // Same for the marker position.
   _placePos = { x: n.x, y: n.y };
   _drawPlaceMinimap();
+
+  // Unity will close the modal almost immediately, so the finger lifts over the
+  // pack canvas underneath and its `click` handler would tear open a new pack.
+  // Shield it for a moment — see triggerPackOpen in main.js.
+  window.suppressPackOpenUntil = Date.now() + 600;
 
   if (typeof Sound !== 'undefined') Sound.play('place');
   send(`placement_tap|${CLIENT_ID}|${n.x.toFixed(3)}|${n.y.toFixed(3)}`);

@@ -363,6 +363,9 @@ const Combo = (() => {
   function _closePathDraw() {
     const panel = _el('comboPath');
     if (panel) panel.classList.remove('combo-path--open');
+    // Same click-through guard as the placement modal: this panel closes out
+    // from under the pointer, and the pack canvas opens on `click`.
+    if (typeof window !== 'undefined') window.suppressPackOpenUntil = Date.now() + 600;
     _path    = [];
     _drawing = false;
     _pending = null;

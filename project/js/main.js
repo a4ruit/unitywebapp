@@ -815,7 +815,17 @@ function initPack() {
 
 let _pendingPackDir = 'right';
 
+// Set by UI that closes a full-screen overlay (see possession.js). Guards against
+// click-through: a tap that dismisses an overlay ends with the finger lifting
+// over whatever was underneath, and the pack canvas opens on `click`. Without
+// this, throwing a thornwire on the minimap immediately tore open a new pack.
+window.suppressPackOpenUntil = 0;
+
 function triggerPackOpen(dir) {
+  if (Date.now() < (window.suppressPackOpenUntil || 0)) {
+    console.log('[pack] Open suppressed — overlay just closed under the pointer');
+    return;
+  }
   if (!consumePack()) return;
   doPackOpen(dir);
 }
