@@ -29,11 +29,42 @@ const Player = (() => {
   const PERK_EVERY = 4;                       // a perk pick every N total levels
   const xpForLevel = (lv) => 50 + lv * 35;    // cost to go from level lv → lv+1
 
+  // Each attribute grows a vine that drops out of the name tag, swings out to
+  // one side, and hangs down the gutter between the pack card and that side's
+  // CARDS / TASKS tab. Nothing else lives in those two strips, so the vines can
+  // run their full length without covering the card or the tabs.
+  //
+  //   side  which gutter the vine settles into
+  //   drop  px below the tag before this vine's first node — the only way to
+  //         keep two vines sharing a gutter from landing on top of each other,
+  //         since a phone gutter is one node wide. Tune this and `side` first
+  //         if the layout feels crowded.
+  //   phase offsets the waver so vines don't wobble in lockstep
+  //
+  // `glyph` names an SVG shape rather than a character on purpose: the pixel font
+  // renders most symbol codepoints as blanks or boxes (the same problem that hit
+  // the Soul Tree's emoji requirements), so the icons are drawn as geometry.
   const ATTRS = [
-    { key: 'dexterity', short: 'DEX', color: '#7ad0ff' },
-    { key: 'presence',  short: 'PRE', color: '#ff9ad0' },
-    { key: 'vigor',     short: 'VIG', color: '#9af0a0' },
+    { key: 'dexterity', short: 'DEX', color: '#7ad0ff', side: 'left',  drop:   0, phase: 0.0, glyph: 'diamond' },
+    { key: 'presence',  short: 'PRE', color: '#ff9ad0', side: 'right', drop:   0, phase: 1.7, glyph: 'ring'    },
+    { key: 'vigor',     short: 'VIG', color: '#9af0a0', side: 'left',  drop: 190, phase: 3.4, glyph: 'cross'   },
   ];
+
+  // ── Vine geometry ───────────────────────────────────────────────────────────
+  const BR = {
+    // `gap` must stay larger than `bend`, so the first node lands after the vine
+    // has finished swinging out. Any closer and it hangs mid-swing, still over
+    // the top corner of the card.
+    gap:       58,  // px below the tag before a vine's first node
+    step:      30,  // px between chained nodes down the same vine
+    node:      18,  // node diameter
+    maxNodes:   5,  // visible chain length — the +N badge carries the true count
+    minStep:   16,  // tightest spacing before nodes read as one blob
+    bend:      46,  // descent over which a vine swings from the tag into its lane
+    waver:    3.5,  // px of horizontal wobble, so it hangs rather than plumbs
+    laneInset: 26,  // px out from the card's edge to the vine's lane
+    sample:     6,  // px between polyline samples when drawing the string
+  };
 
   // Hybrid perk options — each pick lets the player choose ONE bigger bonus.
   const PERKS = [
@@ -210,6 +241,58 @@ const Player = (() => {
       .pl-perk:hover { background: rgba(120, 200, 255, 0.16); border-color: rgba(150, 240, 255, 0.7); }
       .pl-perk-label { font-size: 14px; letter-spacing: 1.5px; color: #ffe7a0; }
       .pl-perk-desc  { font-size: 11px; letter-spacing: 0.5px; color: rgba(200, 235, 255, 0.85); margin-top: 2px; }
+
+      /* ── Stat vines ───────────────────────────────────────────────────────
+         Icons on vines hanging out of the name tag, down the gutters either
+         side of the card. Replaces the need to open the stats window at all:
+         what you've invested in is legible at a glance, permanently, without
+         a tap.
+
+         A full-viewport fixed overlay rather than a box positioned near the tag,
+         because the tag's width changes with the player's name — anchoring in
+         absolute viewport coordinates read from its bounding rect avoids having
+         to keep a wrapper in sync with it. pointer-events:none throughout so it
+         never intercepts a tap meant for the pack. */
+      #pl-branches {
+        position: fixed; inset: 0;
+        z-index: 3;                    /* under the tag (4) and LV badge (5) */
+        display: none;                 /* revealed with the name tag */
+        pointer-events: none;
+        overflow: visible;
+      }
+      #pl-branch-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+
+      .pl-node {
+        position: absolute;
+        width: ${BR.node}px; height: ${BR.node}px;
+        margin-left: ${-BR.node / 2}px; margin-top: ${-BR.node / 2}px;
+        display: flex; align-items: center; justify-content: center;
+        /* Scale/fade in so a newly earned branch announces itself rather than
+           silently appearing between frames. */
+        animation: pl-node-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+      @keyframes pl-node-in {
+        0%   { opacity: 0; transform: scale(0.2); }
+        100% { opacity: 1; transform: scale(1); }
+      }
+
+      /* Do NOT set a 'color' on this element. 'background: currentColor'
+         resolves against the element's OWN color, so declaring a dark color
+         here to tint the text made the background dark too — the badge was
+         rendering near-black on near-black and vanishing. The colour is
+         inherited from .pl-node (set inline to the attribute's colour) and the
+         text tint goes on the inner span instead. */
+      .pl-node-badge {
+        position: absolute; right: -9px; top: -8px;
+        font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+        font-size: 11px; line-height: 1;
+        padding: 1px 4px;
+        background: currentColor;
+        border: 1px solid rgba(4, 10, 14, 0.9);
+        border-radius: 6px;
+        white-space: nowrap;
+      }
+      .pl-node-badge > span { color: #06121a; font-weight: 700; }
     `;
     document.head.appendChild(style);
 
@@ -238,6 +321,28 @@ const Player = (() => {
     stats.addEventListener('click', _closeStats);
     document.body.appendChild(stats);
 
+    // Branch overlay — strings + icon nodes growing out of the name tag. Goes
+    // into #screen-pack alongside the LV badge, NOT document.body: .shell is
+    // `position:relative; z-index:1`, which makes it a stacking context, so a
+    // body-level child at z-index 3 would paint over the entire app instead of
+    // slipping behind the tag. Sharing the tag's parent also means it inherits
+    // the screen's show/hide for free.
+    const branches = document.createElement('div');
+    branches.id = 'pl-branches';
+    branches.innerHTML = `<svg id="pl-branch-svg"><g id="pl-branch-strings"></g></svg>`;
+    screen.appendChild(branches);
+
+    // The anchor is read from the tag's bounding rect, so anything that moves or
+    // resizes it has to trigger a redraw.
+    window.addEventListener('resize', _renderBranches);
+    window.addEventListener('orientationchange', _renderBranches);
+    // The tag's rect changes when it's revealed, when the name is set, and again
+    // when the pixel font finishes loading and reflows its width. Observing it
+    // catches all three without polling.
+    if (tag && typeof ResizeObserver !== 'undefined') {
+      new ResizeObserver(() => _renderBranches()).observe(tag);
+    }
+
     const modal = document.createElement('div');
     modal.id = 'pl-modal';
     modal.innerHTML =
@@ -255,7 +360,164 @@ const Player = (() => {
     if (!_built) return;
     const badge = document.getElementById('pl-level');
     if (badge) badge.textContent = 'LV ' + _totalLevel();
+    _renderBranches();
     if (_statsOpen) _renderStats();
+  }
+
+  // ── Stat vines ──────────────────────────────────────────────────────────────
+  // One vine per attribute the player has invested in, dropping out of the name
+  // tag and hanging down the gutter beside the card. Each level adds another
+  // node further down the SAME vine, so the shape is a readable picture of how
+  // they've played: one long vine means commitment, three short ones mean
+  // they've spread.
+
+  // The lane a vine hangs in: the strip between the pack card and that side's
+  // slide-out tab. Measured rather than hardcoded, because the gutter is only a
+  // few px wide on a phone and hundreds of px wide in a desktop browser window.
+  // Biased to hug the card rather than sitting dead-centre in the gutter, so the
+  // vines stay visually attached to the card at any width — then pushed back in
+  // if that would put them under the tab.
+  function _laneX(side) {
+    const vw    = window.innerWidth;
+    const half  = BR.node / 2 + 4;
+    const stage = document.querySelector('.pack-carousel-stage');
+    const trig  = document.querySelector(side === 'left' ? '.coll-panel-trigger' : '.task-panel-trigger');
+    const tR    = trig  ? trig.getBoundingClientRect()  : null;
+    const sR    = stage ? stage.getBoundingClientRect() : null;
+
+    if (side === 'left') {
+      const tab  = (tR && tR.width)  ? tR.right : 60;
+      const card = (sR && sR.width)  ? sR.left  : vw / 2 - 132;
+      return Math.max(tab + half, card - BR.laneInset);
+    }
+    const tab  = (tR && tR.width) ? tR.left   : vw - 60;
+    const card = (sR && sR.width) ? sR.right  : vw / 2 + 132;
+    return Math.min(tab - half, card + BR.laneInset);
+  }
+
+  // Horizontal position of a vine at `d` px below the tag. Eases from the tag's
+  // edge into the lane over the whole descent to the first node, so a vine with
+  // a big `drop` takes a long diagonal instead of snapping across and then
+  // running parallel to its neighbour in the same gutter.
+  function _vineX(a, d, startX, laneX) {
+    const t     = Math.min(1, d / (a.drop + BR.bend));
+    const ease  = 1 - t * t * (3 - 2 * t);
+    const waver = Math.sin(d * 0.05 + a.phase) * BR.waver * Math.min(1, d / 50);
+    return laneX + (startX - laneX) * ease + waver;
+  }
+
+  // Blocky SVG glyphs rather than font characters — see the note on ATTRS.glyph.
+  function _glyphSvg(kind, color) {
+    const c = color;
+    const s = `stroke="${c}" fill="none" stroke-width="2.4" stroke-linejoin="miter"`;
+    if (kind === 'diamond') return `<svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2 L18 10 L10 18 L2 10 Z" ${s}/></svg>`;
+    if (kind === 'ring')    return `<svg viewBox="0 0 20 20" width="18" height="18"><rect x="3.5" y="3.5" width="13" height="13" ${s}/></svg>`;
+    return `<svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2 V18 M2 10 H18" ${s}/></svg>`;
+  }
+
+  function _renderBranches() {
+    if (!_built) return;
+    const wrap = document.getElementById('pl-branches');
+    const svg  = document.getElementById('pl-branch-strings');
+    const tag  = document.getElementById('playerNametag');
+    if (!wrap || !svg || !tag) return;
+
+    // Nothing to hang branches off until the tag is actually on screen — a
+    // hidden element reports a zero rect, which would anchor everything at 0,0.
+    //
+    // The rect IS the visibility test. Do not reach for offsetParent here: it is
+    // specified to return null for any `position:fixed` element, and the tag is
+    // fixed, so that check is unconditionally true and hides the branches
+    // forever.
+    const r = tag.getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) { wrap.style.display = 'none'; return; }
+
+    // Vines stop short of the pack-type row at the bottom of the screen rather
+    // than running under it.
+    const row     = document.querySelector('#screen-pack .pack-type-row');
+    const rowR    = row ? row.getBoundingClientRect() : null;
+    const floorY  = (rowR && rowR.height) ? rowR.top - 12 : window.innerHeight - 96;
+    const maxDrop = Math.max(0, floorY - r.bottom);
+
+    wrap.style.display = 'block';
+    // Rebuilt wholesale each render. Cheap at this scale (≤3 branches × 5 nodes),
+    // and it keeps the DOM a pure function of state rather than something that
+    // has to be diffed — but it does mean the entry animation replays on every
+    // redraw, so only call this when something actually changed.
+    // Cleared child-by-child rather than with innerHTML: innerHTML on an SVG
+    // element is a late addition (Safari 14+) and this runs on phones.
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    wrap.querySelectorAll('.pl-node').forEach(n => n.remove());
+
+    ATTRS.forEach(a => {
+      const lv = _attr[a.key].level;
+      if (lv <= 0) return;
+
+      // The vine leaves the bottom corner on its own side, so it drops away from
+      // the name rather than across it.
+      const laneX  = _laneX(a.side);
+      const startX = a.side === 'left' ? r.left + 5 : r.right - 5;
+
+      // A long vine would run past the pack-type row at the bottom of the
+      // screen. First tighten the spacing to whatever depth is left, and only if
+      // the nodes would start overlapping drop some off the end — the +N badge
+      // still carries the true count either way.
+      const avail = maxDrop - a.drop - BR.gap;
+      if (avail < 0) return;
+      const fits  = Math.max(1, Math.floor(avail / BR.minStep) + 1);
+
+      const shown = Math.min(lv, BR.maxNodes, fits);
+      const need  = BR.step * (shown - 1);
+      const step  = (shown > 1 && need > avail) ? avail / (shown - 1) : BR.step;
+
+      const pts = [];
+      for (let i = 0; i < shown; i++) {
+        const dd = a.drop + BR.gap + step * i;
+        pts.push({ x: _vineX(a, dd, startX, laneX), y: r.bottom + dd });
+      }
+
+      // String: sampled along the same curve the nodes sit on, so the vine
+      // actually passes through every icon instead of cutting corners between
+      // them. Fine enough to read as a curve, coarse enough to stay cheap.
+      const endD = a.drop + BR.gap + step * (shown - 1);
+      let d = `M ${startX} ${r.bottom}`;
+      for (let s = BR.sample; s < endD; s += BR.sample) {
+        d += ` L ${_vineX(a, s, startX, laneX).toFixed(1)} ${(r.bottom + s).toFixed(1)}`;
+      }
+      d += ` L ${pts[pts.length - 1].x.toFixed(1)} ${pts[pts.length - 1].y.toFixed(1)}`;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', d);
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('stroke', a.color);
+      path.setAttribute('stroke-width', '1.4');
+      path.setAttribute('fill', 'none');
+      path.setAttribute('opacity', '0.75');
+      svg.appendChild(path);
+
+      pts.forEach((p, i) => {
+        const node = document.createElement('div');
+        node.className = 'pl-node';
+        node.style.left  = p.x + 'px';
+        node.style.top   = p.y + 'px';
+        node.style.color = a.color;          // .pl-node-badge inherits this
+        // Stagger so a multi-node vine grows downward rather than popping whole.
+        node.style.animationDelay = (i * 0.06) + 's';
+        node.innerHTML = _glyphSvg(a.glyph, a.color);
+
+        // The count rides the LOWEST node only. One badge per node would just be
+        // the same number repeated down the vine, and the chain already shows
+        // the magnitude — the badge is there to make it exact.
+        if (i === shown - 1) {
+          const badge = document.createElement('div');
+          badge.className = 'pl-node-badge';
+          badge.innerHTML = `<span>+${lv}</span>`;
+          node.appendChild(badge);
+        }
+        wrap.appendChild(node);
+      });
+    });
   }
 
   // Build the stats window's attribute rows + headers.
@@ -315,10 +577,32 @@ const Player = (() => {
       if (color) badge.style.color = color;
     }
     // The tag is pointer-events:none by default — make it tappable so it can
-    // open the stats window.
+    // open the stats window. The branches now show the same information without
+    // a tap, so this is a detail view rather than the only way in.
     const tag = document.getElementById('playerNametag');
     if (tag) { tag.style.pointerEvents = 'auto'; tag.style.cursor = 'pointer'; }
+
+    // The tag has just been shown, but layout may not have settled this frame —
+    // its rect would still be zero and every branch would anchor to 0,0.
+    requestAnimationFrame(_renderBranches);
     _render();
+  }
+
+  // ── DEBUG (temporary — remove with the debug menu before production) ────────
+  // Grants levels outright, skipping the XP curve, so the branch fan can be
+  // driven to any shape by hand. Goes through the same _recompute/_checkPerks
+  // path as a real level so the perk modal still fires on the milestone.
+  function debugLevel(attr, n) {
+    if (!_built) _build();
+    const a = _attr[attr];
+    if (!a) return;
+    a.level += (n || 1);
+    _recompute();
+    if (typeof Sound !== 'undefined') Sound.play('star');
+    _pulse();
+    _checkPerks();
+    _render();
+    console.log('[DEBUG] ' + attr + ' → LV ' + a.level, window.PlayerMods);
   }
 
   function _pulse() {
@@ -368,5 +652,5 @@ const Player = (() => {
     }
   }
 
-  return { gainXP, observe, reveal };
+  return { gainXP, observe, reveal, debugLevel };
 })();

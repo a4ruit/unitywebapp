@@ -27,69 +27,100 @@ let WS_URL = _wsOverride || WS_PRIMARY;
 // ─── Card pools ───────────────────────────────────────────────────────────────
 
 // ─── NATURE (garbage / pristine) ──────────────────────────────────────────────
+// TRIMMED to 4 tiers (common..legendary). Old Grove / Pollen Drift / Tree of Life
+// (mythical/luck-maxxing/legendary-alpha) are cut — their Unity spawn cases still
+// exist but are simply unreachable now, since rollTopCard() only ever rolls
+// tiers actually present in the active pool.
+//
+// Leaf Storm replaces Ancient Yew's slot. It's an ABILITY card, not a placement
+// card — no `placement` field. Tapping it opens the figure-eight trace panel
+// (see combo.js beginAbilityTrace / dropCard's `card.ability` branch) instead of
+// the joystick placement modal.
 const NATURE_CARDS = [
-  { id:'small_cube', name:'Thornwire',       rarity:'common',          rarityRank:0, command:'spawn_small_cube', placement:'thornwire', desc:'Barbed and coiled. It only defends.' },
-  { id:'large_cube', name:'Wildflowers',     rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
-  { id:'sphere',     name:'Flower Bush',     rarity:'rare',            rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'In bloom. Spreading beyond the path.' },
-  { id:'triangle',   name:'Ancient Yew',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   placement:'ancientyew', desc:'It watched the forest grow. It will watch it fall.' },
-  { id:'octagon',    name:'The Old Grove',   rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Before the map. Before the name.' },
-  { id:'triad',      name:'Pollen Drift',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Carried by nothing. Reaching everything.' },
-  { id:'star',       name:'Tree of Life',     rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It remembers the first rain. It will outlast the last.' },
+  { id:'small_cube', name:'Thornwire',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'thornwire',  desc:'Barbed and coiled. It only defends.' },
+  { id:'large_cube', name:'Wildflowers', rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
+  { id:'sphere',     name:'Flower Bush', rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'In bloom. Spreading beyond the path.' },
+  { id:'triangle',   name:'Leaf Storm',  rarity:'legendary', rarityRank:3, command:'spawn_triangle',   ability:'leafstorm',    desc:'Trace the storm. Let it hunt for you.' },
 ];
 
 // ─── FLESH (garbage / horror) ─────────────────────────────────────────────────
+// Every slot here is MEAT FOR THE BOSS: it flies across the map and grafts on as
+// a limb, raising the boss's max HP for good. With no boss alive it lies on the
+// ground and waits to be absorbed by the next one.
+//
+// The creatures that used to come out of this pack (glitchling, glitchworm) now
+// belong to SCOURGE, whose job is attacking the nature players' plants. Card art
+// is keyed by pack + rarity rather than by name, so these renames keep their
+// existing illustrations.
 const FLESH_CARDS = [
-  { id:'small_cube', name:'Mystery Meat', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. The environment has accepted it.' },
-  { id:'large_cube', name:'Fleshling',           rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Small. Hungry. It found you first.' },
-  { id:'sphere',     name:'Blind Box',            rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It has eyes. They do not work. But it knows you are here.' },
-  { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. Pre-dates the colony.' },
+  { id:'small_cube', name:'Mystery Meat', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. It knows where to crawl.' },
+  { id:'large_cube', name:'Gristle Knot',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Muscle with nothing left to move. It wants a body.' },
+  { id:'sphere',     name:'Blind Box',           rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It has eyes. They do not work. Get inside it.' },
+  { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. It will find somewhere to fit.' },
   { id:'octagon',    name:'Unnamed Organ',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'It has a function. You do not want to know what it is.' },
-  { id:'triad',      name:'Spore Cluster',       rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three. Already airborne.' },
+  { id:'triad',      name:'Tendril Cluster',     rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three. All reaching for the same host.' },
   { id:'star',       name:'The Flesh',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was here before you. It will be here after.' },
 ];
 
 // ─── CRITTER (ewaste / pristine) ──────────────────────────────────────────────
+// TRIMMED to 5 tiers — Great Stag (mythical) and The Migration (luck-maxxing)
+// are cut, leaving a GAP at ranks 4-5. Emerald Serpent keeps legendary-alpha, so
+// it's still the guaranteed-legendary voucher's target (see _guaranteedLegendary
+// below) and still what a prismatic critter pull ultimately means.
 const CRITTER_CARDS = [
   { id:'small_cube', name:'Sheep',           rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
   { id:'large_cube', name:'Duck',            rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
   { id:'sphere',     name:'Seagull',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'Red Fox',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
-  { id:'octagon',    name:'Great Stag',      rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The forest holds its breath.' },
-  { id:'triad',      name:'The Migration',   rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Thousands. No map. Right on time.' },
   { id:'star',       name:'Emerald Serpent', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
 ];
 
 // ─── SCOURGE (ewaste / horror) ────────────────────────────────────────────────
+// The pack that attacks the NATURE players' board. It's the only horror route
+// that works with no boss on the field. Two shapes of threat:
+//   • rot fields — a marked ring of ground that chews every plant inside it
+//   • biters — glitchlings and glitchworms that chase individual placements
 const SCOURGE_CARDS = [
-  { id:'small_cube', name:'Ticks',               rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Eight legs. No conscience. Already feeding.' },
-  { id:'large_cube', name:'Infested Mice',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'The fleas are the point. The mice are just transport.' },
-  { id:'sphere',     name:'Necrotic Mass',       rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Growing. Always growing.' },
-  { id:'triangle',   name:'The Black Plague',    rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Arrived by ship. Left by reputation.' },
+  { id:'small_cube', name:'Ticks',               rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Eight legs. No conscience. Everything inside the ring is food.' },
+  { id:'large_cube', name:'Infested Mice',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'It picks a flower and walks straight at it.' },
+  { id:'sphere',     name:'Necrotic Mass',       rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Growing. Always growing. Mostly below the soil.' },
+  { id:'triangle',   name:'The Black Plague',    rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Arrived by ship. Nothing grows where it settles.' },
   { id:'octagon',    name:'Host Event',          rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The distinction between parasite and host is administrative.' },
-  { id:'triad',      name:'Propagation Cluster', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three vectors. Simultaneous. Uncontained.' },
+  { id:'triad',      name:'Propagation Cluster', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three vectors. Three places nobody can plant.' },
   { id:'star',       name:'The Bloom',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It does not spread. It reveals.' },
 ];
 
 // ─── FUNGI (adpack / pristine) ────────────────────────────────────────────────
-// common → legendary get placement (joystick modal + PLACE confirm, same as
-// wildflower / flower bush). mythical and above are direct-spawns only.
+// TRIMMED to 4 tiers (common..legendary), matching Nature's shape.
+//
+// Chanterelle is cut. Giant Puffball is renamed "Puffball" and moved down into
+// the rare slot. Blue Angel fills legendary and is the pack's answer to the boss
+// camping the Soul Seed: it TAUNTS. Planted anywhere on the map it takes priority
+// over whatever the boss is eating, and its 20 HP is how long the germination
+// ground stays clear. Its own placement type ('blueangel', not 'fungi') because
+// Unity treats it as a different card end to end — no spore paint, and three
+// tap-to-drop spore caps once it lands.
 const FUNGI_CARDS = [
-  { id:'small_cube', name:'White Mushroom',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', placement:'fungi', desc:'Overnight. Unannounced.' },
-  { id:'large_cube', name:'Fairy Cap',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', placement:'fungi', desc:'Do not eat. Do not touch.' },
-  { id:'sphere',     name:'Chanterelle',      rarity:'rare',            rarityRank:2, command:'spawn_sphere',     placement:'fungi', desc:'The forest floor gives selectively.' },
-  { id:'triangle',   name:'Giant Puffball',   rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   placement:'fungi', desc:'Ten trillion spores. Patient.' },
-  { id:'octagon',    name:'Death Cap',        rarity:'mythical',        rarityRank:4, command:'spawn_octagon',                       desc:'Beautiful. Absolute.' },
-  { id:'triad',      name:'Spore Release',    rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',                         desc:'Already airborne. Already everywhere.' },
-  { id:'star',       name:'The Network',      rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',                          desc:'It remembered this forest before the trees did.' },
+  { id:'small_cube', name:'White Mushroom', rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'fungi',     desc:'Overnight. Unannounced.' },
+  { id:'large_cube', name:'Fairy Cap',      rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'fungi',     desc:'Do not eat. Do not touch.' },
+  { id:'sphere',     name:'Puffball',       rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'Ten trillion spores. Patient.' },
+  { id:'triangle',   name:'Blue Angel',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   placement:'blueangel', desc:'It sings. The glitch stops whatever it is doing and comes.' },
 ];
 
 // ─── RITUAL (adpack / horror) ─────────────────────────────────────────────────
+// Raises an altar and a procession of acolytes who walk to the boss and burn
+// themselves to HEAL it. The walk is the card: nature players who spot it can
+// kill the acolytes before they arrive and the offering is lost. Higher tiers
+// send more of them, not faster ones.
+//
+// With no boss alive the sacrifices bank toward SUMMONING one instead, which is
+// how the horror side gets back into a fight it has already lost.
 const RITUAL_CARDS = [
-  { id:'small_cube', name:'Sheep Sacrifice',  rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Offered willingly. Or so they believed.' },
-  { id:'large_cube', name:'The Goat',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'The old compact. Blood for favour.' },
-  { id:'sphere',     name:'The Pyre',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'What the circle demands.' },
-  { id:'triangle',   name:'The Offering',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Named. Then unnamed.' },
-  { id:'octagon',    name:'The Summoning',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Something answered.' },
+  { id:'small_cube', name:'Sheep Sacrifice',  rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'The sheep is spent. The one who spent it walks on.' },
+  { id:'large_cube', name:'The Goat',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'The old compact. Blood for favour, paid at a run.' },
+  { id:'sphere',     name:'The Pyre',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Two walk out of the fire. Neither comes back.' },
+  { id:'triangle',   name:'The Offering',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Named. Then unnamed. Then given away.' },
+  { id:'octagon',    name:'The Summoning',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Something answered. It wants feeding.' },
   { id:'triad',      name:'Mass Rite',        rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'They came at midnight. None returned alone.' },
   { id:'star',       name:'The Entity',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was the ritual all along.' },
 ];
@@ -98,15 +129,24 @@ const RITUAL_CARDS = [
 // Choice-driven corruption: a pristine pack occasionally hides one of these.
 // Picking it (dropCard) advances this phone's corruptionLevel toward the horror
 // phase and spawns a corrupted creature; picking nature keeps you pristine.
-// `command:'spawn_large_cube'` + the forced "flesh" pack type makes Unity spawn a
-// Fleshling (SpawnByType uncommon in the flesh phase). Rendered in the flesh
-// theme by cardTextures.buildFace via the `corrupted` flag.
+//
+// `command:'spawn_corrupted'` is a DEDICATED Unity command, not one of the seven
+// shared pack commands. It used to send spawn_large_cube with the pack type
+// forced to "flesh" and rely on uncommon-in-a-horror-pack being intercepted into
+// a glitchling; when the horror packs were split so each owns one verb, that
+// intercept disappeared and this card quietly started dropping boss meat instead
+// of the creature it's named after. The card face is still keyed by `id`, so the
+// art is unchanged.
 const CORRUPTED_FLESHLING = {
   id:'large_cube', name:'Fleshling', rarity:'common', rarityRank:0,
-  command:'spawn_large_cube', corrupted:true,
+  command:'spawn_corrupted', corrupted:true,
   desc:'Small. Hungry. It found you first.',
 };
-const CORRUPTED_CARD_CHANCE = 0.5;   // chance a pristine pack hides a corrupted card
+// Chance a pristine pack hides a corrupted card. Near-guaranteed: in a session
+// lasting minutes rather than weeks, the choice between nature and corruption
+// has to be put in front of a player almost every pull, or most people leave
+// having never been offered it.
+const CORRUPTED_CARD_CHANCE = 0.9;
 
 // ─── Flock o' Sheep — rare "starlight" sheep variant ──────────────────────────
 // A special rare that occasionally appears in pristine critter packs: its symbol
@@ -125,14 +165,25 @@ const FLOCK_CHANCE = 0.25;   // chance a pristine critter pack offers the Flock 
 // so players can contribute to the collective quests without needing currency.
 // Higher rarities require stars earned through those quests.
 // Numbers are intentionally tunable; keep in sync with QUEST_STAR_REWARDS in counter.js.
+// ALL FREE. The currency gate moved to pack acquisition (STARS_PER_PACK in
+// counter.js), which is how the games this models actually work: you pay to
+// pull, then play whatever comes out.
+//
+// Charging to PLACE inverted that, and produced the worst moment in the piece —
+// a first-time player pulls something rare, feels the hit, and is then told they
+// can't use it. That has no real-world referent, so it reads as the game being
+// broken rather than as a critique of anything. It also throttled the only way a
+// player can damage the boss.
+//
+// Restore any of these to re-gate use; the lookup is still wired up.
 const PLACEMENT_COSTS = {
   'common':          0,
   'uncommon':        0,
-  'rare':            3,
-  'legendary':       8,
-  'mythical':        15,
-  'luck-maxxing':    15,
-  'legendary-alpha': 25,
+  'rare':            0,
+  'legendary':       0,
+  'mythical':        0,
+  'luck-maxxing':    0,
+  'legendary-alpha': 0,
 };
 
 // ─── Active pack type ──────────────────────────────────────────────────────────
@@ -367,6 +418,118 @@ const HOLO_PACK_CHANCE = 0.40;
 // 3.5 — see the holo roll at the end of rollPack(). 1 = uniform across rarities.
 const HOLO_COMMON_WEIGHT = 4.0;
 
+// ─── Distinct-card packs ──────────────────────────────────────────────────────
+// Every pool holds exactly ONE card per rarity, and pick() resolves by rarity —
+// so the old composition (common, common, uncommon, top) always produced two
+// identical commons, and a second duplicate whenever the top card rolled
+// uncommon. Packs routinely showed four slots holding two or three different
+// things.
+//
+// A retention-driven game WANTS duplicates: they're what makes a collection feel
+// unfinished. This is a walk-up experience where most people open a handful of
+// packs and never return, so breadth beats grind — the middle slots now draw
+// DISTINCT rarities, which in these pools means distinct cards.
+//
+// Weighted low so variety doesn't quietly turn every pack into a jackpot: most
+// packs still land uncommon + rare, with a legendary surfacing occasionally.
+// Rare is weighted close to uncommon rather than half of it: at 90% corruption
+// most packs have only ONE filler slot, so a heavy uncommon bias would make that
+// slot the same card nearly every time — the sameness this was meant to fix.
+const FILLER_TIER_WEIGHTS = {
+  'uncommon':        5,
+  'rare':            4,
+  'legendary':       1.5,
+  'mythical':        0.5,
+  'luck-maxxing':    0.25,
+  'legendary-alpha': 0.1,
+};
+
+// Nature/Fungi are now trimmed to common..legendary and Critter has a gap at
+// mythical/luck-maxxing (see the card lists above), so a filler draw can no
+// longer assume all 7 tiers exist. `activePool` restricts the candidates to
+// tiers actually present, so e.g. rolling 'mythical' filler for Nature is no
+// longer possible — pick('mythical') on that pool would return an empty object
+// (no command, no rarity) and silently corrupt the pack.
+function pickFillerTiers(count, excludeTier, activePool) {
+  const present = new Set(activePool.map(c => c.rarity));
+  // 'common' is excluded because it's always slot 0 — see rollPack.
+  const pool = Object.keys(FILLER_TIER_WEIGHTS).filter(t => t !== excludeTier && present.has(t));
+  const out  = [];
+
+  for (let i = 0; i < count && pool.length; i++) {
+    const total = pool.reduce((a, t) => a + FILLER_TIER_WEIGHTS[t], 0);
+    let r = Math.random() * total;
+    let idx = 0;
+    while (idx < pool.length - 1 && r >= FILLER_TIER_WEIGHTS[pool[idx]]) {
+      r -= FILLER_TIER_WEIGHTS[pool[idx]];
+      idx++;
+    }
+    out.push(pool[idx]);
+    pool.splice(idx, 1);   // drawn without replacement, so the slots stay distinct
+  }
+  return out;
+}
+
+// Relative weights for the pack's headline pull. Sums to 100 when every tier is
+// present (28+34+18+10+6+4), matching the probabilities this replaced.
+//
+// Was a fixed if/else bracket chain rolled against Math.random(), which assumed
+// every pool had all 6 non-common tiers. Nature and Fungi are now trimmed to
+// common..legendary and Critter has a gap at mythical/luck-maxxing, so that
+// chain would have called pick('mythical') etc. on pools that don't have one —
+// pick() would return a spread of `undefined` (no command, no rarity, no
+// rarityRank), and that broken object would go straight into the pack, breaking
+// the sort and the eventual spawn. rollTopCard renormalises the weights over
+// only the tiers the ACTIVE pool actually has, so it degrades cleanly for any
+// pool shape instead of assuming the full 7-tier ladder.
+const TOP_CARD_WEIGHTS = {
+  'uncommon':        28,
+  'rare':            34,
+  'legendary':       18,
+  'mythical':        10,
+  'luck-maxxing':    6,
+  'legendary-alpha': 4,
+};
+
+function rollTopCard(activePool) {
+  const present = new Set(activePool.map(c => c.rarity));
+  const tiers   = Object.keys(TOP_CARD_WEIGHTS).filter(t => present.has(t));
+  const total   = tiers.reduce((a, t) => a + TOP_CARD_WEIGHTS[t], 0);
+
+  let r = Math.random() * total;
+  for (const t of tiers) {
+    if (r < TOP_CARD_WEIGHTS[t]) return pick(t);
+    r -= TOP_CARD_WEIGHTS[t];
+  }
+  return pick(tiers[tiers.length - 1]);   // float-rounding fallback
+}
+
+// Where an injected special (Flock, corrupted Fleshling) should land.
+//
+// Both used to hard-target the common slot, which was fine at a 50% corruption
+// rate but not at 90%: the Fleshling would overwrite a Flock o' Sheep almost
+// every time it appeared, quietly deleting that card from the game. This finds
+// the next-best slot instead of clobbering an existing special.
+function injectionSlot(cards, topCard, preferCommon) {
+  const free = i => {
+    const c = cards[i];
+    return c !== topCard && !c.flock && !c.corrupted;
+  };
+
+  if (preferCommon) {
+    const ci = cards.findIndex((c, i) => c.rarity === 'common' && free(i));
+    if (ci >= 0) return ci;
+  }
+
+  // Lowest-rarity ordinary card that isn't the pack's headline pull.
+  let best = -1;
+  for (let i = 0; i < cards.length; i++) {
+    if (!free(i)) continue;
+    if (best < 0 || cards[i].rarityRank < cards[best].rarityRank) best = i;
+  }
+  return best;
+}
+
 function rollPack() {
   const cards = [];
 
@@ -384,14 +547,10 @@ function rollPack() {
   // }
 
   isGodPack = false;
-  const roll = Math.random();
-  let topCard;
-  if      (roll < 0.04)  topCard = pick('legendary-alpha');
-  else if (roll < 0.09)  topCard = pick('luck-maxxing');
-  else if (roll < 0.157) topCard = pick('mythical');
-  else if (roll < 0.257) topCard = pick('legendary');
-  else if (roll < 0.457) topCard = pick('rare');
-  else                   topCard = pick('uncommon');
+  // Headline pull — weighted per TOP_CARD_WEIGHTS, restricted to whatever tiers
+  // the active pool actually has (see rollTopCard above).
+  const activePool = getActiveCardPool();
+  let topCard = rollTopCard(activePool);
 
   // Guaranteed Legendary voucher (bought in the pristine shop). Forces the top
   // card to the Emerald Serpent (critter legendary-alpha) — the only legendary
@@ -401,26 +560,38 @@ function rollPack() {
     window._guaranteedLegendary = false;
   }
 
+  // Choice-driven corruption — decided BEFORE the pack is built, because the
+  // Fleshling now gets a slot of its own rather than overwriting one.
+  //
+  // It used to replace the pool's common, which was survivable at 50% but not at
+  // 90%: Thornwire is the nature pool's only common and carries the whole
+  // thornwire mechanic (including the prismatic 3-charge variant), so it would
+  // have vanished from nine packs in ten. The Fleshling is its own kind of
+  // common — the corrupted counterpart to the pool's entry card, sitting beside
+  // it rather than in place of it. Seeing both together is also what makes the
+  // pack read as a CHOICE.
+  const corrupted = corruptionLevel < HORROR_THRESHOLD
+                 && Math.random() < CORRUPTED_CARD_CHANCE;
+
+  // Slot 0 is always the pool's common. The middle slots draw distinct rarities
+  // (see pickFillerTiers), so no two cards in a pack are ever the same — and the
+  // Fleshling takes one of those slots when it appears.
   cards.push(pick('common'));
-  cards.push(pick('common'));
-  cards.push(pick('uncommon'));
+  for (const tier of pickFillerTiers(corrupted ? 1 : 2, topCard.rarity, activePool))
+    cards.push(pick(tier));
+  if (corrupted) cards.push({ ...CORRUPTED_FLESHLING });
   cards.push(topCard);
+
+  // Stable sort, so the two rank-0 cards keep insertion order: the pool's common
+  // first, its corrupted counterpart immediately after it.
   cards.sort((a, b) => a.rarityRank - b.rarityRank);
   // Flock o' Sheep — a starlight rare that occasionally replaces a common in a
   // pristine critter pack (keeping the uncommon Duck). Re-sorted below to its
   // rare position, so it appears to the RIGHT of the Duck.
   if (getActiveCardPool() === CRITTER_CARDS && corruptionLevel < HORROR_THRESHOLD
       && Math.random() < FLOCK_CHANCE) {
-    const fi = cards.findIndex(c => c.rarity === 'common');
+    const fi = injectionSlot(cards, topCard, true);
     if (fi >= 0) cards[fi] = { ...FLOCK_O_SHEEP };
-  }
-
-  // Choice-driven corruption — a pristine pack occasionally hides a corrupted
-  // card (replacing one common). Pick it to advance toward horror; pick nature
-  // to stay clean. Only while still pristine; horror packs are already corrupt.
-  if (corruptionLevel < HORROR_THRESHOLD && Math.random() < CORRUPTED_CARD_CHANCE) {
-    const ci = cards.findIndex(c => c.rarity === 'common');
-    if (ci >= 0) cards[ci] = { ...CORRUPTED_FLESHLING };
   }
 
   // ── Holographic finish roll — critter + nature pools ────────────────────────
@@ -1096,6 +1267,18 @@ function dropCard(card) {
     return;
   }
 
+  // Ability cards (Leaf Storm) open the figure-eight trace panel instead of the
+  // joystick placement modal or a direct spawn. The card is already claimed at
+  // this point (Collection.record/XP above), matching how a placement card is
+  // "spent" the moment its session opens rather than only on success — same
+  // convention as thornwire, which can also fail to find ground after being
+  // claimed.
+  if (card.ability && typeof Combo !== 'undefined' && typeof Combo.beginAbilityTrace === 'function') {
+    Combo.beginAbilityTrace(card.ability, card.name);
+    resetToPackScreen();
+    return;
+  }
+
   // Placement cards get their own modal regardless of phase.
   // The finish rides along as a 6th field so Unity can make the placed object
   // shimmer — and, for Thornwire, grant a prismatic pull its extra charges.
@@ -1220,6 +1403,22 @@ function debugSpawnBlindBox() {
 function debugAddStars() {
   if (typeof addStars === 'function') addStars(25);
   console.log('[DEBUG] +25 stars granted');
+}
+
+// Grants one attribute level so the stat branches on the name tag can be seen
+// without grinding XP. Cycles DEX → PRE → VIG, so the first three taps fan out
+// one branch each and every tap after that stacks another node onto an existing
+// branch — which is both behaviours the branch UI needs to prove.
+//
+// For a single long limb (to check the off-screen clamp), call it directly:
+//   Player.debugLevel('dexterity', 5)
+let _debugStatIdx = 0;
+const DEBUG_STAT_ORDER = ['dexterity', 'presence', 'vigor'];
+function debugStatLevel() {
+  if (typeof Player === 'undefined' || !Player.debugLevel) return;
+  const attr = DEBUG_STAT_ORDER[_debugStatIdx % DEBUG_STAT_ORDER.length];
+  _debugStatIdx++;
+  Player.debugLevel(attr, 1);
 }
 
 // ── Horror Phase Roulette (Three.js) ──────────────────────────────────────

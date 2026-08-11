@@ -1,12 +1,28 @@
 // ─── STARS CURRENCY + PACK COUNTER ────────────────────────────────────────────
 
-let stars           = 0;   // earned through quests and ad-watching — start at zero
-let packsLeft      = 6;   // 6 free packs on load
+// Generous opening balance, modelled on how mobile gacha onboards: hand the
+// player enough currency to learn what spending FEELS like before any scarcity
+// arrives. The tightening later is the argument — it only lands because the
+// abundance came first.
+let stars           = 20;  // 10 packs' worth on top of the free ones
+let packsLeft      = 6;    // 6 free packs on load, then the timed refill
 
 const PACKS_PER_BATCH = 3;
 const STARS_PER_AD     = 10;  // earned by watching full ad
 const STARS_SKIP_AD    = 10;  // cost to skip an ad
-const STARS_PER_BATCH  = 50;  // cost to buy 3 packs
+
+// Cost of one pack, any type.
+//
+// The gate is on ACQUISITION, not use — you pay to pull, then play whatever comes
+// out. That's how the games this models actually work, and it avoids the dead end
+// the old placement costs created, where a first-time player could pull something
+// rare and then not be allowed to use it.
+const STARS_PER_PACK   = 2;
+
+// Bulk purchase from the shop. Priced BELOW buying the same packs one at a time
+// (3 × 2 = 6), because discount-driven over-purchase is itself one of the
+// patterns this work reproduces.
+const STARS_PER_BATCH  = 5;
 
 // Stars earned when a collective quest objective is completed by the room.
 // Unity broadcasts quest_reward|{quest}|{n} → server relays → handled in main.js.
@@ -121,18 +137,30 @@ function updateCounterDisplay() {
 // ─── Consume pack ─────────────────────────────────────────────────────────────
 
 function consumePack() {
-  if (packsLeft <= 0) {
-    if (document.body.classList.contains('pristine-phase')) {
-      showEmpty();   // calm cooldown screen — no ads in the pristine phase
-    } else {
-      showGate();    // horror gate with ad/spend options
-    }
-    return false;
+  // Free timed packs first — they're the thing you were GIVEN, so they should be
+  // spent before the thing you have to pay for. Spending currency while a free
+  // pack sits unused would read as the game picking your pocket.
+  if (packsLeft > 0) {
+    packsLeft--;
+    updateCounterDisplay();
+    pulseCounter();
+    return true;
   }
-  packsLeft--;
-  updateCounterDisplay();
-  pulseCounter();
-  return true;
+
+  // No free packs — buy one.
+  if (spendStars(STARS_PER_PACK)) {
+    pulseCounter();
+    return true;
+  }
+
+  // Out of both. The cooldown screen in the pristine phase, the ad gate once
+  // corrupted — the phase difference IS the tonal shift.
+  if (document.body.classList.contains('pristine-phase')) {
+    showEmpty();   // calm cooldown screen — no ads in the pristine phase
+  } else {
+    showGate();    // horror gate with ad/spend options
+  }
+  return false;
 }
 
 // ─── Pristine "no packs" cooldown screen ─────────────────────────────────────

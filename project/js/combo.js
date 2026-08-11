@@ -69,6 +69,16 @@ const Combo = (() => {
       return true;
     }
     if (msg.startsWith('combo_expired|')) { _clear(); return true; }
+    // "leafstorm_denied|clientId" — Unity rejected the trace because another
+    // storm is already active. The card was already spent when the trace
+    // opened (see beginAbilityTrace), so this is purely informational.
+    if (msg.startsWith('leafstorm_denied|')) {
+      const p = msg.split('|');
+      if (typeof CLIENT_ID !== 'undefined' && p[1] === CLIENT_ID) {
+        _showToast('A storm is already tearing through — wait for it to pass');
+      }
+      return true;
+    }
     if (msg.startsWith('combo_complete|')) {
       const p = msg.split('|');
       _onComplete({
@@ -345,9 +355,38 @@ const Combo = (() => {
   let _path     = [];     // [{x,y}] normalised drop-zone points
   let _drawing  = false;
 
-  const PATH_MAX_POINTS = 24;    // keep the WS message small
+  // Raised 24 → 56. The cap silently TRUNCATES a drag once it's hit, so at 24 a
+  // player tracing a figure eight ran out of budget partway through the second
+  // loop and the stroke just stopped recording mid-gesture. 56 is enough to
+  // close the shape comfortably.
+  //
+  // At ~12 chars per point ("0.123,0.456;") that's still well under 700 chars of
+  // WS payload, so the message stays small.
+  const PATH_MAX_POINTS = 56;
   const PATH_MIN_STEP   = 0.02;  // normalised distance between kept samples
   const PATH_MIN_POINTS = 2;
+
+  // Minimal self-contained toast — no dependency on main.js's UI helpers, since
+  // combo.js already owns its own panel DOM and this only needs to appear once,
+  // briefly, at the bottom of the screen.
+  let _toastTimer = null;
+  function _showToast(text) {
+    let t = document.getElementById('comboToast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'comboToast';
+      t.style.cssText = 'position:fixed;left:50%;bottom:18%;transform:translateX(-50%);' +
+        'background:rgba(20,4,10,0.92);color:#ffb0c0;border:1px solid rgba(255,120,150,0.5);' +
+        'padding:10px 16px;border-radius:6px;font-size:14px;z-index:9999;' +
+        'pointer-events:none;opacity:0;transition:opacity 0.25s ease;text-align:center;max-width:80vw;';
+      document.body.appendChild(t);
+    }
+    t.textContent = text;
+    requestAnimationFrame(() => { t.style.opacity = '1'; });
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2200);
+    if (typeof Sound !== 'undefined') Sound.play('deny');
+  }
 
   function _openPathDraw(card) {
     const panel = _el('comboPath');
@@ -358,6 +397,24 @@ const Combo = (() => {
     _updatePathUI();
     _drawPathMap();
     if (typeof Sound !== 'undefined') Sound.play('uiOpen');
+  }
+
+  /// <summary>
+  /// Open the SAME trace panel for a card that isn't an earned combo reward —
+  /// e.g. Leaf Storm, pulled directly from a pack. `_pending.external = true`
+  /// tells _releasePath to skip the _earned.splice/render, since there's nothing
+  /// in that array to remove.
+  ///
+  /// abilityId is sent as-is in the combo_path message (ComboManager.RunAbilityPath
+  /// dispatches on it generically — 'spiky_sheep' and 'leafstorm' are just two
+  /// registered ids in the same switch).
+  /// </summary>
+  function beginAbilityTrace(abilityId, displayName) {
+    _pending = { idx: -1, card: { comboId: abilityId, name: displayName }, external: true };
+    _openPathDraw(_pending.card);
+
+    const hint = _el('comboPathHint');
+    if (hint) hint.textContent = `trace a figure eight — release to unleash ${displayName || abilityId}`;
   }
 
   function _closePathDraw() {
@@ -464,10 +521,13 @@ const Combo = (() => {
     if (typeof CLIENT_ID !== 'undefined')
       send(`combo_path|${CLIENT_ID}|${card.comboId}|${pts}`);
 
-    // Spend the card only now that the ability has actually been used.
-    const i = _earned.indexOf(card);
-    if (i >= 0) _earned.splice(i, 1);
-    _renderEarned();
+    // External abilities (Leaf Storm) were already claimed in dropCard's pack
+    // flow — there's no entry in _earned to remove.
+    if (!_pending.external) {
+      const i = _earned.indexOf(card);
+      if (i >= 0) _earned.splice(i, 1);
+      _renderEarned();
+    }
 
     if (typeof Sound !== 'undefined') Sound.play('place');
     if (navigator.vibrate) { try { navigator.vibrate([30, 30, 60]); } catch (e) {} }
@@ -522,5 +582,5 @@ const Combo = (() => {
       ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   }
 
-  return { handleMessage };
+  return { handleMessage, beginAbilityTrace };
 })();

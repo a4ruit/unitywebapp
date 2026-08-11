@@ -31,6 +31,14 @@ const Announce = (() => {
   let _bossActive  = false;
   let _bossMaxHP   = 0;
   let _bossHP      = 0;
+  // maxHP as the boss spawned. Everything above it on the bar is health grafted
+  // on by flesh limbs, drawn as a hatched span so the room can see how much of
+  // the pool the horror players added.
+  let _bossBaseMax = 0;
+  // The HP value each limb's band STARTS at (the boss's max before that graft),
+  // so the grafted span can be divided into one cell per limb. Absolute HP
+  // values, not fractions — they stay correct as maxHP keeps growing.
+  let _bossLimbs   = [];
 
   function _el(id) { return document.getElementById(id); }
 
@@ -57,10 +65,21 @@ const Announce = (() => {
     // — a player who just joined shouldn't be told the boss "has manifested" when
     // the fight has been underway for minutes.
     if (msg.startsWith('boss_state|')) {
-      const p   = msg.split('|');
-      const hp  = parseInt(p[1]);
-      const max = parseInt(p[2]);
-      _onBossStateSync(hp, max);
+      const p    = msg.split('|');
+      const hp   = parseInt(p[1]);
+      const max  = parseInt(p[2]);
+      const base = parseInt(p[3]);   // absent on older Unity builds → treat as unfed
+      _onBossStateSync(hp, max, base);
+      return true;
+    }
+    // A flesh card was grafted onto the boss as a limb, raising its max HP.
+    // Everyone's bar has to grow — and show WHERE it grew — see _onBossLimb.
+    if (msg.startsWith('boss_limb|')) {
+      const p      = msg.split('|');
+      const bonus  = parseInt(p[1]);
+      const hp     = parseInt(p[2]);
+      const max    = parseInt(p[3]);
+      _onBossLimb(bonus, hp, max);
       return true;
     }
     if (msg.startsWith('boss_damaged|')) {
@@ -145,9 +164,11 @@ const Announce = (() => {
 
   // ── Boss spawn ──────────────────────────────────────────────────────────────
   function _onBossSpawned(maxHP, spawnerId, colorHex, name) {
-    _bossActive = true;
-    _bossMaxHP  = maxHP || 0;
-    _bossHP     = _bossMaxHP;
+    _bossActive  = true;
+    _bossMaxHP   = maxHP || 0;
+    _bossHP      = _bossMaxHP;
+    _bossBaseMax = _bossMaxHP;
+    _bossLimbs   = [];
     _setHudData();
 
     const isMe = spawnerId && (typeof CLIENT_ID !== 'undefined') && spawnerId === CLIENT_ID;
@@ -177,13 +198,18 @@ const Announce = (() => {
 
   // Silent restore of the live HP bar for a client that joined mid-fight.
   // Deliberately does NOT enqueue a banner — see the boss_state note above.
-  function _onBossStateSync(hp, max) {
+  function _onBossStateSync(hp, max, base) {
     if (isNaN(hp) || isNaN(max) || max <= 0 || hp <= 0) {
       // No live boss (or a malformed sync) — make sure no stale bar is showing.
       _bossActive = false;
       _hideHud();
       return;
     }
+    // A mid-fight joiner missed every boss_limb, so it can only draw the grafted
+    // span as one undivided block from base → max. Subsequent grafts it DOES see
+    // will divide off their own cells at the end of it.
+    _bossBaseMax = (!isNaN(base) && base > 0) ? Math.min(base, max) : max;
+    _bossLimbs   = [];
     _bossActive = true;
     _bossMaxHP  = max;
     _bossHP     = Math.max(0, hp);
@@ -233,8 +259,50 @@ const Announce = (() => {
     }
   }
 
+  // A flesh card fused onto the boss as a limb. Unlike a heal this makes the POOL
+  // bigger, so the bar has to grow a new cell on its right end rather than just
+  // refill — and it gets a bone-coloured flash to read as grafting, not healing.
+  function _onBossLimb(bonus, hp, max) {
+    if (isNaN(max) || max <= 0) return;
+    if (!isNaN(bonus) && bonus > 0) {
+      const from = max - bonus;
+      // If this is the first thing we've heard about the boss, the pre-graft max
+      // becomes our baseline rather than leaving the whole bar looking grafted.
+      if (_bossBaseMax <= 0) _bossBaseMax = from;
+      if (from > _bossBaseMax) _bossLimbs.push(from);
+    }
+    _bossActive = true;
+    _onBossDamaged(hp, max);      // shared HP-bar sync (direction-agnostic)
+    _showHud();
+
+    const fill = _el('bossHudFill');
+    const hud  = _el('bossHud');
+    if (fill) {
+      fill.classList.remove('boss-hud-fill--graft');
+      void fill.offsetWidth;      // reflow, so a rapid triad re-fires the flash
+      fill.classList.add('boss-hud-fill--graft');
+    }
+    if (hud) {
+      hud.classList.remove('boss-hud--graft');
+      void hud.offsetWidth;
+      hud.classList.add('boss-hud--graft');
+    }
+
+    if (hud && !isNaN(bonus) && bonus > 0) {
+      const tick = document.createElement('span');
+      tick.className   = 'boss-heal-tick boss-heal-tick--graft';
+      tick.textContent = `+${bonus}`;
+      hud.appendChild(tick);
+      tick.addEventListener('animationend', () => tick.remove(), { once: true });
+      setTimeout(() => tick.remove(), 1600);
+    }
+  }
+
   function _onBossSlain() {
-    _bossActive = false;
+    _bossActive  = false;
+    _bossBaseMax = 0;
+    _bossLimbs   = [];
+    _renderGraftSegments();   // drop the old boss's limb cells, not just the bar
     _hideHud();
     _enqueue({
       type: 'slain', icon: '✓', title: 'GLITCH CLEANSED',
@@ -267,6 +335,38 @@ const Announce = (() => {
     const pct  = _bossMaxHP > 0 ? Math.max(0, Math.min(1, _bossHP / _bossMaxHP)) : 0;
     if (fill) fill.style.width = (pct * 100).toFixed(1) + '%';
     if (hpEl) hpEl.textContent = `${_bossHP}/${_bossMaxHP}`;
+    _renderGraftSegments();
+  }
+
+  // Marks off the part of the bar that came from grafted limbs. The bar itself
+  // always spans 0..maxHP, so as limbs push maxHP up the core health quietly
+  // occupies a smaller share of it — the hatched tail is the difference, with a
+  // divider per limb so players can count what they'd have to chew through.
+  function _renderGraftSegments() {
+    const bar = _el('bossHudBar');
+    if (!bar) return;
+
+    const old = bar.querySelectorAll('.boss-hud-graft, .boss-hud-tick');
+    for (let i = 0; i < old.length; i++) old[i].remove();
+
+    if (!(_bossMaxHP > 0) || !(_bossBaseMax > 0) || _bossMaxHP <= _bossBaseMax) return;
+
+    const at = v => (Math.max(0, Math.min(1, v / _bossMaxHP)) * 100).toFixed(2) + '%';
+
+    const graft = document.createElement('span');
+    graft.className = 'boss-hud-graft';
+    graft.style.left = at(_bossBaseMax);
+    bar.appendChild(graft);
+
+    // Skip the first boundary — that's the graft region's own left edge.
+    for (let i = 0; i < _bossLimbs.length; i++) {
+      const hp = _bossLimbs[i];
+      if (hp <= _bossBaseMax || hp >= _bossMaxHP) continue;
+      const tick = document.createElement('span');
+      tick.className = 'boss-hud-tick';
+      tick.style.left = at(hp);
+      bar.appendChild(tick);
+    }
   }
   function _showHud() { const h = _el('bossHud'); if (h) h.classList.add('boss-hud--open'); }
   function _hideHud() { const h = _el('bossHud'); if (h) h.classList.remove('boss-hud--open'); }

@@ -94,7 +94,7 @@ let _pendingIce     = [];     // ICE candidates that arrived before setRemoteDes
 let _placing        = false;  // true while user is moving a placement preview
 // Cards that are AIMED by tapping the minimap rather than steered with the
 // joystick. The tap sets the drop point directly and commits it in one gesture.
-const TAP_PLACE_CARDS = ['thornwire'];
+const TAP_PLACE_CARDS = ['thornwire', 'sporecap'];
 let _placeCardType  = '';     // cardType of the active placement session
 let _placeTapMode   = false;  // true when the active card uses tap-to-drop
 // Charges available this session. Unity is authoritative and sends the count on
@@ -373,6 +373,15 @@ function handlePossessionMessage(data) {
     // fall back to joystick mode with a single charge)
     if (parts[1] === CLIENT_ID) {
       _onPlacementGranted(parts[3], parts[4], parts[5]);
+      return true;
+    }
+  }
+  // placement_phase|clientId|duration|label|cardType|ammo — the open session
+  // changed control scheme (Blue Angel → its three spore caps).
+  if (msg.startsWith('placement_phase|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) {
+      _onPlacementPhase(parts[3], parts[4], parts[5]);
       return true;
     }
   }
@@ -2436,6 +2445,40 @@ function _onPlacementGranted(cardName, cardType, ammo) {
   // Thornwire is AIMED, not steered: the player taps the map and the charge is
   // dropped there. Everything else uses the joystick + PLACE button.
   _placeTapMode = TAP_PLACE_CARDS.indexOf(_placeCardType) !== -1;
+
+  _applyPlaceMode(cardName, ammo);
+
+  // Show the overlay — pointer-events:all means the entire background
+  // (pack carousel, shop, stars, everything) is now uninteractable
+  // until placement completes.
+  _ui.placeOverlay.classList.add('active');
+
+  // Hide the inhabit button while placing
+  _ui.btn.classList.add('poss-hidden');
+
+  console.log('[possession.js] Placement started — UI modal active, background blocked');
+}
+
+// A placement session that changes its own control scheme partway through.
+// Sent by Unity as placement_phase|clientId|duration|label|cardType|ammo — used
+// by the Blue Angel, which is STEERED into the ground and then hands the player
+// three tap-to-drop spore caps without the modal ever closing. Rebuilding the
+// controls in place keeps it as one continuous gesture instead of the phone
+// flashing back to the pack carousel between two halves of the same card.
+function _onPlacementPhase(label, cardType, ammo) {
+  if (!_placing) return;   // no open session to re-arm
+
+  _placeCardType = (cardType || '').toLowerCase();
+  _placeTapMode  = TAP_PLACE_CARDS.indexOf(_placeCardType) !== -1;
+
+  _applyPlaceMode(label, ammo);
+  console.log('[possession.js] Placement phase →', _placeCardType, 'ammo', _placeAmmoLeft);
+}
+
+// Point the modal at either the joystick or the minimap, reset its ammo pips and
+// relabel it. Shared by the initial grant and any mid-session phase change so the
+// two can never drift apart.
+function _applyPlaceMode(cardName, ammo) {
   // Tap mode starts with NO marker — one only appears where the player taps.
   // Steered cards start centred until Unity sends the first real position.
   _placePos = _placeTapMode ? null : { x: 0.5, y: 0.5 };
@@ -2454,6 +2497,12 @@ function _onPlacementGranted(cardName, cardType, ammo) {
     _ui.placeCardHeader.innerHTML = label + '<br>PLACEMENT';
   }
 
+  // Joystick streaming is pointless in tap mode — there's no stick to read.
+  // Cleared unconditionally so a phase change out of steer mode doesn't leave
+  // the old interval running against a stick that's no longer on screen.
+  clearInterval(_placementInputInterval);
+  _placementInputInterval = null;
+
   if (_placeTapMode) {
     // Tap-to-drop: the map IS the control, so the joystick and PLACE button
     // would only be dead weight. Hide them and arm the minimap for taps.
@@ -2465,7 +2514,11 @@ function _onPlacementGranted(cardName, cardType, ammo) {
       _ui.placeMinimap.style.cursor        = 'crosshair';
       _ui.placeMinimap.style.pointerEvents = 'auto';
     }
-    if (_ui.placeHint) _ui.placeHint.textContent = '✛ tap the map to drop';
+    if (_ui.placeHint) {
+      _ui.placeHint.textContent = _placeCardType === 'sporecap'
+        ? '✛ tap the map to plant'
+        : '✛ tap the map to drop';
+    }
   } else {
     _ui.placeOverlay.classList.remove('place-tap');
     // Move joystick (left) + PLACE button (right) into the controls row so
@@ -2477,18 +2530,7 @@ function _onPlacementGranted(cardName, cardType, ammo) {
     _ui.joyZone.style.display = 'flex';
     _ui.place.style.display   = 'flex';
     if (_ui.placeHint) _ui.placeHint.textContent = '▲ look up at installation screen';
-  }
 
-  // Show the overlay — pointer-events:all means the entire background
-  // (pack carousel, shop, stars, everything) is now uninteractable
-  // until placement completes.
-  _ui.placeOverlay.classList.add('active');
-
-  // Hide the inhabit button while placing
-  _ui.btn.classList.add('poss-hidden');
-
-  // Joystick streaming is pointless in tap mode — there's no stick to read.
-  if (!_placeTapMode) {
     // Stream joystick to Unity as placement_move at up to 20 fps — gated by
     // the dirty-flag helpers so idle ticks don't waste WS bandwidth.
     _resetInputSendTracking();  // first tick always fires
@@ -2499,8 +2541,6 @@ function _onPlacementGranted(cardName, cardType, ammo) {
       }
     }, 50);
   }
-
-  console.log('[possession.js] Placement started — UI modal active, background blocked');
 }
 
 function _onPlacementDenied() {
