@@ -659,7 +659,17 @@ const label = document.getElementById('wsLabel');
 
 function setStatus(connected) {
   dot.classList.toggle('live', connected);
-  label.textContent = connected ? 'live' : 'offline';
+  // Show WHICH relay, not just up/down. The failure that cost a whole testing
+  // session was a phone with a perfectly healthy socket open to a server Unity
+  // wasn't on — indistinguishable from working, because the only thing on screen
+  // said "live". The host is the one fact that would have caught it instantly.
+  const host = (() => {
+    try { return new URL(WS_URL).host.replace('unitywebapp.onrender.com', 'render')
+                                     .replace('packmentality.cc', 'cc'); }
+    catch (e) { return '?'; }
+  })();
+  label.textContent = connected ? `live · ${host}` : `offline · ${host}`;
+  if (label.parentElement) label.parentElement.title = WS_URL;
 }
 
 // ── WS verbose logging gate ─────────────────────────────────────────────────
@@ -773,7 +783,10 @@ function reSendSetName() {
 function connect() {
   try {
     _wsHadOpenThisAttempt = false;
-    if (WS_DEBUG) console.log('[WS] Connecting to', WS_URL);
+    // NOT gated behind WS_DEBUG. Which relay this phone is talking to is the one
+    // line worth having in every console, every time — it's the fact that makes a
+    // phone/Unity mismatch obvious instead of invisible.
+    console.log('[WS] Connecting to', WS_URL);
     ws = new WebSocket(WS_URL);
     ws.onopen  = () => {
       _wsHadOpenThisAttempt = true;
