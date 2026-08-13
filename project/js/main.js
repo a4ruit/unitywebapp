@@ -1402,10 +1402,23 @@ document.addEventListener('click', function(e) {
 function debugTogglePhase() {
   const btn = document.getElementById('debugPhaseBtn');
   const inHorror = corruptionLevel >= HORROR_THRESHOLD;
-  // Speak to Unity so the COLLECTIVE bar moves — every phone flips with us.
-  // (Old behaviour mutated only the local packsOpened; that no longer drives
-  // anything since corruption is Unity-authoritative now.)
+
+  // TWO separate things have to move, and only doing one is why this stopped
+  // working:
+  //
+  //   1. Unity's COLLECTIVE corruption bar — the world's state.
+  //   2. This phone's PERSONAL corruption level — which is what actually drives
+  //      the pack tabs, the card pools and the card art on this device.
+  //
+  // corruptionLevel is only ever incremented by placing a corrupted card, so
+  // messaging Unity alone left the world corrupted while the phone stayed
+  // resolutely in nature phase. updatePersonalPhase() is what flips the UI.
   send(inHorror ? 'debug_corruption_reset' : 'debug_corruption_horror');
+
+  corruptionLevel = inHorror ? 0 : HORROR_THRESHOLD;
+  updatePersonalPhase();
+  sendPackType();   // the active pack tab means a different pool now
+
   if (inHorror) {
     btn.textContent = '▸ horror';
     btn.dataset.phase = 'pristine';
