@@ -89,12 +89,50 @@ const Player = (() => {
   function _totalLevel() { return _attr.dexterity.level + _attr.presence.level + _attr.vigor.level; }
 
   // ── Modifiers ─────────────────────────────────────────────────────────────────
+  // The room's pooled Presence, mirrored back from Unity. Display only — Unity is
+  // authoritative and applies the real multiplier itself.
+  let _roomMoveMult   = 1;
+  let _roomPresence   = 0;
+  let _roomPlayers    = 0;
+
   function _recompute() {
     window.PlayerMods = {
-      flockCount:      3 + Math.floor(_attr.presence.level / 3) + _perk.flock,
+      // Presence no longer feeds this — flock size is perk-only now. Presence
+      // pools into a ROOM-WIDE movement bonus instead (see _pushPresence).
+      flockCount:      3 + _perk.flock,
       sporeBudgetMult: 1 + 0.06 * _attr.dexterity.level + 0.30 * _perk.spore,
       starGainMult:    1 + 0.05 * _attr.vigor.level     + 0.20 * _perk.star,
+      // Mirrored, not computed here — see above.
+      roomMoveMult:    _roomMoveMult,
     };
+    _pushPresence();
+  }
+
+  // Report this phone's Presence level so Unity can pool it with everyone else's.
+  //
+  // We send the LEVEL, not a multiplier: the pooling maths has to live in one
+  // place or two clients on different app versions would disagree about what the
+  // room bonus is. Unity owns it and broadcasts the result back.
+  let _sentPresence = -1;
+  function _pushPresence() {
+    const lv = _attr.presence.level;
+    if (lv === _sentPresence) return;          // only on an actual change
+    _sentPresence = lv;
+    if (typeof CLIENT_ID !== 'undefined' && typeof send === 'function') {
+      send(`player_presence|${CLIENT_ID}|${lv}`);
+    }
+  }
+
+  // Unity broadcast: room_mods|mult|totalPresence|contributors
+  function handleMessage(msg) {
+    if (typeof msg !== 'string' || !msg.startsWith('room_mods|')) return false;
+    const p = msg.split('|');
+    _roomMoveMult = parseFloat(p[1]) || 1;
+    _roomPresence = parseInt(p[2]) || 0;
+    _roomPlayers  = parseInt(p[3]) || 0;
+    if (window.PlayerMods) window.PlayerMods.roomMoveMult = _roomMoveMult;
+    _render();
+    return true;
   }
 
   // ── XP / levelling ──────────────────────────────────────────────────────────────
@@ -534,7 +572,12 @@ const Player = (() => {
     const m = window.PlayerMods || {};
     const buff = {
       dexterity: `+${Math.round(((m.sporeBudgetMult || 1) - 1) * 100)}% spore`,
-      presence:  `${m.flockCount || 3} sheep / flock`,
+      // Shows the ROOM's bonus, not this player's contribution — the number you
+      // benefit from is the pooled one, and seeing it move when someone else
+      // levels up is the point of pooling it.
+      presence:  _roomPlayers > 0
+                   ? `room ×${_roomMoveMult.toFixed(2)} speed · ${_roomPlayers} playing`
+                   : `room ×${_roomMoveMult.toFixed(2)} speed`,
       vigor:     `+${Math.round(((m.starGainMult || 1) - 1) * 100)}% stars`,
     };
     const rows = document.getElementById('pl-stats-rows');
@@ -652,5 +695,5 @@ const Player = (() => {
     }
   }
 
-  return { gainXP, observe, reveal, debugLevel };
+  return { gainXP, observe, reveal, debugLevel, handleMessage };
 })();

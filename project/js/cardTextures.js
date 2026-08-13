@@ -53,7 +53,14 @@ const CardTextures = (() => {
   // rather than the green their 'common' rarity would otherwise give them.
   const CORRUPTED_LABEL_COLOR = '#9a9a9a';
 
-  const ANIMATED = new Set(['mythical','luck-maxxing','legendary-alpha']);
+  // 'legendary' joins the animated set so its activation border actually moves —
+  // cards3d/choiceGrid3d only re-render per frame for rarities listed here, so a
+  // time-driven effect on an unlisted rarity would draw once and sit frozen.
+  const ANIMATED = new Set(['legendary','mythical','luck-maxxing','legendary-alpha']);
+
+  // Rarities that get the WoW-style activation overlay. Legendary and up — the
+  // tiers that should feel like something lit up when you pulled them.
+  const ACTIVATION = new Set(['legendary','mythical','luck-maxxing','legendary-alpha']);
 
   function isAnimated(rarity) { return ANIMATED.has(rarity); }
   function getCfg(rarity)     { return RARITY_CFG[rarity] || RARITY_CFG.common; }
@@ -2308,6 +2315,102 @@ const CardTextures = (() => {
   }
 
   // Glitchy corrupted-card border — a DISTINCT black frame that jitters and
+  // ─── Activation border (legendary and up) ────────────────────────────────────
+  // WoW's spell-activation overlay: chunky pixel blocks chasing each other around
+  // the frame with a comet tail, over a faint standing shimmer, plus occasional
+  // twinkles. Tinted to the rarity's own colour so each tier still reads as
+  // itself rather than every high card glowing identically.
+  //
+  // Deliberately built from axis-aligned fillRects on an 8px grid rather than
+  // strokes or gradients — this is a pixel game, and a smoothly feathered glow
+  // would be the one soft element on an otherwise hard-edged card.
+  function drawActivationBorder(ctx, rarity, t) {
+    const cfg = getCfg(rarity);
+    const rgb = hexToRgb(cfg.border);
+
+    ctx.save();
+
+    const B  = 8;                      // block size — also the grid the border snaps to
+    const x0 = 8, y0 = 8, w = 240, h = 368;
+
+    // Perimeter walked clockwise as a flat list of block positions, so a marching
+    // head is just an index into it and corners need no special handling.
+    const pts = [];
+    for (let x = x0;        x <  x0 + w;  x += B) pts.push([x, y0]);
+    for (let y = y0;        y <  y0 + h;  y += B) pts.push([x0 + w - B, y]);
+    for (let x = x0 + w - B; x >= x0;     x -= B) pts.push([x, y0 + h - B]);
+    for (let y = y0 + h - B; y >= y0;     y -= B) pts.push([x0, y]);
+
+    const n    = pts.length;
+    const TAIL = 15;                   // blocks in each comet's fade-out
+    const head = (t * 26) % n;
+
+    // Diagonal shine sweep. Travels ACROSS the card rather than around the
+    // perimeter, so it catches the top and left edges together then the bottom
+    // and right — which is how a glint actually crosses a metal frame. The comet
+    // above runs the loop; this is the thing that reads as light.
+    //
+    // Period is longer than the march on purpose: a constant glint stops being a
+    // glint. Most of the time the frame just glows, then it flashes.
+    const SHINE_PERIOD = 2.6;                                  // seconds per sweep
+    const SHINE_WIDTH  = 0.16;                                 // band width, 0..1 of the diagonal
+    const sweepPos = ((t % SHINE_PERIOD) / SHINE_PERIOD) * 1.5 - 0.25;  // overshoots both ends
+
+    for (let i = 0; i < n; i++) {
+      const [px, py] = pts[i];
+
+      // Two comets running opposite sides at once — a single head leaves most of
+      // the frame dark at any moment and reads as a loading bar, not activation.
+      let a = 0;
+      for (let c = 0; c < 2; c++) {
+        const hd = (head + c * n / 2) % n;
+        const d  = (i - hd + n) % n;
+        if (d < TAIL) a = Math.max(a, 1 - d / TAIL);
+      }
+      // Standing shimmer underneath, so the whole frame stays lit between passes.
+      a = Math.max(a, 0.16 + 0.10 * Math.sin(t * 3 + i * 0.45));
+
+      // Position along the top-left → bottom-right diagonal, 0..1.
+      const proj  = ((px - x0) + (py - y0)) / (w + h);
+      // Squared falloff so the band has a hot centre rather than a flat plateau.
+      const near  = Math.max(0, 1 - Math.abs(proj - sweepPos) / SHINE_WIDTH);
+      const shine = near * near;
+
+      ctx.fillStyle = `rgba(${rgb},${Math.min(1, a * 0.85 + shine * 0.6).toFixed(3)})`;
+      ctx.fillRect(px, py, B, B);
+
+      // Bright core — on the comet's leading blocks, and on whatever the shine is
+      // crossing. Same white inset for both so they read as one material.
+      const core = Math.max(a > 0.72 ? (a - 0.72) * 2.2 : 0, shine);
+      if (core > 0.02) {
+        ctx.fillStyle = `rgba(255,255,255,${Math.min(1, core).toFixed(3)})`;
+        ctx.fillRect(px + 2, py + 2, B - 4, B - 4);
+      }
+      // Full-block blowout at the very peak of the sweep, so the glint has a
+      // moment where it overtakes the frame colour entirely.
+      if (shine > 0.86) {
+        ctx.fillStyle = `rgba(255,255,255,${((shine - 0.86) * 4).toFixed(3)})`;
+        ctx.fillRect(px, py, B, B);
+      }
+    }
+
+    // ── Twinkles ──────────────────────────────────────────────────────────────
+    // Pixel plus-signs popping on and off around the frame. Stepped rather than
+    // continuous so they blink like pixels instead of fading like a gradient.
+    const step = Math.floor(t * 7);
+    for (let i = 0; i < 5; i++) {
+      if (_hrand(i * 4.7 + step) < 0.55) continue;
+      const idx      = Math.floor(_hrand(i * 2.3 + step * 0.7) * n);
+      const [sx, sy] = pts[idx];
+      const s        = 2 + Math.floor(_hrand(i + step) * 2);
+      ctx.fillStyle  = 'rgba(255,255,255,0.9)';
+      ctx.fillRect(sx + B / 2 - s, sy + B / 2 - 1, s * 2, 2);
+      ctx.fillRect(sx + B / 2 - 1, sy + B / 2 - s, 2, s * 2);
+    }
+
+    ctx.restore();
+  }
+
   // breaks up, with a monochrome pulse and flickering ASCII. Animated via t
   // (corrupted cards re-render each frame, like holo).
   function drawGlitchBorder(ctx, t) {
@@ -2549,6 +2652,7 @@ const CardTextures = (() => {
     // Their own symbol + name are still drawn on top by drawShape / drawLabels.
     if (card.name === 'White Mushroom' || card.name === 'Sheep') skinKey = 'nature-common';
     if (card.name === 'Duck'           || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
+    if (card.name === 'Seagull'        || card.name === 'Puffball')  skinKey = 'nature-rare';
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
@@ -2568,6 +2672,9 @@ const CardTextures = (() => {
     if (card.name === 'Emerald Serpent') drawOuroboros(ctx, t);
     else                                 drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
+    // Over the labels, under the holo sheen: the overlay should read as sitting
+    // on the frame, but holo is a finish applied to the whole card face.
+    if (ACTIVATION.has(card.rarity)) drawActivationBorder(ctx, card.rarity, t);
     if (card.variant === 'holo') drawHolo(ctx, t);
     return canvas;
   }

@@ -794,6 +794,7 @@ function connect() {
       if (handleQuestMessage(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
+      if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
       handlePossessionMessage(e.data);
     };
   } catch(e) { setStatus(false); reconnectTimer = setTimeout(connect, 3000); }
@@ -1257,7 +1258,8 @@ function dropCard(card) {
   if (typeof Player !== 'undefined') Player.gainXP('presence', 12);
 
   // Flock o' Sheep — releases a small flock (several sheep) instead of one.
-  // The flock size scales with the Presence attribute (PlayerMods.flockCount).
+  // Flock size comes from the SHEPHERD perk only now — Presence used to feed it,
+  // but Presence pools into the room-wide speed bonus instead (see PlayerMods.cs).
   if (card.flock) {
     if (typeof CLIENT_ID !== 'undefined') {
       const flockN = (window.PlayerMods && window.PlayerMods.flockCount) || 3;
