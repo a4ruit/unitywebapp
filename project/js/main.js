@@ -15,15 +15,19 @@
 // the socket opens, packs open, cards render, and not one message reaches the
 // world. Change both together, every time.
 //
-// Currently RENDER, not packmentality.cc. The RMIT network cannot reach the .cc
-// domain at all — that was being hidden by an automatic failover which silently
-// moved whoever couldn't reach it onto this server instead. Devices on uni Wi-Fi
-// were all quietly running here; only 5G phones actually reached .cc, which is
-// why they were the ones that appeared broken.
-const WS_PRIMARY = 'wss://unitywebapp.onrender.com';
-// Kept ONLY for the ?server=do manual override, for testing .cc reachability
-// from a given network. Nothing selects it automatically.
-const WS_BACKUP  = 'wss://packmentality.cc';
+// Currently the DigitalOcean droplet (Sydney) — preferred over Render, which on
+// the free tier sleeps after inactivity and cold-starts for ~30s.
+//
+// It was briefly on Render because packmentality.cc had been auto-classified as
+// "Grayware" by URL-filtering vendors — an unlucky reputation hit that education
+// networks block outright, which is why phones on uni Wi-Fi couldn't reach it
+// while a laptop on 5G could. Recategorised as Entertainment-and-Arts and now
+// reachable. If a venue blocks it again, flip this AND WS_Client.wsUrl in Unity
+// to the Render URL together, and verify both readouts agree.
+const WS_PRIMARY = 'wss://packmentality.cc';
+// Kept ONLY for the ?server=render manual override. Nothing selects it
+// automatically — automatic failover is what caused the silent split.
+const WS_BACKUP  = 'wss://unitywebapp.onrender.com';
 
 const _wsOverride = (() => {
   try {
