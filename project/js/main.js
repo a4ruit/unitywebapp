@@ -10,7 +10,11 @@
 // we retry the same URL (= transient blip, not a server outage).
 //
 // Manual override for testing:  ?server=do  or  ?server=render  in the URL.
+// THE relay. Both the phones and Unity must be pinned to the same one — see the
+// note in ws.onclose about why automatic failover was removed.
 const WS_PRIMARY = 'wss://packmentality.cc';
+// Kept ONLY for the ?server=render manual override, so a broken .cc can still be
+// worked around deliberately during testing. Nothing selects it automatically.
 const WS_BACKUP  = 'wss://unitywebapp.onrender.com';
 
 const _wsOverride = (() => {
@@ -771,15 +775,19 @@ function connect() {
     };
     ws.onclose = () => {
       setStatus(false);
-      // Never reached `open` → this URL is unreachable. Swap to the other
-      // endpoint for the next attempt (unless the URL was forced via
-      // ?server= override — then the user explicitly chose this server,
-      // so honor that and keep retrying it).
-      if (!_wsHadOpenThisAttempt && !_wsOverride && WS_PRIMARY !== WS_BACKUP) {
-        const other = (WS_URL === WS_PRIMARY) ? WS_BACKUP : WS_PRIMARY;
-        console.warn('[WS] Failover:', WS_URL, '→', other);
-        WS_URL = other;
-      }
+      // AUTOMATIC FAILOVER REMOVED — retry the same endpoint forever.
+      //
+      // The two relays are independent servers with nothing bridging them, and
+      // Unity failed over on its own schedule, so the two sides could silently
+      // settle on different ones. A phone in that state looks completely healthy:
+      // the socket is open, packs open, cards render — but every message goes to
+      // a relay Unity isn't listening to, so names never register and nothing
+      // ever spawns.
+      //
+      // It only took ONE failed attempt to strand a phone there, which is why it
+      // hit 5G users hardest: mobile first-connections lose that race far more
+      // often than Wi-Fi ones. Retrying the same URL is strictly better — a phone
+      // that can't reach the server fails visibly instead of half-working.
       reconnectTimer = setTimeout(connect, 3000);
     };
     ws.onerror = () => ws.close();
