@@ -10,18 +10,29 @@
 // we retry the same URL (= transient blip, not a server outage).
 //
 // Manual override for testing:  ?server=do  or  ?server=render  in the URL.
-// THE relay. Both the phones and Unity must be pinned to the same one — see the
-// note in ws.onclose about why automatic failover was removed.
-const WS_PRIMARY = 'wss://packmentality.cc';
-// Kept ONLY for the ?server=render manual override, so a broken .cc can still be
-// worked around deliberately during testing. Nothing selects it automatically.
-const WS_BACKUP  = 'wss://unitywebapp.onrender.com';
+// ⚠ THE RELAY. This MUST match WS_Client.wsUrl in Unity — they are two ends of
+// one pipe, and if they differ, everything looks healthy while nothing works:
+// the socket opens, packs open, cards render, and not one message reaches the
+// world. Change both together, every time.
+//
+// Currently RENDER, not packmentality.cc. The RMIT network cannot reach the .cc
+// domain at all — that was being hidden by an automatic failover which silently
+// moved whoever couldn't reach it onto this server instead. Devices on uni Wi-Fi
+// were all quietly running here; only 5G phones actually reached .cc, which is
+// why they were the ones that appeared broken.
+const WS_PRIMARY = 'wss://unitywebapp.onrender.com';
+// Kept ONLY for the ?server=do manual override, for testing .cc reachability
+// from a given network. Nothing selects it automatically.
+const WS_BACKUP  = 'wss://packmentality.cc';
 
 const _wsOverride = (() => {
   try {
     const v = new URLSearchParams(location.search).get('server');
-    if (v === 'do'     || v === 'primary') return WS_PRIMARY;
-    if (v === 'render' || v === 'backup')  return WS_BACKUP;
+    // Mapped by SERVER NAME, not by primary/backup — those labels swap whenever
+    // the active relay changes, and a ?server=render that quietly meant .cc is
+    // exactly the kind of confusion this whole bug was made of.
+    if (v === 'render') return 'wss://unitywebapp.onrender.com';
+    if (v === 'do' || v === 'cc' || v === 'packmentality') return 'wss://packmentality.cc';
   } catch (e) {}
   return null;
 })();
