@@ -2506,6 +2506,11 @@ const Pack3D = (() => {
     rebuildTextMesh();
     rebuildCloudMeshes();
     rebuildCircleMesh();
+    // Petals ↔ flies. Missing here, which is why reverting out of horror left the
+    // flies circling a nature pack until you switched tabs and back — that path
+    // goes through setPackTheme, which rebuilds everything. rebuildFlyMeshes
+    // reads isNaturePhase() itself, so it swaps the right way in both directions.
+    rebuildFlyMeshes();
     if (rimLight) {
       if (isNaturePhase())       { rimLight.color.setStyle('#81d4fa'); rimLight.intensity = 2.2; }
       else if (isFungiPhase())   { rimLight.color.setStyle('#d4a870'); rimLight.intensity = 1.8; }

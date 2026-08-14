@@ -108,6 +108,36 @@
         </div>
       </div>
 
+      <!-- SOUL RECOVERY CONSOLE ────────────────────────────────────────────
+           Shown on every phone while the room votes on restarting the loop.
+           Deliberately the least designed screen in the app: no art, no
+           animation, nothing to tap. Every other screen in this piece is
+           seductive; the one moment that asks for a real decision is a text
+           prompt and a keyboard. -->
+      <div class="screen hidden" id="screen-soul">
+        <div class="soul-term">
+          <div class="soul-term-line soul-term-dim">&gt; soul_tree.status</div>
+          <div class="soul-term-line soul-term-err">STATE: TERMINATED</div>
+          <div class="soul-term-line soul-term-dim">&gt; recover --collective</div>
+          <div class="soul-term-line soul-term-q">DATA RECOVERABLE: CONTINUE?</div>
+
+          <div class="soul-term-tally" id="soulTally">awaiting the room…</div>
+
+          <!-- Focused the moment the screen opens, keyboard already up. Friction
+               here should come from having to decide, not from hunting a field. -->
+          <div class="soul-term-field">
+            <span class="soul-term-caret">&gt;</span>
+            <input class="soul-term-input" id="soulInput"
+                   type="text" maxlength="12" placeholder="type yes or no"
+                   autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+                   onkeydown="if(event.key==='Enter') submitSoulVote()">
+          </div>
+
+          <div class="soul-term-line soul-term-out" id="soulOutput"></div>
+          <button class="soul-term-btn" onclick="submitSoulVote()">[ send ]</button>
+        </div>
+      </div>
+
       <!-- PACK SCREEN -->
       <div class="screen hidden" id="screen-pack">
         <!-- player's persistent name tag (set on the username screen) -->

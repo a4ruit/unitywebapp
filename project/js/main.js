@@ -179,6 +179,14 @@ const FLOCK_O_SHEEP = {
 };
 const FLOCK_CHANCE = 0.25;   // chance a pristine critter pack offers the Flock o' Sheep
 
+// How many sheep one Flock o' Sheep card releases.
+//
+// A plain constant, not a PlayerMods field. It used to scale with Presence and
+// with the SHEPHERD perk; Presence now pools into the room-wide movement bonus
+// and the perks are gone, so it could never vary — a knob that reads like it
+// does something while always returning 3 is worse than a number.
+const FLOCK_SIZE = 3;
+
 // ─── Placement star costs ──────────────────────────────────────────────────────
 // Common and uncommon are always free — lower rarities must remain accessible
 // so players can contribute to the collective quests without needing currency.
@@ -238,6 +246,147 @@ window.HORROR_THRESHOLD = HORROR_THRESHOLD;
 
 // Drives everything tied to THIS phone's personal phase (called on every pull
 // and on WS reconnect). Does NOT touch the collective bar or packsOpened.
+// ── Soul recovery console ───────────────────────────────────────────────────
+// Unity broadcasts soul_recovery|needed|yes|no while the room votes on whether
+// to restart the loop, and soul_recovery_end once it passes.
+//
+// The console does NOT interrupt mid-action. A player part-way through opening a
+// pack, placing a card or inhabiting a creature finishes what they're doing and
+// lands on the console afterwards — being yanked out of a placement would read
+// as a crash, and the vote has no deadline that makes the interruption worth it.
+
+let _soulActive  = false;   // Unity is asking
+let _soulPending = false;   // asking, but this phone is mid-action
+let _soulVoted   = null;    // 'yes' | 'no' | null — what THIS phone answered
+
+function handleSoulMessage(data) {
+  if (typeof data !== 'string') return false;
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+
+  if (msg.startsWith('soul_recovery|')) {
+    const p = msg.split('|');
+    _soulActive = true;
+    _updateSoulTally(parseInt(p[1]) || 1, parseInt(p[2]) || 0, parseInt(p[3]) || 0);
+    _soulPending = true;
+    maybeShowSoulConsole();
+    return true;
+  }
+
+  if (msg === 'soul_recovery_end') {
+    _soulActive = _soulPending = false;
+    _soulVoted  = null;
+    const out = document.getElementById('soulOutput');
+    if (out) out.textContent = '';
+    const inp = document.getElementById('soulInput');
+    if (inp) inp.value = '';
+    // Everyone returns together — the seed is back and the loop restarts.
+    resetToPackScreen();
+    console.log('[soul] recovery complete — back to the pack screen');
+    return true;
+  }
+  return false;
+}
+
+// True when this phone is part-way through something that shouldn't be cut off.
+// Deliberately conservative: anything other than sitting on the pack screen
+// counts as busy.
+function _soulBusy() {
+  const pack = document.getElementById('screen-pack');
+  if (!pack || pack.classList.contains('hidden')) return true;   // on another screen
+  if (document.getElementById('packStack')?.children.length) return true;  // cards open
+  // Placement and possession live in possession.js's own overlay, which is
+  // shown by adding `active` rather than by the .screen/.hidden system — so it
+  // has to be checked separately or a player steering a placement would be
+  // yanked out of it mid-drag.
+  if (document.getElementById('poss-place-overlay')?.classList.contains('active')) return true;
+  if (document.querySelector('.combo-path--open')) return true;
+  return false;
+}
+
+/// Show the console if this phone is idle; otherwise leave _soulPending set and
+/// try again from resetToPackScreen when the current action finishes.
+function maybeShowSoulConsole() {
+  if (!_soulPending || !_soulActive) return;
+  if (_soulBusy()) return;
+
+  _soulPending = false;
+  showScreen('screen-soul');
+
+  // Focused immediately with the keyboard up. The friction in this moment should
+  // come from having to decide, not from hunting for a text field.
+  const inp = document.getElementById('soulInput');
+  if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 60); }
+}
+
+function _updateSoulTally(needed, yes, no) {
+  const el = document.getElementById('soulTally');
+  if (!el) return;
+  el.textContent = `consent ${yes}/${needed}` + (no > 0 ? `   ·   declined ${no}` : '');
+}
+
+function submitSoulVote() {
+  const inp = document.getElementById('soulInput');
+  const out = document.getElementById('soulOutput');
+  if (!inp) return;
+
+  const v = inp.value.trim().toLowerCase();
+  inp.value = '';
+
+  // Generous on yes/no, pedantic on nothing else. Rejecting "yeah" would read as
+  // broken rather than austere, and the moment would be lost to a typo.
+  const YES = ['yes','y','yeah','yep','yup','ok','okay','sure','continue','proceed'];
+  const NO  = ['no','n','nope','nah','stop','cancel','deny'];
+
+  let answer = null;
+  if (YES.includes(v)) answer = 'yes';
+  else if (NO.includes(v)) answer = 'no';
+
+  if (answer === null) {
+    if (out) out.textContent = `> ${v || '…'}\nARGUMENT INVALID`;
+    if (typeof Sound !== 'undefined') Sound.play('deny');
+    inp.focus();
+    return;
+  }
+
+  _soulVoted = answer;
+  if (typeof CLIENT_ID !== 'undefined') send(`soul_vote|${CLIENT_ID}|${answer}`);
+
+  // A "no" is acknowledged, logged, and changes nothing this phone can see. It
+  // isn't rejected and it isn't argued with — it simply doesn't stop anything,
+  // which is the point being made.
+  if (out) out.textContent = answer === 'yes'
+    ? '> yes\nCONSENT REGISTERED. AWAITING THE ROOM.'
+    : '> no\nRESPONSE ACKNOWLEDGED.';
+  if (typeof Sound !== 'undefined') Sound.play(answer === 'yes' ? 'star' : 'deny');
+  inp.blur();
+}
+
+// ── Boss defeat cleanses this phone ─────────────────────────────────────────
+// Unity broadcasts "corruption_cleansed" when the room kills the boss.
+//
+// Lives in main.js rather than corruption-bar.js because that file is currently
+// shelved (its <script> tag is commented out in index.html), so a handler there
+// would never run — and this is the ONLY way out of personal horror phase.
+// corruptionLevel is otherwise write-once-upward: placing a corrupted card
+// increments it and nothing decrements it, so a player who crossed over stayed
+// corrupted for the session and kept re-summoning the boss with every legendary.
+function handleCleanseMessage(data) {
+  if (typeof data !== 'string') return false;
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+  if (msg !== 'corruption_cleansed') return false;
+
+  if (corruptionLevel > 0) {
+    corruptionLevel = 0;
+    // Repoints pack tabs, card pools and card art back to nature. Also resets
+    // _prevPersonalLevel, so a later re-crossing still fires the glitch
+    // transition and the boss summon rather than being swallowed.
+    updatePersonalPhase();
+    sendPackType();
+    console.log('[corruption] cleansed by boss defeat — back to nature phase');
+  }
+  return true;
+}
+
 function updatePersonalPhase() {
   const level      = corruptionLevel;
   const isPristine = level < HORROR_THRESHOLD;
@@ -454,13 +603,17 @@ const HOLO_COMMON_WEIGHT = 4.0;
 // Rare is weighted close to uncommon rather than half of it: at 90% corruption
 // most packs have only ONE filler slot, so a heavy uncommon bias would make that
 // slot the same card nearly every time — the sameness this was meant to fix.
+// legendary and above are NOT here — they're headline-only, see below. They used
+// to be included at low weight, but for a 3-tier pool (Nature, Fungi) removing
+// the top card's own tier leaves exactly 2 candidates for the 2 filler slots —
+// both get drawn every time, no randomness left. That made a legendary appear as
+// FILLER in almost every pack whenever it wasn't already the headline, which is
+// why legendaries were showing up far more than the top-card odds alone suggest.
+// Filler now only ever draws from uncommon/rare, so legendary stays a genuine
+// headline event instead of a near-guaranteed extra.
 const FILLER_TIER_WEIGHTS = {
-  'uncommon':        5,
-  'rare':            4,
-  'legendary':       1.5,
-  'mythical':        0.5,
-  'luck-maxxing':    0.25,
-  'legendary-alpha': 0.1,
+  'uncommon': 5,
+  'rare':     4,
 };
 
 // Nature/Fungi are now trimmed to common..legendary and Critter has a gap at
@@ -489,8 +642,7 @@ function pickFillerTiers(count, excludeTier, activePool) {
   return out;
 }
 
-// Relative weights for the pack's headline pull. Sums to 100 when every tier is
-// present (28+34+18+10+6+4), matching the probabilities this replaced.
+// Relative weights for the pack's headline pull.
 //
 // Was a fixed if/else bracket chain rolled against Math.random(), which assumed
 // every pool had all 6 non-common tiers. Nature and Fungi are now trimmed to
@@ -501,10 +653,21 @@ function pickFillerTiers(count, excludeTier, activePool) {
 // the sort and the eventual spawn. rollTopCard renormalises the weights over
 // only the tiers the ACTIVE pool actually has, so it degrades cleanly for any
 // pool shape instead of assuming the full 7-tier ladder.
+//
+// legendary DROPPED 18 → 11. With filler no longer able to award a legendary
+// (see FILLER_TIER_WEIGHTS), this is now the ONLY source of a legendary pull, so
+// it had to be retuned on its own terms rather than inheriting a weight that was
+// originally set alongside a filler path that doubled its real frequency.
+// Target was roughly 2–3 legendary pulls across a ~13-pack session:
+//   Nature / Fungi   (3 tiers: uncommon+rare+legendary)         11/73  ≈ 15.1%
+//   Critter          (4 tiers, + legendary-alpha)               11/77  ≈ 14.3%
+//   Flesh/Scourge/Ritual (all 7 tiers)                          11/93  ≈ 11.8%
+// The horror pools land a little under target — acceptable, since a rarer
+// legendary pull on the corrupting side isn't the reported problem.
 const TOP_CARD_WEIGHTS = {
   'uncommon':        28,
   'rare':            34,
-  'legendary':       18,
+  'legendary':       11,
   'mythical':        10,
   'luck-maxxing':    6,
   'legendary-alpha': 4,
@@ -826,6 +989,8 @@ function connect() {
       if (typeof Player !== 'undefined') Player.observe(e.data);
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
+      if (handleSoulMessage(e.data))    return;
+      if (handleCleanseMessage(e.data)) return;
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleQuestMessage(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
@@ -1293,13 +1458,11 @@ function dropCard(card) {
   // Player progression — releasing a critter into the world feeds Presence.
   if (typeof Player !== 'undefined') Player.gainXP('presence', 12);
 
-  // Flock o' Sheep — releases a small flock (several sheep) instead of one.
-  // Flock size comes from the SHEPHERD perk only now — Presence used to feed it,
-  // but Presence pools into the room-wide speed bonus instead (see PlayerMods.cs).
+  // Flock o' Sheep — releases a small flock instead of one sheep. Kept as a
+  // proof of concept for batch-release cards; FLOCK_SIZE is fixed.
   if (card.flock) {
     if (typeof CLIENT_ID !== 'undefined') {
-      const flockN = (window.PlayerMods && window.PlayerMods.flockCount) || 3;
-      for (let n = 0; n < flockN; n++) send(`spawn_small_cube|${CLIENT_ID}|critter`);
+      for (let n = 0; n < FLOCK_SIZE; n++) send(`spawn_small_cube|${CLIENT_ID}|critter`);
     }
     resetToPackScreen();
     return;
@@ -1357,6 +1520,11 @@ function resetToPackScreen() {
   Pack3D.resetPack();
   showScreen('screen-pack');
   setTickerState('idle');
+
+  // The player has just finished whatever they were doing. If the room is being
+  // asked about the soul tree, this is the moment to hand them the console —
+  // see the note on _soulPending about why the vote never interrupts an action.
+  maybeShowSoulConsole();
 }
 
 // ─── Debug controls ───────────────────────────────────────────────────────────
