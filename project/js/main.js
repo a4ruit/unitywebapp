@@ -58,7 +58,10 @@ let WS_URL = _wsOverride || WS_PRIMARY;
 const NATURE_CARDS = [
   { id:'small_cube', name:'Thornwire',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'thornwire',  desc:'Barbed and coiled. It only defends.' },
   { id:'large_cube', name:'Wildflowers', rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
-  { id:'sphere',     name:'Flower Bush', rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'In bloom. Spreading beyond the path.' },
+  // `placement` stays 'flowerbush' — it is the wire protocol Unity matches on,
+  // and the halo, radius and prefab lookups are all keyed to that string. Only
+  // the name the player reads has changed.
+  { id:'sphere',     name:'Lightning Iris', rarity:'rare',   rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'It blooms and the air goes tight. Whatever is near feels it first.' },
   { id:'triangle',   name:'Leaf Storm',  rarity:'legendary', rarityRank:3, command:'spawn_triangle',   ability:'leafstorm',    desc:'Trace the storm. Let it hunt for you.' },
 ];
 
@@ -246,121 +249,6 @@ window.HORROR_THRESHOLD = HORROR_THRESHOLD;
 
 // Drives everything tied to THIS phone's personal phase (called on every pull
 // and on WS reconnect). Does NOT touch the collective bar or packsOpened.
-// ── Soul recovery console ───────────────────────────────────────────────────
-// Unity broadcasts soul_recovery|needed|yes|no while the room votes on whether
-// to restart the loop, and soul_recovery_end once it passes.
-//
-// The console does NOT interrupt mid-action. A player part-way through opening a
-// pack, placing a card or inhabiting a creature finishes what they're doing and
-// lands on the console afterwards — being yanked out of a placement would read
-// as a crash, and the vote has no deadline that makes the interruption worth it.
-
-let _soulActive  = false;   // Unity is asking
-let _soulPending = false;   // asking, but this phone is mid-action
-let _soulVoted   = null;    // 'yes' | 'no' | null — what THIS phone answered
-
-function handleSoulMessage(data) {
-  if (typeof data !== 'string') return false;
-  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
-
-  if (msg.startsWith('soul_recovery|')) {
-    const p = msg.split('|');
-    _soulActive = true;
-    _updateSoulTally(parseInt(p[1]) || 1, parseInt(p[2]) || 0, parseInt(p[3]) || 0);
-    _soulPending = true;
-    maybeShowSoulConsole();
-    return true;
-  }
-
-  if (msg === 'soul_recovery_end') {
-    _soulActive = _soulPending = false;
-    _soulVoted  = null;
-    const out = document.getElementById('soulOutput');
-    if (out) out.textContent = '';
-    const inp = document.getElementById('soulInput');
-    if (inp) inp.value = '';
-    // Everyone returns together — the seed is back and the loop restarts.
-    resetToPackScreen();
-    console.log('[soul] recovery complete — back to the pack screen');
-    return true;
-  }
-  return false;
-}
-
-// True when this phone is part-way through something that shouldn't be cut off.
-// Deliberately conservative: anything other than sitting on the pack screen
-// counts as busy.
-function _soulBusy() {
-  const pack = document.getElementById('screen-pack');
-  if (!pack || pack.classList.contains('hidden')) return true;   // on another screen
-  if (document.getElementById('packStack')?.children.length) return true;  // cards open
-  // Placement and possession live in possession.js's own overlay, which is
-  // shown by adding `active` rather than by the .screen/.hidden system — so it
-  // has to be checked separately or a player steering a placement would be
-  // yanked out of it mid-drag.
-  if (document.getElementById('poss-place-overlay')?.classList.contains('active')) return true;
-  if (document.querySelector('.combo-path--open')) return true;
-  return false;
-}
-
-/// Show the console if this phone is idle; otherwise leave _soulPending set and
-/// try again from resetToPackScreen when the current action finishes.
-function maybeShowSoulConsole() {
-  if (!_soulPending || !_soulActive) return;
-  if (_soulBusy()) return;
-
-  _soulPending = false;
-  showScreen('screen-soul');
-
-  // Focused immediately with the keyboard up. The friction in this moment should
-  // come from having to decide, not from hunting for a text field.
-  const inp = document.getElementById('soulInput');
-  if (inp) { inp.value = ''; setTimeout(() => inp.focus(), 60); }
-}
-
-function _updateSoulTally(needed, yes, no) {
-  const el = document.getElementById('soulTally');
-  if (!el) return;
-  el.textContent = `consent ${yes}/${needed}` + (no > 0 ? `   ·   declined ${no}` : '');
-}
-
-function submitSoulVote() {
-  const inp = document.getElementById('soulInput');
-  const out = document.getElementById('soulOutput');
-  if (!inp) return;
-
-  const v = inp.value.trim().toLowerCase();
-  inp.value = '';
-
-  // Generous on yes/no, pedantic on nothing else. Rejecting "yeah" would read as
-  // broken rather than austere, and the moment would be lost to a typo.
-  const YES = ['yes','y','yeah','yep','yup','ok','okay','sure','continue','proceed'];
-  const NO  = ['no','n','nope','nah','stop','cancel','deny'];
-
-  let answer = null;
-  if (YES.includes(v)) answer = 'yes';
-  else if (NO.includes(v)) answer = 'no';
-
-  if (answer === null) {
-    if (out) out.textContent = `> ${v || '…'}\nARGUMENT INVALID`;
-    if (typeof Sound !== 'undefined') Sound.play('deny');
-    inp.focus();
-    return;
-  }
-
-  _soulVoted = answer;
-  if (typeof CLIENT_ID !== 'undefined') send(`soul_vote|${CLIENT_ID}|${answer}`);
-
-  // A "no" is acknowledged, logged, and changes nothing this phone can see. It
-  // isn't rejected and it isn't argued with — it simply doesn't stop anything,
-  // which is the point being made.
-  if (out) out.textContent = answer === 'yes'
-    ? '> yes\nCONSENT REGISTERED. AWAITING THE ROOM.'
-    : '> no\nRESPONSE ACKNOWLEDGED.';
-  if (typeof Sound !== 'undefined') Sound.play(answer === 'yes' ? 'star' : 'deny');
-  inp.blur();
-}
-
 // ── Boss defeat cleanses this phone ─────────────────────────────────────────
 // Unity broadcasts "corruption_cleansed" when the room kills the boss.
 //
@@ -989,7 +877,6 @@ function connect() {
       if (typeof Player !== 'undefined') Player.observe(e.data);
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
-      if (handleSoulMessage(e.data))    return;
       if (handleCleanseMessage(e.data)) return;
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleQuestMessage(e.data)) return;
@@ -1520,11 +1407,6 @@ function resetToPackScreen() {
   Pack3D.resetPack();
   showScreen('screen-pack');
   setTickerState('idle');
-
-  // The player has just finished whatever they were doing. If the room is being
-  // asked about the soul tree, this is the moment to hand them the console —
-  // see the note on _soulPending about why the vote never interrupts an action.
-  maybeShowSoulConsole();
 }
 
 // ─── Debug controls ───────────────────────────────────────────────────────────

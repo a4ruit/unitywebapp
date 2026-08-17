@@ -25,19 +25,67 @@ const CardTextures = (() => {
     symbolHeight:     170,   // height of the symbol (width auto-scales to preserve aspect ratio)
 
     // Rarity label (small text below the symbol)
-    rarityY:          312,
+    rarityY:          298,
     rarityFontSize:   12,
 
-    // Separator line between rarity and description
-    separatorY:       322,
-    separatorPad:     28,    // horizontal padding from card edges
+    // ── Stats (HP left, ATK right of the symbol) ────────────────────────────
+    // Same vertical band as the artwork. Each stat is its own rarity-coloured
+    // rectangle, hugging the left / right of the symbol rather than sitting
+    // under the title.
+    statInset:        18,    // distance from each card edge
+    statGap:          5,     // space between icon and number inside a box
+    statBoxPadX:      6,     // inner padding of each rectangle
+    statBoxPadY:      4,
+    statScale:        2,     // pixel-sprite scale (1 sprite-px → 2 canvas-px)
+    statFontSize:     20,    // slightly smaller so the boxes fit beside the art
+    statBoxBorder:    2,     // rectangle stroke — matches the title box
 
-    // Description / flavour text (bottom of card)
-    descStartY:       340,
-    descLineHeight:   17,
-    descFontSize:     15,
-    descMaxWidth:     208,
+    // Rules text (footer, under rarity)
+    descStartY:       324,
+    descLineHeight:   18,
+    descFontSize:     16,
+    descMaxWidth:     200,
+    descMaxLines:     3,     // hard cap; see the note where wrapping happens
   };
+
+  // ── Card stats ──────────────────────────────────────────────────────────────
+  //
+  // Mirrored from Unity so a card states what it actually does:
+  //   atk — FleshBoss.DamageForCardType(cardType)
+  //   hp  — NatureHealth.PlantHP / FungiHP / CritterHP, or a per-card preset
+  //
+  // Keyed by the card's `placement` type where it has one, because that's the
+  // string Unity switches on. Cards with no placement (direct spawns) fall back
+  // to their id.
+  //
+  // ⚠ These are a COPY. If the Unity values change, these have to change too —
+  // there's no shared source across the two runtimes. Wrong numbers on a card are
+  // worse than no numbers, so check both when tuning.
+  //
+  // Rules can run to ~3 lines of ~28 characters now that the stats no longer
+  // eat the footer. Keep them short anyway — a card should say the one thing
+  // that matters.
+  const CARD_STATS = {
+    thornwire:  { hp: 9,  atk: 6,  rule: 'Throw a charge. AOE on hit.' },
+    wildflower: { hp: 9,  atk: 3,  rule: 'Plant. Small AOE damage.' },
+    // ATK is the TOTAL the chain carries, not what any one target takes. The rule
+    // text has to say the split, because a player reading 12 next to a card that
+    // deals 4 a hit will think it is broken.
+    flowerbush: { hp: 9,  atk: 12, rule: 'Plant. Chains to 3 foes, 4 each.' },
+    leafstorm:  { hp: 0,  atk: 8,  rule: 'Trace a path. Hits all enemies.' },
+    fungi:      { hp: 12, atk: 3,  rule: 'Plant, then draw a spore path.' },
+    blueangel:  { hp: 20, atk: 2,  rule: 'Bait. Drains from range.' },
+    sporecap:   { hp: 12, atk: 1,  rule: 'Tap to drop. Bursts on hit.' },
+  };
+
+  /// Stats for a card, or null when it has none (critters, horror cards, the
+  /// direct-spawn tiers). Returning null rather than zeroes matters — a "0 ATK"
+  /// corner on a sheep reads as a bug rather than as "this isn't a weapon".
+  function cardStats(card) {
+    if (!card) return null;
+    if (card.ability === 'leafstorm') return CARD_STATS.leafstorm;
+    return CARD_STATS[card.placement] || null;
+  }
 
   const RARITY_CFG = {
     common:           { border:'#8bc28b', emissive:0x101810, emissiveIntensity:0.15, light:null },
@@ -88,6 +136,7 @@ const CardTextures = (() => {
   _loadSkin('nature-common',   'assets/common-card.png');
   _loadSkin('nature-uncommon', 'assets/uncommon-card.png');
   _loadSkin('nature-rare',     'assets/epic-card.png');
+  _loadSkin('legendary',       'assets/legendary-card.png');
   _loadSkin('flesh-common',    'assets/flesh_card_common.png');
   // Custom symbol art — loaded once, reused as the central illustration for
   // its respective card. Add new symbols here as they're made.
@@ -384,6 +433,103 @@ const CardTextures = (() => {
 
   // â”€â”€â”€ NATURE shape drawers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  // ─── Lightning Iris sprite ──────────────────────────────────────────────────
+  // Hand-placed pixels rather than a downscaled render of the vector iris. Curves
+  // resampled to a grid this small turn to mush, and the neighbouring cards use
+  // real pixel-art PNGs, so a smooth symbol sat visibly apart from them.
+  //
+  // The grid is rasterised from the same bezier petals the vector version used,
+  // then cleaned up by hand, so the sprite is the drawing rather than a guess at
+  // it. Two changes were needed on the way down:
+  //
+  // The petals are splayed rather than radial — three standards fanning up, three
+  // falls fanning down, which is how the flower actually sits. Six petals evenly
+  // around a circle collapsed into a column with a skirt at this resolution.
+  //
+  // Every petal is outlined against its NEIGHBOURS, not just against empty space.
+  // Outlining the silhouette alone fused the three falls into one mass with no
+  // internal structure, which is what made the first attempt read badly.
+  const IRIS_ART = [
+    '............D............',
+    '...........DLD...........',
+    '...........DLD...........',
+    '....DDD...DLHLD...DDD....',
+    '....DLLD..DLHLD..DLLD....',
+    '....DLHLDDDLHLDDDLHLD....',
+    '....DLHHLDDLHLDDLHHLD....',
+    '....DLHLDDLHHHLDDLHLD....',
+    '.....DLLDDLHHHLDDLLD.....',
+    '.....DLLDDLHHHLDDLLD.....',
+    '......DLDDLHHHLDDLD......',
+    '......DLDDLHHHLDDLD......',
+    '.....DDDDDHHWHHDDDDD.....',
+    '...DDMMDDHHWWWHHDDMMDD...',
+    '..DMMLMDDHWWWWWHDDMLMMD..',
+    '..DMLLLMDHHWWWHHDMLLLMD..',
+    '.DMLLLMDDMHHWHHMDDMLLLMD.',
+    '.DMLLLMDDHMHHHMHDDMLLLMD.',
+    'DMLLLLHDDMLLHLLMDDHLLLLMD',
+    'DMLLLHHDDMLLHLLMDDHHLLLMD',
+    'DMLLHHMDDMLLHLLMDDMHHLLMD',
+    'DMLHLLMDDMLLHLLMDDMLLHLMD',
+    'DHHLLLLMDDMLHLMDDMLLLLHHD',
+    'DHMMMMMMMDDMHMDDMMMMMMMHD',
+    '.DDDDDDDDD.DHD.DDDDDDDDD.',
+  ];
+
+  const IRIS_PAL = {
+    D: '#4a2d63',   // outline, dark enough to hold the shape against the frame
+    M: '#8f5faf',   // shaded underside of a petal
+    L: '#b985d8',   // body, close to the Last Bloom this replaced
+    H: '#d9b8f2',   // lit face, and the beard running down each fall
+    W: '#fdf7ff',   // charged core
+  };
+
+  // Rasterised once and cached. Rebuilding a sprite every frame on a phone is the
+  // kind of thing that costs frames on the live stage for no visible gain.
+  let _irisSprite = null;
+
+  function getIrisSprite() {
+    if (_irisSprite) return _irisSprite;
+
+    const h = IRIS_ART.length;
+    const w = IRIS_ART[0].length;
+
+    // A ragged row silently shifts every pixel after it, and the result looks
+    // like a drawing mistake rather than a bug, so say so loudly.
+    const ragged = IRIS_ART.findIndex(r => r.length !== w);
+    if (ragged !== -1) {
+      console.warn(`[cardTextures] IRIS_ART row ${ragged} is ${IRIS_ART[ragged].length}px, expected ${w}`);
+    }
+
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const g = c.getContext('2d');
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < IRIS_ART[y].length; x++) {
+        const ch = IRIS_ART[y][x];
+        if (ch === '.') continue;
+        g.fillStyle = IRIS_PAL[ch] || IRIS_PAL.M;
+        g.fillRect(x, y, 1, 1);
+      }
+    }
+
+    // Centre of the charged core, found from the art rather than written down, so
+    // the pulse cannot drift out of place the next time the sprite is redrawn.
+    let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < IRIS_ART[y].length; x++) {
+        if (IRIS_ART[y][x] === 'W') { sx += x; sy += y; n++; }
+      }
+    }
+    c.coreX = n ? Math.round(sx / n) : Math.floor(w / 2);
+    c.coreY = n ? Math.round(sy / n) : Math.floor(h / 2);
+
+    _irisSprite = c;
+    return c;
+  }
+
   function drawShapeNature(ctx, rarity, t) {
     // Custom pixel-art PNG symbol — falls through to procedural drawing if the
     // image hasn't loaded yet, so the card never renders empty.
@@ -408,6 +554,48 @@ const CardTextures = (() => {
         ctx.drawImage(wf, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
         return;
       }
+    }
+
+    if (rarity === 'rare') {
+      // Lightning Iris. Drawn here, before the shared translate below, for the
+      // same reason the PNG symbols are — so it lands on LAYOUT.symbolCenterY
+      // with the rest of the pack instead of the older procedural origin.
+      const spr = getIrisSprite();
+
+      // Integer scale, always. At a fractional one nearest-neighbour rounds some
+      // source pixels to n screen pixels and their neighbours to n+1, so the
+      // sprite renders with uneven pixel sizes and stops reading as pixel art.
+      const scale = Math.max(1, Math.min(
+        Math.floor(LAYOUT.symbolHeight / spr.height),
+        Math.floor(170 / spr.width),          // keep it inside the card frame
+      ));
+      const w = spr.width * scale;
+      const h = spr.height * scale;
+
+      // Whole pixels on the destination too, or the whole grid lands on a half
+      // pixel and the edges blur despite the smoothing being off.
+      const x = Math.round(128 - w / 2);
+      const y = Math.round(LAYOUT.symbolCenterY - h / 2);
+
+      const smoothing = ctx.imageSmoothingEnabled;
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(spr, x, y, w, h);
+
+      // The core pulses, drawn as whole grid cells so it stays on the pixel grid
+      // rather than glowing softly over it.
+      const pulse = 0.45 + Math.sin(t * 5) * 0.3;
+      const cx = x + spr.coreX * scale;
+      const cy = y + spr.coreY * scale;
+      ctx.fillStyle = `rgba(255,255,255,${pulse})`;
+      ctx.fillRect(cx, cy, scale, scale);
+      ctx.fillStyle = `rgba(233,214,255,${pulse * 0.5})`;
+      ctx.fillRect(cx - scale, cy, scale, scale);
+      ctx.fillRect(cx + scale, cy, scale, scale);
+      ctx.fillRect(cx, cy - scale, scale, scale);
+      ctx.fillRect(cx, cy + scale, scale, scale);
+
+      ctx.imageSmoothingEnabled = smoothing;
+      return;
     }
 
     ctx.save();
@@ -477,37 +665,6 @@ const CardTextures = (() => {
         ctx.strokeStyle = '#4a8aaa'; ctx.lineWidth = 1;
         ctx.stroke();
       });
-
-    } else if (rarity === 'rare') {
-      // Last Bloom â€” 8 petals around a glowing centre
-      const petalCount = 8;
-      for (let i = 0; i < petalCount; i++) {
-        const angle = (i / petalCount) * Math.PI * 2;
-        ctx.save(); ctx.rotate(angle);
-        ctx.fillStyle = `rgba(154,106,184,${0.3 + (i % 2) * 0.18})`;
-        ctx.strokeStyle = '#9a6ab8'; ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-7, 2);
-        ctx.bezierCurveTo(-10, -10, -6, -28, 0, -34);
-        ctx.bezierCurveTo(6, -28, 10, -10, 7, 2);
-        ctx.closePath(); ctx.fill(); ctx.stroke();
-        ctx.restore();
-      }
-      // Stamen ring
-      ctx.strokeStyle = 'rgba(220,180,255,0.5)'; ctx.lineWidth = 1;
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(a)*8, Math.sin(a)*8);
-        ctx.lineTo(Math.cos(a)*13, Math.sin(a)*13);
-        ctx.stroke();
-        ctx.beginPath(); ctx.arc(Math.cos(a)*14, Math.sin(a)*14, 1.5, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(240,210,255,0.9)'; ctx.fill();
-      }
-      // Centre
-      ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(210,170,255,0.8)'; ctx.fill();
-      ctx.strokeStyle = '#9a6ab8'; ctx.lineWidth = 2; ctx.stroke();
 
     } else if (rarity === 'legendary') {
       // Ancient Yew — gnarled trunk, spreading canopy, red berries
@@ -2049,6 +2206,127 @@ const CardTextures = (() => {
     }
   }
 
+  // ── Pixel stat icons ──────────────────────────────────────────────────────
+  // Drawn as nearest-neighbour sprites so they sit in the same language as the
+  // rest of the card (pixel borders, VT323, Share Tech Mono). A circle with a
+  // caption is a UI chip; a heart and a sword are HP and ATK.
+
+  const HEART_PX = [
+    '..ooo...ooo..',
+    '.o###o.o###o.',
+    'o#####o#####o',
+    'o###########o',
+    'o###########o',
+    '.o#########o.',
+    '..o#######o..',
+    '...o#####o...',
+    '....o###o....',
+    '.....o#o.....',
+    '......o......',
+  ];
+
+  // Vertical blade, crossguard, short grip. Reads as a weapon at 14×24 px
+  // (7×12 sprite × scale 2) without competing with the number beside it.
+  const SWORD_PX = [
+    '...o...',
+    '..o#o..',
+    '..o#o..',
+    '..o#o..',
+    '..o#o..',
+    '..o#o..',
+    '.o###o.',
+    'o#ooo#o',
+    '..oHo..',
+    '..oHo..',
+    '..oHo..',
+    '.o###o.',
+  ];
+
+  function blitPixels(ctx, ox, oy, scale, rows, palette) {
+    const prev = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    for (let y = 0; y < rows.length; y++) {
+      const row = rows[y];
+      for (let x = 0; x < row.length; x++) {
+        const ch = row[x];
+        if (ch === '.' || ch === ' ') continue;
+        ctx.fillStyle = palette[ch] || palette['#'];
+        ctx.fillRect(ox + x * scale, oy + y * scale, scale, scale);
+      }
+    }
+    ctx.imageSmoothingEnabled = prev;
+  }
+
+  function spriteSize(rows, scale) {
+    let w = 0;
+    for (let i = 0; i < rows.length; i++) if (rows[i].length > w) w = rows[i].length;
+    return { w: w * scale, h: rows.length * scale };
+  }
+
+  function drawStatNumber(ctx, value, x, y) {
+    ctx.font         = `bold ${LAYOUT.statFontSize}px "Share Tech Mono", monospace`;
+    ctx.textAlign    = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth    = 4;
+    ctx.strokeStyle  = 'rgba(0,0,0,0.92)';
+    ctx.strokeText(String(value), x, y);
+    ctx.fillStyle    = '#ffffff';
+    ctx.fillText(String(value), x, y);
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  /// HP on the left of the symbol, ATK on the right, vertically centred with
+  /// the art. Number sits next to its icon so a two-digit value (Blue Angel's
+  /// 20) never has to live inside the sprite.
+  function drawCardStats(ctx, stats, borderColor) {
+    if (!stats) return;
+
+    const s    = LAYOUT.statScale;
+    const gap  = LAYOUT.statGap;
+    const padX = LAYOUT.statBoxPadX;
+    const padY = LAYOUT.statBoxPadY;
+    const heart = spriteSize(HEART_PX, s);
+    const sword = spriteSize(SWORD_PX, s);
+    const boxH  = Math.max(heart.h, sword.h) + padY * 2;
+    const y     = LAYOUT.symbolCenterY - boxH / 2;
+    const stroke = borderColor || '#8bc28b';
+
+    ctx.save();
+    ctx.font = `bold ${LAYOUT.statFontSize}px "Share Tech Mono", monospace`;
+
+    const paint = (x, value, icon, iconW, iconH, palette) => {
+      const w = iconW + gap + ctx.measureText(String(value)).width + padX * 2;
+      ctx.fillStyle = 'rgba(10,16,10,0.88)';
+      ctx.fillRect(x, y, w, boxH);
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth   = LAYOUT.statBoxBorder;
+      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, boxH - 1);
+
+      const iconX = x + padX;
+      const iconY = y + (boxH - iconH) / 2;
+      blitPixels(ctx, iconX, iconY, s, icon, palette);
+      drawStatNumber(ctx, value, iconX + iconW + gap, y + boxH / 2);
+      return w;
+    };
+
+    if (stats.hp > 0) {
+      paint(LAYOUT.statInset, stats.hp, HEART_PX, heart.w, heart.h, {
+        '#': '#e45a6a',
+        'o': '#2a0c10',
+      });
+    }
+
+    const atkW = sword.w + gap + ctx.measureText(String(stats.atk)).width + padX * 2;
+    paint(256 - LAYOUT.statInset - atkW, stats.atk, SWORD_PX, sword.w, sword.h, {
+      '#': '#f0e6c8',
+      'H': '#c07038',
+      'o': '#1a1208',
+    });
+
+    ctx.restore();
+    ctx.textAlign = 'center';
+  }
+
   function drawLabels(ctx, card, rarity, t, opts = {}) {
     const cfg = getCfg(rarity);
 
@@ -2124,28 +2402,30 @@ const CardTextures = (() => {
     ctx.fillStyle = rarityColor;
     ctx.fillText(rarity.toUpperCase(), 128, LAYOUT.rarityY);
 
-    // Flavour block (separator + description) is the last thing drawn. Compact
-    // renders such as the collection grid pass { hideFlavor:true } to skip it —
-    // the text is illegible at that size. The real in-game card is untouched.
-    if (opts.hideFlavor) return;
+    const stats = cardStats(card);
 
-    // Separator line between rarity and description
-    ctx.strokeStyle = `rgba(${opts.labelColor        ? hexToRgb(opts.labelColor)
-                             : rarity === 'legendary-alpha' ? '255,255,255'
-                             : hexToRgb(cfg.border)},0.3)`;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(LAYOUT.separatorPad,         LAYOUT.separatorY);
-    ctx.lineTo(256 - LAYOUT.separatorPad,   LAYOUT.separatorY);
-    ctx.stroke();
+    // Footer (stats + rules) is skipped on compact renders such as the
+    // collection grid — none of it is legible at that size.
+    if (!opts.hideFlavor) {
 
-    // ── DESCRIPTION (bottom of card) ────────────────────────────────────────
+    // ── STATS — HP left of the symbol, ATK right, same row as the art
+    drawCardStats(ctx, stats, nameColor);
+
+    // ── DESCRIPTION — just the text. No plate, no border. The old boxed panel
+    // was fighting the icons for the same strip of the card.
     const descSize = LAYOUT.descFontSize;
     const lh       = LAYOUT.descLineHeight;
     ctx.font = `${descSize}px "Share Tech Mono", monospace`;
 
-    // Wrap into lines first so we can size a backing plate behind the text.
-    const words = card.desc.split(' ');
+    // Rules text where the card has any, flavour where it doesn't.
+    //
+    // A card that now does measurable damage should say what it does. The
+    // flavour line stays on cards with no mechanics of their own (critters,
+    // horror pulls, the direct-spawn tiers), where atmosphere is all there is
+    // to communicate.
+    const bodyText = (stats && stats.rule) ? stats.rule : card.desc;
+
+    const words = (bodyText || '').split(' ');
     const lines = [];
     let line = '';
     words.forEach(w => {
@@ -2156,21 +2436,24 @@ const CardTextures = (() => {
     });
     if (line) lines.push(line);
 
-    // Dark backing plate so the flavour text reads over the busy card art.
-    const plateX   = LAYOUT.separatorPad - 4;
-    const plateW   = 256 - plateX * 2;
-    const plateTop = LAYOUT.descStartY - descSize + 1;
-    const plateBot = LAYOUT.descStartY + (lines.length - 1) * lh + 7;
-    ctx.fillStyle = 'rgba(6,10,8,0.74)';
-    ctx.fillRect(plateX, plateTop, plateW, plateBot - plateTop);
+    if (lines.length > LAYOUT.descMaxLines) {
+      lines.length = LAYOUT.descMaxLines;
+      lines[LAYOUT.descMaxLines - 1] =
+        lines[LAYOUT.descMaxLines - 1].replace(/\s*\S*$/, '…');
+      console.warn('[cardTextures] Description too long for', card.name,
+                   '— truncated. Keep rules under ~66 characters.');
+    }
 
-    // Brighter, larger flavour text with a soft shadow for extra contrast.
-    ctx.fillStyle   = 'rgba(240,236,222,0.95)';
+    ctx.font        = `${descSize}px "Share Tech Mono", monospace`;
+    ctx.fillStyle   = 'rgba(242,238,226,0.97)';
+    ctx.textAlign   = 'center';
     ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur  = 3;
+    ctx.shadowBlur  = 2;
     let lineY = LAYOUT.descStartY;
     lines.forEach(l => { ctx.fillText(l, 128, lineY); lineY += lh; });
     ctx.shadowBlur = 0;
+
+    } // end hideFlavor skip
   }
 
   // â”€â”€â”€ Public: buildFace â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -2179,7 +2462,7 @@ const CardTextures = (() => {
   // with yellow dorsal fins + horned head, gentle emerald shimmer.
   function drawOuroboros(ctx, t) {
     ctx.save();
-    ctx.translate(128, 178);
+    ctx.translate(128, LAYOUT.symbolCenterY);
     const R = 44, N = 30;
     const gap = 0.6;                       // radians of open mouth/tail gap
     const span = Math.PI * 2 - gap;
@@ -2653,6 +2936,9 @@ const CardTextures = (() => {
     if (card.name === 'White Mushroom' || card.name === 'Sheep') skinKey = 'nature-common';
     if (card.name === 'Duck'           || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
     if (card.name === 'Seagull'        || card.name === 'Puffball')  skinKey = 'nature-rare';
+    // Leaf Storm, Blue Angel, and every other legendary-rarity card share
+    // legendary-card.png as the frame. Symbol + labels still draw on top.
+    if (card.rarity === 'legendary') skinKey = 'legendary';
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
