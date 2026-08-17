@@ -275,6 +275,73 @@ function handleCleanseMessage(data) {
   return true;
 }
 
+// ─── Love mail ────────────────────────────────────────────────────────────────
+// Post-boss phase. Unity sends "lovemail|needed|opened|secondsLeft|declined"
+// while a window is open and "lovemail_end" when it closes either way.
+//
+// Reply and Open are the same message with a different verb, because there is no
+// answer to this mail that isn't a yes. The X is the only refusal, and it does
+// not lower what the room needs.
+
+let _loveMailOpen    = false;   // a window is live
+let _loveMailAnswered = false;  // this phone has already clicked something
+let _loveMailReturn  = null;    // screen to restore when it closes
+
+function handleLoveMailMessage(data) {
+  if (typeof data !== 'string') return false;
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+
+  if (msg === 'lovemail_end') {
+    if (!_loveMailOpen) return true;
+    _loveMailOpen = false;
+    _loveMailAnswered = false;
+    // Don't yank a player out of whatever they moved on to.
+    if (document.getElementById('screen-lovemail') &&
+        !document.getElementById('screen-lovemail').classList.contains('hidden')) {
+      showScreen(_loveMailReturn || 'screen-pack');
+    }
+    _loveMailReturn = null;
+    return true;
+  }
+
+  if (!msg.startsWith('lovemail|')) return false;
+
+  const [, needed, opened, secs] = msg.split('|');
+
+  if (!_loveMailOpen) {
+    _loveMailOpen = true;
+    _loveMailAnswered = false;
+    // Remember where they were so closing returns them there.
+    const current = document.querySelector('.screen:not(.hidden)');
+    _loveMailReturn = current ? current.id : 'screen-pack';
+    showScreen('screen-lovemail');
+  }
+
+  const status = document.getElementById('loveMailStatus');
+  if (status) {
+    status.textContent = _loveMailAnswered
+      ? `SENT.  ${opened}/${needed}`
+      : `${opened}/${needed} OPENED   ${secs}s`;
+  }
+  return true;
+}
+
+function _loveMailSend(action) {
+  if (!_loveMailOpen || _loveMailAnswered) return;
+  _loveMailAnswered = true;
+  if (typeof CLIENT_ID !== 'undefined') send(`lovemail_click|${CLIENT_ID}|${action}`);
+}
+
+function loveMailOpen()    { _loveMailSend('open');  _loveMailDismiss(); }
+function loveMailReply()   { _loveMailSend('reply'); _loveMailDismiss(); }
+function loveMailDecline() { _loveMailSend('no');    _loveMailDismiss(); }
+
+// Whatever they chose, the window goes away for them. The room's count keeps
+// running on the shared screen.
+function _loveMailDismiss() {
+  showScreen(_loveMailReturn || 'screen-pack');
+}
+
 function updatePersonalPhase() {
   const level      = corruptionLevel;
   const isPristine = level < HORROR_THRESHOLD;
@@ -880,6 +947,7 @@ function connect() {
       if (handleCleanseMessage(e.data)) return;
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleQuestMessage(e.data)) return;
+      if (handleLoveMailMessage(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;

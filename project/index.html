@@ -427,6 +427,37 @@
       </div>
 
       <!-- PRISTINE OUT-OF-PACKS SCREEN — calm cooldown, no ads ──────────── -->
+      <!-- LOVE MAIL. Deliberately not styled like the rest of the app. It has to
+           look like something that arrived rather than something we built. -->
+      <div class="screen hidden" id="screen-lovemail">
+        <div class="win2k">
+          <div class="win2k-title">
+            <span class="win2k-title-text">WH4Ti5L0VE - Message</span>
+            <button class="win2k-x" onclick="loveMailDecline()" aria-label="Close">&#10005;</button>
+          </div>
+
+          <div class="win2k-body">
+            <div class="win2k-hdr"><span>From:</span><i class="win2k-redact"></i></div>
+            <div class="win2k-hdr"><span>To:</span><i class="win2k-redact short"></i></div>
+            <div class="win2k-hdr"><span>Cc:</span><i class="win2k-redact tiny"></i></div>
+            <div class="win2k-hdr"><span>Subject:</span><b>WH4Ti5L0VE</b></div>
+
+            <div class="win2k-message">kindly check the attached LOVELETTER coming from it.</div>
+
+            <div class="win2k-attach" onclick="loveMailOpen()">
+              <div class="win2k-attach-icon">&#128220;</div>
+              <div class="win2k-attach-name">LOVE-LET...<br><span>(10KB)</span></div>
+            </div>
+
+            <div class="win2k-buttons">
+              <button class="win2k-btn" onclick="loveMailReply()">Reply</button>
+              <button class="win2k-btn" onclick="loveMailOpen()">Open</button>
+            </div>
+          </div>
+        </div>
+        <div class="lovemail-status" id="loveMailStatus"></div>
+      </div>
+
       <div class="screen hidden" id="screen-empty">
         <div class="empty-wrapper">
           <div class="empty-icon">📦</div>
