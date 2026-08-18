@@ -487,19 +487,24 @@ const CardTextures = (() => {
 
   // Rasterised once and cached. Rebuilding a sprite every frame on a phone is the
   // kind of thing that costs frames on the live stage for no visible gain.
-  let _irisSprite = null;
+  let _spriteCache = {};
 
-  function getIrisSprite() {
-    if (_irisSprite) return _irisSprite;
+  /// Rasterises an ASCII grid into a cached offscreen canvas.
+  ///
+  /// Shared by every hand-drawn nature symbol. Rebuilding a sprite each frame on
+  /// a phone is exactly the sort of cost that showed up as dropped frames on the
+  /// ritual pack, so each one is drawn once and kept.
+  function getSprite(key, art, pal) {
+    if (_spriteCache[key]) return _spriteCache[key];
 
-    const h = IRIS_ART.length;
-    const w = IRIS_ART[0].length;
+    const h = art.length;
+    const w = art[0].length;
 
     // A ragged row silently shifts every pixel after it, and the result looks
     // like a drawing mistake rather than a bug, so say so loudly.
-    const ragged = IRIS_ART.findIndex(r => r.length !== w);
+    const ragged = art.findIndex(r => r.length !== w);
     if (ragged !== -1) {
-      console.warn(`[cardTextures] IRIS_ART row ${ragged} is ${IRIS_ART[ragged].length}px, expected ${w}`);
+      console.warn(`[cardTextures] ${key} row ${ragged} is ${art[ragged].length}px, expected ${w}`);
     }
 
     const c = document.createElement('canvas');
@@ -507,28 +512,90 @@ const CardTextures = (() => {
     const g = c.getContext('2d');
 
     for (let y = 0; y < h; y++) {
-      for (let x = 0; x < IRIS_ART[y].length; x++) {
-        const ch = IRIS_ART[y][x];
+      for (let x = 0; x < art[y].length; x++) {
+        const ch = art[y][x];
         if (ch === '.') continue;
-        g.fillStyle = IRIS_PAL[ch] || IRIS_PAL.M;
+        g.fillStyle = pal[ch] || pal.M;
         g.fillRect(x, y, 1, 1);
       }
     }
 
-    // Centre of the charged core, found from the art rather than written down, so
-    // the pulse cannot drift out of place the next time the sprite is redrawn.
+    // Centre of the brightest glyph, found from the art rather than written
+    // down, so an animated highlight cannot drift out of place when the sprite
+    // is redrawn.
     let sx = 0, sy = 0, n = 0;
     for (let y = 0; y < h; y++) {
-      for (let x = 0; x < IRIS_ART[y].length; x++) {
-        if (IRIS_ART[y][x] === 'W') { sx += x; sy += y; n++; }
+      for (let x = 0; x < art[y].length; x++) {
+        if (art[y][x] === 'W') { sx += x; sy += y; n++; }
       }
     }
     c.coreX = n ? Math.round(sx / n) : Math.floor(w / 2);
     c.coreY = n ? Math.round(sy / n) : Math.floor(h / 2);
 
-    _irisSprite = c;
+    _spriteCache[key] = c;
     return c;
   }
+
+  /// Draws a cached sprite at the pack's standard symbol position.
+  ///
+  /// Integer scale only. At a fractional one, nearest-neighbour rounds some
+  /// source pixels to n screen pixels and their neighbours to n+1, so the sprite
+  /// renders with uneven pixel sizes and stops reading as pixel art. The
+  /// destination is rounded for the same reason — a grid on a half pixel blurs
+  /// even with smoothing off.
+  function drawSprite(ctx, spr) {
+    const scale = Math.max(1, Math.min(
+      Math.floor(LAYOUT.symbolHeight / spr.height),
+      Math.floor(170 / spr.width),
+    ));
+    const w = spr.width * scale;
+    const h = spr.height * scale;
+    const x = Math.round(128 - w / 2);
+    const y = Math.round(LAYOUT.symbolCenterY - h / 2);
+
+    const smoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(spr, x, y, w, h);
+    ctx.imageSmoothingEnabled = smoothing;
+
+    return { x, y, scale };
+  }
+
+  // ─── Leaf Storm sprite ──────────────────────────────────────────────────────
+  // Three blades radiating from one centre, after the triquetra. The first pass
+  // arranged them as a chase — each leaf tangent to a ring, pointing at the
+  // next — which is a nicer idea and an unreadable shape at 20px, because the
+  // eye has to trace a circle to find the form. Three lobes from a shared core
+  // is one silhouette instead of three, and it holds at any size.
+  const LEAF_ART = [
+    '..........DDD..........',
+    '.........DMHMD.........',
+    '........DMLHLMD........',
+    '........DMLHLMD........',
+    '.......DMLLHLLMD.......',
+    '.......DMLLHLLMD.......',
+    '.......DMLLHLLMD.......',
+    '.......DMLLHLLMD.......',
+    '........DMLHLMD........',
+    '........DMLHLMD........',
+    '.........DMHMD.........',
+    '.....DDD.DMLMD.DDD.....',
+    '...DDMMMDLLLLLDMMMDD...',
+    '..DMMLLLMHLMLHMLLLMMD..',
+    '.DMLLLLHHLMDMLHHLLLLMD.',
+    '.DMLLHHHLMD.DMLHHHLLMD.',
+    '.DMLHHLLMD...DMLLHHHMD.',
+    'DMHHLLLLMD...DMLLLLHHMD',
+    'DDMMMMMMD.....DMMMMMMDD',
+    '..DDDDDD.......DDDDDD..',
+  ];
+
+  const LEAF_PAL = {
+    D: '#25401d',   // outline, dark enough to hold against the gold frame
+    M: '#4b8a35',   // shaded side of the blade
+    L: '#74bd52',   // lit side
+    H: '#a9e07d',   // midrib
+  };
 
   function drawShapeNature(ctx, rarity, t) {
     // Custom pixel-art PNG symbol — falls through to procedural drawing if the
@@ -560,26 +627,8 @@ const CardTextures = (() => {
       // Lightning Iris. Drawn here, before the shared translate below, for the
       // same reason the PNG symbols are — so it lands on LAYOUT.symbolCenterY
       // with the rest of the pack instead of the older procedural origin.
-      const spr = getIrisSprite();
-
-      // Integer scale, always. At a fractional one nearest-neighbour rounds some
-      // source pixels to n screen pixels and their neighbours to n+1, so the
-      // sprite renders with uneven pixel sizes and stops reading as pixel art.
-      const scale = Math.max(1, Math.min(
-        Math.floor(LAYOUT.symbolHeight / spr.height),
-        Math.floor(170 / spr.width),          // keep it inside the card frame
-      ));
-      const w = spr.width * scale;
-      const h = spr.height * scale;
-
-      // Whole pixels on the destination too, or the whole grid lands on a half
-      // pixel and the edges blur despite the smoothing being off.
-      const x = Math.round(128 - w / 2);
-      const y = Math.round(LAYOUT.symbolCenterY - h / 2);
-
-      const smoothing = ctx.imageSmoothingEnabled;
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(spr, x, y, w, h);
+      const spr = getSprite('iris', IRIS_ART, IRIS_PAL);
+      const { x, y, scale } = drawSprite(ctx, spr);
 
       // The core pulses, drawn as whole grid cells so it stays on the pixel grid
       // rather than glowing softly over it.
@@ -593,8 +642,11 @@ const CardTextures = (() => {
       ctx.fillRect(cx + scale, cy, scale, scale);
       ctx.fillRect(cx, cy - scale, scale, scale);
       ctx.fillRect(cx, cy + scale, scale, scale);
+      return;
+    }
 
-      ctx.imageSmoothingEnabled = smoothing;
+    if (rarity === 'legendary') {
+      drawSprite(ctx, getSprite('leafstorm', LEAF_ART, LEAF_PAL));
       return;
     }
 
@@ -2933,9 +2985,12 @@ const CardTextures = (() => {
     // common-card.png background ('nature-common' skin); Duck (critter uncommon)
     // and Fairy Cap (fungi uncommon) reuse uncommon-card.png ('nature-uncommon').
     // Their own symbol + name are still drawn on top by drawShape / drawLabels.
-    if (card.name === 'White Mushroom' || card.name === 'Sheep') skinKey = 'nature-common';
-    if (card.name === 'Duck'           || card.name === 'Fairy Cap') skinKey = 'nature-uncommon';
-    if (card.name === 'Seagull'        || card.name === 'Puffball')  skinKey = 'nature-rare';
+    // Matched on the card's DISPLAY name, so renaming a card silently drops its
+    // artwork unless these move with it. Renamed together in the critter pass:
+    // Sheep -> RAM, Duck -> DDoS Duck, Seagull -> C:\GULL.
+    if (card.name === 'White Mushroom' || card.name === 'RAM')        skinKey = 'nature-common';
+    if (card.name === 'DDoS Duck'      || card.name === 'Fairy Cap')  skinKey = 'nature-uncommon';
+    if (card.name === 'C:\\GULL'        || card.name === 'Puffball')  skinKey = 'nature-rare';
     // Leaf Storm, Blue Angel, and every other legendary-rarity card share
     // legendary-card.png as the frame. Symbol + labels still draw on top.
     if (card.rarity === 'legendary') skinKey = 'legendary';

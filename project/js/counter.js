@@ -444,6 +444,19 @@ function _syncRefreshButton() {
 
 // Prismatic name tag — cosmetic upgrade, persists for the session.
 let _prismaticOwned = false;
+// BIG BUFF — temporary, personal, and stackable with the room-wide speed buff.
+// The stars are spent here; Unity owns the clock, so a phone that reloads or
+// lies about its timer cannot extend what actually applies to a placement.
+function shopBuyBigBuff(cost, btn) {
+  if (!spendStars(cost)) { _shopDenied(); return; }
+  syncShopBalance();
+  updateShopButtons();
+  if (typeof CLIENT_ID !== 'undefined' && typeof send === 'function') {
+    send(`buff_purchase|${CLIENT_ID}|big`);
+  }
+  _shopConfirm(btn, 'ACTIVE');
+}
+
 function shopBuyPrismatic(cost, btn) {
   if (_prismaticOwned) { _shopConfirm(btn, 'ACTIVE'); return; }  // already owned
   if (!spendStars(cost)) { _shopDenied(); return; }

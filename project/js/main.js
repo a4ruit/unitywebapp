@@ -90,9 +90,9 @@ const FLESH_CARDS = [
 // it's still the guaranteed-legendary voucher's target (see _guaranteedLegendary
 // below) and still what a prismatic critter pull ultimately means.
 const CRITTER_CARDS = [
-  { id:'small_cube', name:'Sheep',           rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
-  { id:'large_cube', name:'Duck',            rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
-  { id:'sphere',     name:'Seagull',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
+  { id:'small_cube', name:'RAM',             rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
+  { id:'large_cube', name:'DDoS Duck',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
+  { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'Red Fox',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
   { id:'star',       name:'Emerald Serpent', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
 ];
@@ -160,7 +160,7 @@ const RITUAL_CARDS = [
 // of the creature it's named after. The card face is still keyed by `id`, so the
 // art is unchanged.
 const CORRUPTED_FLESHLING = {
-  id:'large_cube', name:'Fleshling', rarity:'common', rarityRank:0,
+  id:'large_cube', name:'Glitchling', rarity:'common', rarityRank:0,
   command:'spawn_corrupted', corrupted:true,
   desc:'Small. Hungry. It found you first.',
 };
@@ -594,6 +594,19 @@ function pickFillerTiers(count, excludeTier, activePool) {
     out.push(pool[idx]);
     pool.splice(idx, 1);   // drawn without replacement, so the slots stay distinct
   }
+
+  // Backfill with commons if the pool ran dry.
+  //
+  // FILLER_TIER_WEIGHTS only holds uncommon and rare, and the top card's own
+  // rarity is excluded from it — so a rare or uncommon headline pull left just
+  // ONE tier to draw from and the pack silently came out at three cards instead
+  // of four. A second common is the right filler: it keeps the "no two slots
+  // share a rarity" rule everywhere it matters (the middle slots are still
+  // distinct from each other and from the headline), it costs nothing against
+  // the legendary odds that were just rebalanced, and duplicate commons are
+  // ordinary in the genre this imitates.
+  while (out.length < count) out.push('common');
+
   return out;
 }
 

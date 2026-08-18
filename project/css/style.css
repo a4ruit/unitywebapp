@@ -4139,3 +4139,17 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   100% { transform: scale(1);    box-shadow: 0 0 10px rgba(80, 200, 255, 0.18); }
 }
 .buff-chip--bump { animation: buffChipBump 0.45s steps(5); }
+
+/* BIG BUFF — warm against the speed chip's cyan, so two stacked chips read as
+   two different kinds of thing rather than two of the same. */
+.buff-chip--big {
+  border-color: rgba(255, 170, 90, 0.5);
+  color: rgba(255, 220, 180, 0.92);
+  box-shadow: 0 0 10px rgba(255, 150, 60, 0.2);
+}
+.buff-chip--big .buff-chip-sym {
+  color: #ffb056;
+  text-shadow: 0 0 6px rgba(255, 176, 86, 0.7);
+}
+
+.shop-item--big { border-color: rgba(255, 170, 90, 0.35); }

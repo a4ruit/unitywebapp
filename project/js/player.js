@@ -131,6 +131,18 @@ const Player = (() => {
 
   // Unity broadcast: room_mods|mult|totalPresence|contributors
   function handleMessage(msg) {
+    // buff_granted|clientId|big|seconds — Unity confirming a shop purchase and
+    // telling us how long it actually lasts. The chip counts down from that
+    // rather than from the moment of purchase, so the bar agrees with the buff.
+    if (typeof msg === 'string' && msg.startsWith('buff_granted|')) {
+      const b = msg.split('|');
+      if (b[1] === CLIENT_ID && b[2] === 'big') {
+        _bigUntil = Date.now() + (parseFloat(b[3]) || 0) * 1000;
+        _renderBuffRail();
+      }
+      return true;
+    }
+
     if (typeof msg !== 'string' || !msg.startsWith('room_mods|')) return false;
     const p = msg.split('|');
     _roomMoveMult = parseFloat(p[1]) || 1;
@@ -148,30 +160,53 @@ const Player = (() => {
   // nobody can see is indistinguishable from no bonus.
 
   let _lastBuffMult = 1;
+  let _bigUntil     = 0;     // epoch ms the BIG BUFF expires
+  let _buffTicker   = null;
 
+  // Chips stack in the rail, so a player carrying both the room's speed bonus
+  // and their own purchase sees two. They are deliberately different kinds of
+  // thing — one is pooled and permanent, one is bought and expiring — and the
+  // countdown is what tells them apart at a glance.
   function _renderBuffRail() {
     const rail = document.getElementById('buffRail');
     if (!rail) return;
 
-    // Hidden entirely at the floor. An always-present chip reading "×1.00" is
-    // furniture; one that appears when the room earns something is information.
-    if (!(_roomMoveMult > 1.001)) {
-      rail.classList.remove('buff-rail--open');
-      rail.innerHTML = '';
+    const chips = [];
+
+    if (_roomMoveMult > 1.001) {
+      const pct  = Math.round((_roomMoveMult - 1) * 100);
+      const bump = _roomMoveMult > _lastBuffMult + 0.0001;
+      chips.push(
+        `<div class="buff-chip${bump ? ' buff-chip--bump' : ''}" title="Room speed">` +
+          `<span class="buff-chip-sym">&gt;&gt;</span>` +
+          `<span class="buff-chip-val">+${pct}%</span>` +
+        `</div>`);
+      _lastBuffMult = _roomMoveMult;
+    } else {
       _lastBuffMult = 1;
-      return;
     }
 
-    const pct  = Math.round((_roomMoveMult - 1) * 100);
-    const bump = _roomMoveMult > _lastBuffMult + 0.0001;
+    const bigLeft = Math.max(0, Math.ceil((_bigUntil - Date.now()) / 1000));
+    if (bigLeft > 0) {
+      chips.push(
+        `<div class="buff-chip buff-chip--big" title="Bigger placements">` +
+          `<span class="buff-chip-sym">▲</span>` +
+          `<span class="buff-chip-val">${bigLeft}s</span>` +
+        `</div>`);
+    }
 
-    rail.innerHTML =
-      `<div class="buff-chip${bump ? ' buff-chip--bump' : ''}" title="Room speed">` +
-        `<span class="buff-chip-sym">&gt;&gt;</span>` +
-        `<span class="buff-chip-val">+${pct}%</span>` +
-      `</div>`;
-    rail.classList.add('buff-rail--open');
-    _lastBuffMult = _roomMoveMult;
+    rail.innerHTML = chips.join('');
+    rail.classList.toggle('buff-rail--open', chips.length > 0);
+
+    // Only tick while something is actually counting down. A permanent interval
+    // redrawing an empty rail forever is the kind of thing that quietly costs a
+    // phone battery over a long session.
+    if (bigLeft > 0 && _buffTicker === null) {
+      _buffTicker = setInterval(_renderBuffRail, 1000);
+    } else if (bigLeft <= 0 && _buffTicker !== null) {
+      clearInterval(_buffTicker);
+      _buffTicker = null;
+    }
   }
 
   // ── XP / levelling ──────────────────────────────────────────────────────────────
