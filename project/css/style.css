@@ -4062,3 +4062,34 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   letter-spacing: 0.06em;
   text-align: center;
 }
+
+/* ── <WH4Ti5L0VE> HUD tint ────────────────────────────────────────────────────
+   Same bar, same layout, different hue — matching how the two bosses are told
+   apart in Unity. Applied to the HUD root so the fill and the readout shift
+   together. */
+.boss-hud--mail .boss-hud-fill {
+  background: linear-gradient(90deg, rgba(230, 30, 25, 0.95), rgba(255, 140, 40, 0.95));
+  box-shadow: 0 0 8px rgba(255, 90, 30, 0.65);
+}
+.boss-hud--mail .boss-hud-hp   { color: rgba(255, 190, 150, 0.9); }
+.boss-hud--mail .boss-hud-name { color: rgba(255, 150, 110, 0.95); }
+
+/* ── <WH4Ti5L0VE> HP bar ──────────────────────────────────────────────────────
+   Its own element, stacked under the glitch boss's rather than replacing it.
+   Inherits .boss-hud for layout and slide-in; only the offset and the hue
+   differ, so the two read as the same kind of readout. */
+.boss-hud--mail {
+  /* Sits one bar-height lower, so both are visible if both are ever alive. The
+     hidden transform has to be overridden too, or it would slide in from the
+     wrong place. */
+  transform: translate(-50%, -260%);
+  border-color: rgba(255, 110, 60, 0.55);
+}
+.boss-hud--mail.boss-hud--open { transform: translate(-50%, 46px); }
+
+.boss-hud--mail .boss-hud-fill {
+  background: linear-gradient(90deg, rgba(230, 30, 25, 0.95), rgba(255, 140, 40, 0.95));
+  box-shadow: 0 0 8px rgba(255, 90, 30, 0.65);
+}
+.boss-hud--mail .boss-hud-hp   { color: rgba(255, 190, 150, 0.9); }
+.boss-hud--mail .boss-hud-name { color: rgba(255, 150, 110, 0.95); }

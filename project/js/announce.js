@@ -103,6 +103,32 @@ const Announce = (() => {
       _onBossSlain();
       return true;
     }
+
+    // ── <WH4Ti5L0VE> ─────────────────────────────────────────────────────────
+    // Same HUD, same handlers, different name and tint. Its messages are kept on
+    // their own prefix so the two bosses can never overwrite each other's state
+    // if both are ever on the field.
+    if (msg.startsWith('wh4t_spawned|')) {
+      _mailSpawned(parseInt(msg.split('|')[1]) || 0);
+      return true;
+    }
+    if (msg.startsWith('wh4t_damaged|')) {
+      const p = msg.split('|');
+      _mailDamaged(parseInt(p[2]), parseInt(p[3]));
+      return true;
+    }
+    if (msg === 'wh4t_slain' || msg.startsWith('wh4t_slain|')) {
+      _mailSlain();
+      return true;
+    }
+    // Late-join sync, same contract as boss_state. Restores the live bar without
+    // replaying the arrival banner — a player who just walked in shouldn't be
+    // told the attachment opened when the fight has been running for a minute.
+    if (msg.startsWith('wh4t_state|')) {
+      const p = msg.split('|');
+      _mailStateSync(parseInt(p[1]), parseInt(p[2]));
+      return true;
+    }
     if (msg.startsWith('godpack_pulled|')) {
       const p        = msg.split('|');
       const name     = p[1] || '';
@@ -163,6 +189,67 @@ const Announce = (() => {
   }
 
   // ── Boss spawn ──────────────────────────────────────────────────────────────
+  // ── <WH4Ti5L0VE> HUD ────────────────────────────────────────────────────────
+  // Entirely separate from the glitch boss's HUD above. Its own element, its own
+  // state, its own update path. Nothing here reads or writes _bossHP, _bossMaxHP,
+  // _bossLimbs or #bossHud, so a bug in this block can only ever produce one
+  // wrong bar rather than breaking the fight that has been shipping for months.
+
+  let _mailActive = false;
+  let _mailHP     = 0;
+  let _mailMaxHP  = 0;
+
+  function _mailUpdate() {
+    const fill = _el('bossHudMailFill');
+    const hpEl = _el('bossHudMailHp');
+    const name = _el('bossHudMailName');
+    const pct  = _mailMaxHP > 0 ? Math.max(0, Math.min(1, _mailHP / _mailMaxHP)) : 0;
+    if (name) name.textContent = 'WH4Ti5L0VE';
+    if (fill) fill.style.width = (pct * 100).toFixed(1) + '%';
+    if (hpEl) hpEl.textContent = `${_mailHP}/${_mailMaxHP}`;
+  }
+
+  function _mailShow() { const h = _el('bossHudMail'); if (h) h.classList.add('boss-hud--open'); }
+  function _mailHide() { const h = _el('bossHudMail'); if (h) h.classList.remove('boss-hud--open'); }
+
+  // Nobody is credited with spawning this one, because everybody who clicked did.
+  function _mailSpawned(maxHP) {
+    _mailActive = true;
+    _mailMaxHP  = maxHP || 0;
+    _mailHP     = _mailMaxHP;
+    _mailUpdate();
+
+    _enqueue({
+      type: 'boss', icon: '✉', title: 'WH4Ti5L0VE',
+      body: 'The attachment opened.<br>Something came through with it.',
+      duration: 6000, vibrate: [70, 50, 70],
+      onDismiss: () => { if (_mailActive) _mailShow(); },
+    });
+  }
+
+  function _mailDamaged(hp, max) {
+    if (!isNaN(max) && max > 0) _mailMaxHP = max;
+    if (!isNaN(hp)) _mailHP = Math.max(0, hp);
+    _mailUpdate();
+  }
+
+  function _mailSlain() {
+    _mailActive = false;
+    _mailHP     = 0;
+    _mailUpdate();
+    _mailHide();
+  }
+
+  // Late join. Restores the bar without replaying the arrival banner.
+  function _mailStateSync(hp, max) {
+    if (isNaN(hp) || isNaN(max) || max <= 0 || hp <= 0) { _mailSlain(); return; }
+    _mailActive = true;
+    _mailMaxHP  = max;
+    _mailHP     = Math.max(0, hp);
+    _mailUpdate();
+    _mailShow();
+  }
+
   function _onBossSpawned(maxHP, spawnerId, colorHex, name) {
     _bossActive  = true;
     _bossMaxHP   = maxHP || 0;
