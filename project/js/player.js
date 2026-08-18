@@ -138,7 +138,40 @@ const Player = (() => {
     _roomPlayers  = parseInt(p[3]) || 0;
     if (window.PlayerMods) window.PlayerMods.roomMoveMult = _roomMoveMult;
     _render();
+    _renderBuffRail();
     return true;
+  }
+
+  // ── Collective buff rail ────────────────────────────────────────────────────
+  // Mirrors the Unity name-tag badge. The buff is pooled and otherwise invisible
+  // — placements are quietly faster and nothing says so — and a collective bonus
+  // nobody can see is indistinguishable from no bonus.
+
+  let _lastBuffMult = 1;
+
+  function _renderBuffRail() {
+    const rail = document.getElementById('buffRail');
+    if (!rail) return;
+
+    // Hidden entirely at the floor. An always-present chip reading "×1.00" is
+    // furniture; one that appears when the room earns something is information.
+    if (!(_roomMoveMult > 1.001)) {
+      rail.classList.remove('buff-rail--open');
+      rail.innerHTML = '';
+      _lastBuffMult = 1;
+      return;
+    }
+
+    const pct  = Math.round((_roomMoveMult - 1) * 100);
+    const bump = _roomMoveMult > _lastBuffMult + 0.0001;
+
+    rail.innerHTML =
+      `<div class="buff-chip${bump ? ' buff-chip--bump' : ''}" title="Room speed">` +
+        `<span class="buff-chip-sym">&gt;&gt;</span>` +
+        `<span class="buff-chip-val">+${pct}%</span>` +
+      `</div>`;
+    rail.classList.add('buff-rail--open');
+    _lastBuffMult = _roomMoveMult;
   }
 
   // ── XP / levelling ──────────────────────────────────────────────────────────────

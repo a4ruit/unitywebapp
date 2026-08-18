@@ -131,6 +131,11 @@
         <!-- Earned synergy ability cards — persist for the session until spent -->
         <div id="comboTray" class="combo-tray"></div>
 
+        <!-- Collective buffs. Left rail, opposite the combo tray, because these
+             are things the ROOM earned rather than anything this player can
+             spend. Empty and hidden until a buff is actually live. -->
+        <div id="buffRail" class="buff-rail"></div>
+
         <!-- Pack type selector -->
         <div class="pack-type-row">
           <button class="pack-type-btn active" id="packTypeGarbage" onclick="setPackType('garbage')">

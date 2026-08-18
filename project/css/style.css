@@ -4093,3 +4093,49 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 }
 .boss-hud--mail .boss-hud-hp   { color: rgba(255, 190, 150, 0.9); }
 .boss-hud--mail .boss-hud-name { color: rgba(255, 150, 110, 0.95); }
+
+/* ── Collective buff rail ─────────────────────────────────────────────────────
+   Left side, mirroring .combo-tray on the right. The split is meaningful: the
+   right holds cards this player can spend, the left holds conditions the room
+   is under. Nothing here is tappable. */
+.buff-rail {
+  position: fixed;
+  bottom: 122px;
+  left: 12px;
+  z-index: 7;
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+}
+.buff-rail--open { display: flex; }
+
+.buff-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(10, 16, 22, 0.9);
+  border: 1px solid rgba(120, 220, 255, 0.45);
+  border-radius: 3px;
+  font-family: 'lo-res', monospace;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: rgba(180, 240, 255, 0.92);
+  box-shadow: 0 0 10px rgba(80, 200, 255, 0.18);
+}
+.buff-chip-sym {
+  font-size: 12px;
+  color: #7be3ff;
+  text-shadow: 0 0 6px rgba(123, 227, 255, 0.7);
+}
+.buff-chip-val { color: #ffffff; }
+
+/* Pulses once when the room earns another step, so a buff climbing is felt on
+   the phone as well as in the placement. */
+@keyframes buffChipBump {
+  0%   { transform: scale(1);    box-shadow: 0 0 10px rgba(80, 200, 255, 0.18); }
+  40%  { transform: scale(1.14); box-shadow: 0 0 18px rgba(120, 230, 255, 0.6); }
+  100% { transform: scale(1);    box-shadow: 0 0 10px rgba(80, 200, 255, 0.18); }
+}
+.buff-chip--bump { animation: buffChipBump 0.45s steps(5); }
