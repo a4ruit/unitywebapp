@@ -4153,3 +4153,58 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 }
 
 .shop-item--big { border-color: rgba(255, 170, 90, 0.35); }
+
+/* ── Soul recovery console ────────────────────────────────────────────────────
+   Terminal register, matching the name screen and the Unity overlay. No
+   `display` at the id level — .screen already flex-centres, and an id-level
+   display beats `.screen.hidden { display:none }`, which is what made the mail
+   window show up on the name screen. */
+#screen-soul {
+  flex-direction: column;
+  padding: 18px;
+  background: #05060a;
+}
+.soul-term {
+  width: 100%;
+  max-width: 320px;
+  border: 1px solid rgba(120, 255, 190, 0.35);
+  background: rgba(6, 14, 12, 0.95);
+  box-shadow: 0 0 18px rgba(60, 220, 160, 0.15);
+  padding: 14px;
+  font-family: 'lo-res', monospace;
+  color: rgba(150, 255, 210, 0.9);
+}
+.soul-term-head   { font-size: 8px; color: rgba(120, 255, 190, 0.55); letter-spacing: 0.14em; }
+.soul-term-line   { font-size: 10px; margin-top: 10px; line-height: 1.6; color: #ff6a5e; }
+.soul-term-prompt { font-size: 11px; margin-top: 12px; letter-spacing: 0.08em; }
+
+.soul-bar {
+  margin-top: 14px;
+  height: 10px;
+  border: 1px solid rgba(120, 255, 190, 0.35);
+  background: rgba(0, 0, 0, 0.6);
+}
+.soul-bar-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(60,220,160,0.9), rgba(160,255,210,0.9));
+  transition: width 0.25s linear;
+}
+.soul-count { font-size: 8px; margin-top: 6px; letter-spacing: 0.1em; color: rgba(150,255,210,0.7); }
+
+.soul-btns { display: flex; gap: 10px; margin-top: 16px; }
+.soul-btn {
+  flex: 1;
+  padding: 10px 0;
+  background: transparent;
+  border: 1px solid rgba(120, 255, 190, 0.45);
+  color: rgba(150, 255, 210, 0.9);
+  font-family: 'lo-res', monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+}
+.soul-btn:active { background: rgba(120, 255, 190, 0.15); }
+.soul-btn--no    { border-color: rgba(255, 120, 110, 0.45); color: rgba(255, 160, 150, 0.9); }
+.soul-sent       { margin-top: 12px; font-size: 8px; letter-spacing: 0.12em; color: rgba(120,255,190,0.6); }

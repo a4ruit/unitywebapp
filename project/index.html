@@ -40,6 +40,7 @@
       <button onclick="debugSpawnBlindBox(); debugMenuClose()">spawn blind box</button>
       <button onclick="debugAddStars(); debugMenuClose()">+25 stars</button>
       <button onclick="debugStatLevel()">+1 stat lv</button>
+      <button onclick="debugForceCloseSoul(); debugMenuClose()">unstick soul screen</button>
     </div>
   </div>
   <div class="god-pack-banner hidden" id="godPackBanner">
@@ -454,6 +455,26 @@
       <!-- PRISTINE OUT-OF-PACKS SCREEN — calm cooldown, no ads ──────────── -->
       <!-- LOVE MAIL. Deliberately not styled like the rest of the app. It has to
            look like something that arrived rather than something we built. -->
+      <!-- SOUL RECOVERY — shown to everyone the moment the Soul Tree dies.
+           Force-shown over whatever the player was doing, because the prompt is
+           the only way the session continues. -->
+      <div class="screen hidden" id="screen-soul">
+        <div class="soul-term">
+          <div class="soul-term-head">&gt; SYSTEM</div>
+          <div class="soul-term-line" id="soulTermMsg">THE SOUL TREE HAS WITHERED.</div>
+          <div class="soul-term-prompt">DATA RECOVERABLE: CONTINUE?</div>
+
+          <div class="soul-bar"><span class="soul-bar-fill" id="soulBarFill"></span></div>
+          <div class="soul-count" id="soulCount">0 / 0 CONFIRMED</div>
+
+          <div class="soul-btns">
+            <button class="soul-btn soul-btn--yes" id="soulYesBtn" onclick="submitSoulVote(true)">[ Y ]</button>
+            <button class="soul-btn soul-btn--no"  onclick="submitSoulVote(false)">[ N ]</button>
+          </div>
+          <div class="soul-sent hidden" id="soulSent">RESPONSE LOGGED</div>
+        </div>
+      </div>
+
       <div class="screen hidden" id="screen-lovemail">
         <div class="win2k">
           <div class="win2k-title">

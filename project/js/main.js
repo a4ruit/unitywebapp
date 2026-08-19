@@ -342,6 +342,92 @@ function _loveMailDismiss() {
   showScreen(_loveMailReturn || 'screen-pack');
 }
 
+// ─── Soul recovery ────────────────────────────────────────────────────────────
+// Unity sends "soul_recovery|needed|yes|no" while the vote is open and
+// "soul_recovery_end" when it closes either way.
+//
+// This screen is force-shown over WHATEVER the player is doing. An earlier
+// version queued it until the current action finished, which is why a playtest
+// stranded everyone who was mid-placement or steering a creature when the tree
+// died: the action they were waiting to finish could never finish, because the
+// world it belonged to was gone.
+
+let _soulOpen   = false;
+let _soulVoted  = false;
+let _soulReturn = null;
+
+function handleSoulMessage(data) {
+  if (typeof data !== 'string') return false;
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+
+  if (msg === 'soul_recovery_end') {
+    if (!_soulOpen) return true;
+    _soulOpen = false;
+    _soulVoted = false;
+    showScreen(_soulReturn || 'screen-pack');
+    _soulReturn = null;
+    return true;
+  }
+
+  if (!msg.startsWith('soul_recovery|')) return false;
+
+  const [, needed, yes, no] = msg.split('|');
+
+  if (!_soulOpen) {
+    _soulOpen  = true;
+    _soulVoted = false;
+    const cur  = document.querySelector('.screen:not(.hidden)');
+    // Never return them to a placement screen — that session is already over.
+    _soulReturn = (cur && cur.id !== 'screen-soul' && cur.id !== 'screen-place')
+                ? cur.id : 'screen-pack';
+    _soulForceOut();
+    showScreen('screen-soul');
+    const sent = document.getElementById('soulSent');
+    if (sent) sent.classList.add('hidden');
+  }
+
+  const n = parseInt(needed) || 0, y = parseInt(yes) || 0, nn = parseInt(no) || 0;
+  const fill = document.getElementById('soulBarFill');
+  const cnt  = document.getElementById('soulCount');
+  if (fill) fill.style.width = (n > 0 ? Math.min(100, (y / n) * 100) : 0).toFixed(0) + '%';
+  if (cnt)  cnt.textContent = `${y} / ${n} CONFIRMED` + (nn > 0 ? `  ·  ${nn} DECLINED` : '');
+  return true;
+}
+
+// Tears down anything that owns the screen or an input loop. Unity has already
+// ended the underlying sessions; this is the phone catching up so the prompt
+// isn't drawn underneath a joystick.
+function _soulForceOut() {
+  // DOM level only, on purpose. Unity's CancelAllSessions already broadcast
+  // placement_done, which possession.js handles through its own teardown — this
+  // is only here in case that message is lost or arrives late, so it must not
+  // depend on any function inside another module.
+  ['poss-place-overlay', 'comboPath', 'comboPrompt'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active', 'open');
+  });
+}
+
+function submitSoulVote(yes) {
+  if (!_soulOpen || _soulVoted) return;
+  _soulVoted = true;
+  if (typeof CLIENT_ID !== 'undefined') send(`soul_vote|${CLIENT_ID}|${yes ? 'yes' : 'no'}`);
+  const sent = document.getElementById('soulSent');
+  if (sent) sent.classList.remove('hidden');
+}
+
+// Failsafe. If the console is ever shown with no way out — a dropped connection,
+// a Unity crash, a bug we have not found — this releases the phone locally
+// without waiting for Unity. It does not resolve the vote, it just stops one
+// person being trapped.
+function debugForceCloseSoul() {
+  _soulOpen = false;
+  _soulVoted = false;
+  showScreen(_soulReturn || 'screen-pack');
+  _soulReturn = null;
+  console.warn('[soul] force-closed locally');
+}
+
 function updatePersonalPhase() {
   const level      = corruptionLevel;
   const isPristine = level < HORROR_THRESHOLD;
@@ -957,6 +1043,7 @@ function connect() {
       if (typeof Player !== 'undefined') Player.observe(e.data);
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
+      if (handleSoulMessage(e.data)) return;
       if (handleCleanseMessage(e.data)) return;
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleQuestMessage(e.data)) return;
@@ -1162,12 +1249,48 @@ let _pendingPackDir = 'right';
 // this, throwing a thornwire on the minimap immediately tore open a new pack.
 window.suppressPackOpenUntil = 0;
 
+// ─── Pack-open re-entry guard ─────────────────────────────────────────────────
+// Tapping the pack again mid-animation used to restart the sequence from the
+// top. consumePack() had already run, so the player was charged a pack, the
+// in-flight reveal was thrown away, and nothing was ever spawned from it — a
+// spammed tap could burn an inventory in seconds and produce nothing.
+//
+// The guard has to sit BEFORE consumePack, or the pack is spent before we decide
+// to ignore the tap.
+let _packOpening = false;
+let _packOpenWatchdog = null;
+
+function _beginPackOpen() {
+  _packOpening = true;
+  // Nothing may leave this flag set forever. Every exit clears it, but a bug in
+  // any one of those paths would lock the player out of the whole game, so a
+  // watchdog releases it regardless. Generous, because it should never be what
+  // actually clears the flag.
+  clearTimeout(_packOpenWatchdog);
+  _packOpenWatchdog = setTimeout(() => {
+    if (!_packOpening) return;
+    console.warn('[pack] Watchdog released the open guard — a completion path did not clear it');
+    _packOpening = false;
+  }, 12000);
+}
+
+function _endPackOpen() {
+  _packOpening = false;
+  clearTimeout(_packOpenWatchdog);
+  _packOpenWatchdog = null;
+}
+
 function triggerPackOpen(dir) {
   if (Date.now() < (window.suppressPackOpenUntil || 0)) {
     console.log('[pack] Open suppressed — overlay just closed under the pointer');
     return;
   }
+  if (_packOpening) {
+    console.log('[pack] Ignored — an open is already running');
+    return;
+  }
   if (!consumePack()) return;
+  _beginPackOpen();
   doPackOpen(dir);
 }
 
@@ -1194,10 +1317,16 @@ function adpackConfirmSkip() {
 }
 
 function adpackCancel() {
+  _endPackOpen();
   showScreen('screen-pack');
 }
 
 function doPackOpen(dir) {
+  // Armed here as well as in triggerPackOpen, because the adpack prompt calls
+  // straight in and would otherwise run an unguarded open. Idempotent — arming
+  // twice just resets the watchdog.
+  _beginPackOpen();
+
   // Pack-opening sound — no-op unless "sound on" was ticked on the name screen.
   if (typeof Sound !== 'undefined') Sound.play('packOpen');
 
@@ -1308,6 +1437,8 @@ function triggerFlash() {
 // ─── Normal choice grid ───────────────────────────────────────────────────────
 
 function showChoiceGrid() {
+  // The reveal is over and the player is choosing — safe to arm the pack again.
+  _endPackOpen();
   Cards3D.destroy();
   const el = document.getElementById('revealCard');
   if (el) { el.innerHTML = ''; el.style.opacity = ''; }
@@ -1359,6 +1490,7 @@ function showLegendaryReveal() {
 // ─── God-pack claim grid ──────────────────────────────────────────────────────
 
 function showGodPackClaimGrid() {
+  _endPackOpen();
   Cards3D.destroy();
   const el = document.getElementById('revealCard');
   if (el) { el.innerHTML = ''; el.style.opacity = ''; }

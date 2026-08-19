@@ -125,7 +125,7 @@ const CardTextures = (() => {
     return `hsl(${h},100%,60%)`;
   }
 
-  // ─── Preloaded card skin images ──────────────────────────────────────────────
+
 
   const _cardSkins = {};
   function _loadSkin(key, src) {
@@ -138,8 +138,7 @@ const CardTextures = (() => {
   _loadSkin('nature-rare',     'assets/epic-card.png');
   _loadSkin('legendary',       'assets/legendary-card.png');
   _loadSkin('flesh-common',    'assets/flesh_card_common.png');
-  // Custom symbol art — loaded once, reused as the central illustration for
-  // its respective card. Add new symbols here as they're made.
+
   _loadSkin('symbol-leaf',       'assets/leaf-symbol.png');
   _loadSkin('symbol-critter',    'assets/critter-symbol.png');
   _loadSkin('symbol-duck',       'assets/duck-card.png');
@@ -561,6 +560,46 @@ const CardTextures = (() => {
     return { x, y, scale };
   }
 
+  // ─── Thornwire sprite ───────────────────────────────────────────────────────
+  // A single barbed horn: thick at the root, tapering to a point, curving as it
+  // rises, with three barbs growing off the outer edge.
+  //
+  // Authored row by row rather than fitted to a curve. Four attempts at solving
+  // it from beziers produced either a banana or a blob, and at 19px the
+  // silhouette is small enough that stating it outright is both quicker and more
+  // accurate than describing it mathematically.
+  //
+  // Every barb starts ON the body's own edge. One column of daylight and it
+  // reads as a speck floating beside the thorn instead of growing out of it.
+  const THORN_ART = [
+    '..........D.',
+    '.........DMD',
+    '.........DMD',
+    '........DMMD',
+    '......DDMHMD',
+    '.....DDMLHMD',
+    '.......DMMD.',
+    '......DMHMD.',
+    '......DMHMD.',
+    '...DDDLLHMD.',
+    '...DMMLHMD..',
+    '....DMLHMD..',
+    '....DMLHMD..',
+    '...DMLHMD...',
+    '.DDMLLHMD...',
+    'DDMLLLHMD...',
+    '..DMLHMD....',
+    '.DMMMMMD....',
+    '.DDDDDD.....',
+  ];
+
+  const THORN_PAL = {
+    D: '#2e2216',   // outline
+    M: '#6b5326',   // shaded side
+    L: '#a8842f',   // body
+    H: '#d8b558',   // lit inner curve
+  };
+
   // ─── Leaf Storm sprite ──────────────────────────────────────────────────────
   // Three blades radiating from one centre, after the triquetra. The first pass
   // arranged them as a chase — each leaf tangent to a ring, pointing at the
@@ -601,16 +640,11 @@ const CardTextures = (() => {
     // Custom pixel-art PNG symbol — falls through to procedural drawing if the
     // image hasn't loaded yet, so the card never renders empty.
     // Position + size are controlled by LAYOUT.symbolCenterY / LAYOUT.symbolHeight.
-    if (rarity === 'common') {
-      const sym = _cardSkins['symbol-leaf'];
-      if (sym && sym.complete && sym.naturalWidth > 0) {
-        ctx.imageSmoothingEnabled = false;
-        const targetH = LAYOUT.symbolHeight;
-        const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
-        ctx.drawImage(sym, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
-        return;
-      }
-    }
+    // NOTE: the 'symbol-leaf' PNG used to draw here for the nature common.
+    // Thornwire now has its own barbed symbol below, so the leaf is shelved
+    // rather than deleted — the asset is still loaded under that key and the
+    // procedural Fallen Leaf fallback is still further down, both ready for
+    // whichever common card wants them next.
 
     if (rarity === 'uncommon') {
       const wf = _cardSkins['symbol-wildflower'];
@@ -621,6 +655,11 @@ const CardTextures = (() => {
         ctx.drawImage(wf, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
         return;
       }
+    }
+
+    if (rarity === 'common') {
+      drawSprite(ctx, getSprite('thorn', THORN_ART, THORN_PAL));
+      return;
     }
 
     if (rarity === 'rare') {
