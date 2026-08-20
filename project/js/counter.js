@@ -471,6 +471,55 @@ function shopBuyPrismatic(cost, btn) {
   _shopConfirm(btn, '✦ ACTIVE');
 }
 
+// ── Titles ───────────────────────────────────────────────────────────────────
+// A title is the one piece of identity a player keeps. Everything else the shop
+// sells is either consumable or a colour; this follows them onto the world tag,
+// the roster and every announcement they cause.
+//
+// 50 stars — the most expensive thing in the shop by a distance, and deliberately
+// out of reach of a lucky pack or two. A title should be evidence that someone
+// actually played the game the way it asks, not something bought on arrival.
+//
+// One title only for now. TITLES is a table rather than a constant so adding
+// the second is a line here plus a line of markup.
+const TITLES = {
+  playtester: { text: 'THE BEST PLAYTESTER', cost: 50 },
+};
+let _titleOwned = '';
+
+function shopBuyTitle(key, btn) {
+  const t = TITLES[key];
+  if (!t) return;
+  if (_titleOwned === t.text) { _shopConfirm(btn, 'WORN'); return; }   // already owned
+  if (!spendStars(t.cost)) { _shopDenied(); return; }
+
+  _titleOwned = t.text;
+  syncShopBalance();
+  updateShopButtons();
+  _syncTitleButton();
+
+  // Semi-permanent, so it has to reach every surface at once: the phone's own
+  // tag here, and Unity's world label, player list and announcements via the
+  // set_name re-broadcast.
+  if (typeof playerTitle !== 'undefined') playerTitle = t.text;
+  if (typeof applyTitleNametag === 'function') applyTitleNametag();
+  if (typeof reSendSetName    === 'function') reSendSetName();
+
+  _shopConfirm(btn, 'WORN');
+}
+
+function _syncTitleButton() {
+  const btn  = document.getElementById('shopTitleBtn');
+  const item = document.getElementById('shopTitleItem');
+  if (!btn) return;
+  if (_titleOwned) {
+    btn.textContent   = 'WORN';
+    btn.disabled      = true;
+    btn.style.opacity = '0.6';
+    if (item) item.style.opacity = '0.7';
+  }
+}
+
 function _syncPrismaticButton() {
   const btn  = document.getElementById('shopPrismaticBtn');
   const item = document.getElementById('shopPrismaticItem');
@@ -518,5 +567,7 @@ function updateShopButtons() {
       item.style.opacity = canAfford ? '1' : '0.6';
     }
   });
-  _syncRefreshButton();   // cooldown state must win over the affordability pass
+  _syncRefreshButton();    // cooldown state must win over the affordability pass
+  _syncPrismaticButton();  // owned state must too — both repaint after this pass
+  _syncTitleButton();
 }

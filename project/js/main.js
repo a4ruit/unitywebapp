@@ -917,8 +917,15 @@ let _wsHadOpenThisAttempt = false;
 //   - the player's placement labels in the world
 //   - the floating tag when they inhabit a critter
 //   - (future) chat-log entries
-// Wire protocol:  set_name|<CLIENT_ID>|<NAME>|<#RRGGBB>
+// Wire protocol:  set_name|<CLIENT_ID>|<NAME>|<#RRGGBB>|<PRISMATIC>|<TITLE>
+//   field 5 = "1" when the prismatic cosmetic is owned
+//   field 6 = purchased title WITHOUT brackets, e.g. THE BEST PLAYTESTER
+// Both trail the original three fields, so an older relay or an older Unity
+// build simply ignores them.
 let playerName   = '';
+// A purchased title. Semi-permanent, so it has to ride EVERY set_name — Unity
+// only overwrites its stored title when field 6 is present.
+let playerTitle  = '';
 let playerColor  = '';   // set by selectPlayerColor() or randomly on submit
 let soundEnabled = true; // name-screen "sound" toggle — gates all phone audio
 
@@ -949,6 +956,19 @@ function _updateSoundToggle() {
   if (box) box.textContent = soundEnabled ? '[✓]' : '[ ]';
 }
 
+// One builder for all three send sites. They used to compose the message
+// separately and had already drifted: the reconnect handler sent three fields
+// and silently dropped the prismatic flag, so a phone that reconnected lost its
+// cosmetic until it bought another one.
+function _setNamePayload() {
+  const prismatic = (typeof _prismaticOwned !== 'undefined' && _prismaticOwned) ? '1' : '';
+  return `set_name|${CLIENT_ID}|${playerName}|${playerColor}|${prismatic}|${playerTitle}`;
+}
+
+function sendSetName() {
+  if (ws && ws.readyState === WebSocket.OPEN && playerName) ws.send(_setNamePayload());
+}
+
 function submitPlayerName() {
   const input = document.getElementById('nameInput');
   const raw   = input ? input.value.trim() : '';
@@ -965,10 +985,7 @@ function submitPlayerName() {
   // The enter-world tap is a user gesture — unlock audio now so later sounds
   // aren't blocked by mobile autoplay policy (no-op if sound is toggled off).
   if (typeof Sound !== 'undefined') { Sound.setEnabled(soundEnabled); Sound.unlock(); }
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    const prismatic = (typeof _prismaticOwned !== 'undefined' && _prismaticOwned) ? '|1' : '';
-    ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}${prismatic}`);
-  }
+  sendSetName();
   // Show the player's persistent name tag on the pack screen, in their colour.
   const tag = document.getElementById('playerNametag');
   if (tag) {
@@ -983,6 +1000,29 @@ function submitPlayerName() {
   document.getElementById('screen-pack').classList.remove('hidden');
 }
 
+// Render the purchased title under the phone's own name tag.
+//
+// Under rather than inline, unlike the world label and the roster: the pack
+// screen has vertical room, and a title reads as a second, quieter line of
+// identity there. Rebuilt from scratch each call so buying and re-rendering
+// cannot stack two of them.
+function applyTitleNametag() {
+  const tag = document.getElementById('playerNametag');
+  if (!tag) return;
+
+  let el = document.getElementById('playerTitleTag');
+  if (!playerTitle) { if (el) el.remove(); return; }
+
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'playerTitleTag';
+    // After the tag, not inside it — the tag's own colour and the prismatic
+    // gradient are set on that element, and a child would inherit both.
+    tag.insertAdjacentElement('afterend', el);
+  }
+  el.textContent = `<${playerTitle}>`;
+}
+
 // Apply the prismatic CSS to the web name tag immediately when purchased.
 function applyPrismaticNametag() {
   const tag = document.getElementById('playerNametag');
@@ -994,12 +1034,8 @@ function applyPrismaticNametag() {
   }
 }
 
-// Re-broadcast set_name including the new prismatic flag so Unity updates live.
-function reSendSetName() {
-  if (ws && ws.readyState === WebSocket.OPEN && playerName) {
-    ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}|1`);
-  }
-}
+// Re-broadcast identity so Unity picks up a cosmetic the moment it is bought.
+function reSendSetName() { sendSetName(); }
 
 function connect() {
   try {
@@ -1016,7 +1052,7 @@ function connect() {
       clearTimeout(reconnectTimer);
       sendPackType();
       updatePossessionWS();
-      if (playerName) ws.send(`set_name|${CLIENT_ID}|${playerName}|${playerColor}`);
+      sendSetName();
     };
     ws.onclose = () => {
       setStatus(false);
@@ -1046,6 +1082,7 @@ function connect() {
       if (handleSoulMessage(e.data)) return;
       if (handleCleanseMessage(e.data)) return;
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
+      if (handleSoulTreeGoal(e.data)) return;
       if (handleQuestMessage(e.data)) return;
       if (handleLoveMailMessage(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
@@ -1069,6 +1106,28 @@ function send(msg) {
 // Unity broadcasts "quest_reward|{quest}|{packCount}" when a collective
 // objective completes. Server relays it to all phones. We convert it to a
 // star reward and show a brief banner so the player knows they earned something.
+
+// Soul Tree objectives, straight through to the Main Task row. Both messages
+// already existed — the site's per-flower count was being broadcast and simply
+// had nothing listening on the phone.
+function handleSoulTreeGoal(data) {
+  if (typeof data !== 'string') return false;
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+  if (typeof TaskTracker === 'undefined') return false;
+
+  if (msg.startsWith('soultree_site|')) {
+    const p = msg.split('|');
+    TaskTracker.setSeedProgress(parseInt(p[1]) || 0, parseInt(p[2]) || 0);
+    return true;
+  }
+  if (msg.startsWith('soultree_goal|')) {
+    const p = msg.split('|');
+    TaskTracker.setTreeGoal(p[1] || '', parseInt(p[2]) || 0, parseInt(p[3]) || 0,
+                            parseInt(p[4]) || 0, p[5] === '1', p[6] === '1');
+    return true;
+  }
+  return false;
+}
 
 function handleQuestMessage(msg) {
   // Live progress broadcast from Unity's QuestManager: quest_progress|quest|count|goal

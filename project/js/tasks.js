@@ -162,6 +162,9 @@ const TaskTracker = (() => {
   function togglePanel() { _setOpen(!_open); }
 
   function _setOpen(state) {
+    // Opening is the acknowledgement — the badge clears here rather than on a
+    // timer, so it always means "there is something you have not looked at".
+    if (state) _mainSeen = _mainKey;
     if (_open === state) return;
     _open = state;
     const panel = document.getElementById('taskPanel');
@@ -225,6 +228,88 @@ const TaskTracker = (() => {
 
   // ── UI rendering ─────────────────────────────────────────────────────────────
 
+  // ── Main task ──────────────────────────────────────────────────────────────
+  // What the ROOM is working on, straight from Unity. Feedback from a playtest
+  // was that people arrived with no idea what to do, and anyone standing away
+  // from the projection could not read the Soul Seed's label — so the objective
+  // existed only for people near the screen. This puts it on every phone.
+
+  let _main = null;   // { title, detail, have, need, ready }
+
+  /// Germination: soultree_site|planted|required
+  function setSeedProgress(planted, required) {
+    _main = {
+      title : 'THE SOUL SEED',
+      detail: 'Germination Stage',
+      have  : planted,
+      need  : required,
+      ready : planted >= required,
+      line  : `Plant ${required} flowers on the mound`,
+    };
+    _flagNew('seed:' + planted + '/' + required);
+    _render();
+  }
+
+  /// After sprouting: soultree_goal|stage|plants|animals|fungi|combo|ready
+  function setTreeGoal(stage, plants, animals, fungi, combo, ready) {
+    const parts = [];
+    if (plants  > 0) parts.push(`${plants} flowers`);
+    if (animals > 0) parts.push(`${animals} animals`);
+    if (fungi   > 0) parts.push(`${fungi} fungi`);
+    if (combo)       parts.push('a player combo');
+
+    _main = {
+      title : 'THE SOUL TREE',
+      // Every stage reads "<name> Stage", matching Germination. The final stage
+      // never appears here — Unity only broadcasts a goal while a NEXT stage
+      // exists — so there is no last-stage case to special-case.
+      detail: stage ? stage + ' Stage' : '',
+      have  : null,
+      need  : null,
+      ready : ready,
+      line  : ready ? 'Ready to grow' : 'Needs ' + parts.join(', '),
+    };
+    // Only the STAGE seeds the badge, not every count. A pulsing marker that
+    // returns on each flower would be noise, and players would stop reading it.
+    _flagNew('goal:' + stage);
+    _render();
+  }
+
+  // The badge marks a genuinely new objective. It clears when the panel is
+  // opened and comes back only when the key changes — the stage advancing, or
+  // the very first thing the room is asked to do.
+  let _mainKey = null, _mainSeen = null;
+  function _flagNew(key) {
+    const stageKey = key.split(':')[0] === 'goal' ? key : 'seed';
+    if (stageKey !== _mainKey) { _mainKey = stageKey; }
+  }
+  function _mainIsNew() { return _mainKey !== null && _mainKey !== _mainSeen; }
+
+  function _mainRows() {
+    if (!_main) return [];
+    const pct = (_main.need > 0 && _main.have !== null)
+      ? Math.min(100, (_main.have / _main.need) * 100) : (_main.ready ? 100 : 0);
+    const count = (_main.have !== null && _main.need !== null)
+      ? `<span class="task-mission-count">${_main.have}/${_main.need}</span>` : '';
+    // Class names are prefixed `mission-` rather than `main-`. The existing task
+    // rows already use `.task-main` for their inner wrapper, so styling a class
+    // by that name put a border around every task in the panel.
+    return [
+      '<div class="task-section-hdr task-section-hdr--mission">── Main Task</div>',
+      '<div class="task-mission' + (_main.ready ? ' task-mission--ready' : '') + '">' +
+        `<div class="task-mission-title">&lt;${_main.title}&gt;${count}</div>` +
+        `<div class="task-mission-stage">${_main.detail}</div>` +
+        // Same [ ] / [✓] indicator the other rows use, so the objective reads as
+        // a task rather than as a status line.
+        `<div class="task-mission-line">` +
+          `<span class="task-mission-box">${_main.ready ? '[✓]' : '[ ]'}</span>` +
+          `<span>${_main.line}</span>` +
+        `</div>` +
+        `<div class="task-mission-bar"><span style="width:${pct.toFixed(0)}%"></span></div>` +
+      '</div>',
+    ];
+  }
+
   function _render() {
     _updateTrigger();
     if (!_open) return;
@@ -232,6 +317,8 @@ const TaskTracker = (() => {
     if (!body) return;
 
     const rows = [];
+
+    rows.push(..._mainRows());
 
     rows.push('<div class="task-section-hdr">── My Tasks</div>');
     _ind.forEach(t => rows.push(_row(t)));
@@ -273,10 +360,28 @@ const TaskTracker = (() => {
     const f = total > 0 ? Math.round((done / total) * W) : 0;
     const fill  = '█'.repeat(f);
     const empty = '░'.repeat(W - f);
+    const alert = _mainIsNew();
+    btn.classList.toggle('task-panel-trigger--alert', alert);
+
     btn.innerHTML =
       `<span class="task-trigger-label">TASKS</span>` +
       `<span class="task-trigger-count">${done}/${total}</span>` +
       `<span class="task-trigger-bar"><span class="task-trigger-bar-fill">${fill}</span><span class="task-trigger-bar-empty">${empty}</span></span>`;
+
+    // The badge is a CHILD of the button, but absolutely positioned outside its
+    // left edge — so it is anchored to the tab yet out of the flow entirely and
+    // cannot change the tab's size.
+    //
+    // It has to be re-appended because the line above replaces innerHTML. As a
+    // sibling of the button it was anchored to .task-panel, which is as tall as
+    // its body while the trigger stays compact at the top (align-items:
+    // flex-start), so "halfway down" put it far below the tab.
+    if (alert) {
+      const bang = document.createElement('span');
+      bang.className = 'task-bang';
+      bang.textContent = '!';
+      btn.appendChild(bang);
+    }
   }
 
   // Brief pixel-blink on the tab whenever a task progresses
@@ -289,6 +394,7 @@ const TaskTracker = (() => {
     btn.addEventListener('animationend', () => btn.classList.remove('task-panel-trigger--ping'), { once: true });
   }
 
-  return { recordEvent, recordQuestProgress, recordQuestComplete, refreshIndividual, togglePanel };
+  return { recordEvent, recordQuestProgress, recordQuestComplete, refreshIndividual,
+           togglePanel, setSeedProgress, setTreeGoal, mainIsNew: _mainIsNew };
 
 })();
