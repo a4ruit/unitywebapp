@@ -275,7 +275,11 @@
               <div class="shop-item shop-item--title" id="shopTitleItem">
                 <span class="shop-item-icon">❖</span>
                 <div class="shop-item-info">
-                  <div class="shop-item-name">TITLE &lt;THE BEST PLAYTESTER&gt;</div>
+                  <!-- Broken by hand rather than left to wrap. At this width the
+                       browser split it as "TITLE <THE / BEST / PLAYTESTER>",
+                       which orphans THE from the phrase it belongs to. A second
+                       title will need its own breaks. -->
+                  <div class="shop-item-name">TITLE<br>&lt;THE BEST<br>PLAYTESTER&gt;</div>
                   <div class="shop-item-stars">★ 50</div>
                 </div>
                 <button class="shop-btn" id="shopTitleBtn" onclick="shopBuyTitle('playtester', this)">WEAR</button>

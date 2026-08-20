@@ -144,6 +144,7 @@ const CardTextures = (() => {
   _loadSkin('symbol-duck',       'assets/duck-card.png');
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
+  _loadSkin('symbol-thornwire',  'assets/thornwire-symbol.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -658,6 +659,22 @@ const CardTextures = (() => {
     }
 
     if (rarity === 'common') {
+      // The PNG is the real symbol; THORN_ART below was the placeholder it
+      // replaces. Kept as the fallback rather than deleted, so a card mid-flight
+      // when the image has not decoded yet still renders something.
+      const th = _cardSkins['symbol-thornwire'];
+      if (th && th.complete && th.naturalWidth > 0) {
+        ctx.imageSmoothingEnabled = false;
+        const targetH = LAYOUT.symbolHeight;
+        const targetW = targetH * (th.naturalWidth / th.naturalHeight);
+        // Whole pixels. A half-pixel destination on a nearest-neighbour draw is
+        // what turns crisp pixel art into a smeared column.
+        ctx.drawImage(th,
+                      Math.round(128 - targetW / 2),
+                      Math.round(LAYOUT.symbolCenterY - targetH / 2),
+                      Math.round(targetW), Math.round(targetH));
+        return;
+      }
       drawSprite(ctx, getSprite('thorn', THORN_ART, THORN_PAL));
       return;
     }

@@ -4275,6 +4275,12 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   gap: 6px;
 }
 .task-mission-box { flex: 0 0 auto; color: rgba(168, 216, 255, 0.75); }
+
+/* The objective takes the slack so the reward chip is pushed to the right edge,
+   matching the personal task rows. Without this the chip sits immediately after
+   the text and the column of ★ values stops lining up. */
+.task-mission-text { flex: 1 1 auto; min-width: 0; }
+.task-mission-line .task-rwd { align-self: flex-start; }
 .task-mission--ready .task-mission-box { color: #9ce8a0; }
 
 .task-mission-bar {

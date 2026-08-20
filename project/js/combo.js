@@ -14,6 +14,7 @@
 // guesswork.
 //
 // Messages (from Unity's ComboManager):
+//   combo_path|clientId|comboId|x,y;x,y;...|finish   (web -> Unity)
 //   combo_primed|comboId|primerId|primerName|colorHex|needCard|windowSecs
 //   combo_expired|comboId
 //   combo_complete|comboId|primerId|primerName|completerId|completerName|colorHex
@@ -409,8 +410,12 @@ const Combo = (() => {
   /// dispatches on it generically — 'spiky_sheep' and 'leafstorm' are just two
   /// registered ids in the same switch).
   /// </summary>
-  function beginAbilityTrace(abilityId, displayName) {
-    _pending = { idx: -1, card: { comboId: abilityId, name: displayName }, external: true };
+  function beginAbilityTrace(abilityId, displayName, finish) {
+    _pending = {
+      idx: -1,
+      card: { comboId: abilityId, name: displayName, finish: finish || '' },
+      external: true,
+    };
     _openPathDraw(_pending.card);
 
     const hint = _el('comboPathHint');
@@ -519,7 +524,9 @@ const Combo = (() => {
     const card = _pending.card;
     const pts  = _path.map(p => `${p.x.toFixed(3)},${p.y.toFixed(3)}`).join(';');
     if (typeof CLIENT_ID !== 'undefined')
-      send(`combo_path|${CLIENT_ID}|${card.comboId}|${pts}`);
+      // 5th field is the card's finish — '' or 'holo'. Trailing, so an older
+      // Unity build that splits on the first four fields is unaffected.
+      send(`combo_path|${CLIENT_ID}|${card.comboId}|${pts}|${card.finish || ''}`);
 
     // External abilities (Leaf Storm) were already claimed in dropCard's pack
     // flow — there's no entry in _earned to remove.

@@ -119,7 +119,7 @@ let _seagullAvailable = false;
 let _serpentAvailable = false;
 // Which creature is currently possessed — drives which WS verbs to send for
 // joystick input + action button. Null when nothing is being possessed.
-//   'sheep' → sheep_input / sheep_eat / possess_end
+//   'sheep' → sheep_input / sheep_eat (RAM missile launch) / possess_end
 //   'duck'  → duck_input  / duck_flap / duck_possess_end
 //   'fox'   → fox_input   / fox_pounce / fox_possess_end
 //   'box'   → box_input   / box_open  / box_possess_end
@@ -358,6 +358,15 @@ function handlePossessionMessage(data) {
     return true;
   }
 
+  // Format: ram_fired|clientId|shotsLeft|cooldownSecs
+  if (msg.startsWith('ram_fired|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) {
+      _onRamFired(Number(parts[2]), Number(parts[3]));
+      return true;
+    }
+  }
+
   // Unity broadcasts this every time the possessed sheep eats a Resource.
   // Format: sheep_ate|clientId|totalEaten
   if (msg.startsWith('sheep_ate|')) {
@@ -454,6 +463,22 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('box_possess_granted|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onBoxGranted(Number(parts[2])); return true; }
+  }
+  // box_locked|clientId — someone else claimed the box. Unity sends one of
+  // these to every OTHER connected client the moment a player inhabits it.
+  //
+  // This handler did not exist, which is the whole bug: the box stayed marked
+  // available on every other phone, so _refreshCamPreview kept re-opening the
+  // BOX CAM window with its overlaid Inhabit button on all of them. It looked
+  // like inhabiting the box pinged everybody, when really nothing was ever
+  // telling the other phones to stand down.
+  //
+  // Addressed to the RECIPIENT, not the claimer — Unity loops its known clients
+  // and sends each one their own id, so the test is the same CLIENT_ID check
+  // every other message here uses.
+  if (msg.startsWith('box_locked|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onBoxLocked(); return true; }
   }
   if (msg.startsWith('box_possess_denied|')) {
     const parts = msg.split('|');
@@ -1357,6 +1382,52 @@ function _buildUI() {
       transform: scale(0.92);
     }
 
+    /* ── RAM reload sweep ──────────────────────────────────────────────────
+       The button IS the timer. A separate countdown elsewhere on screen makes
+       the player look away from the thing they are waiting on, and during a
+       possession their eyes are on the joystick and this button only.
+
+       --ram-cool runs 1 -> 0 as the reload completes, so the wedge EMPTIES
+       clockwise and the button visibly refills with ammo. Driven from JS as a
+       plain custom property; no layout, no reflow, just a repaint. */
+    #poss-eat { --ram-cool: 0; overflow: hidden; }
+
+    #poss-eat::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      /* from -90deg so the wedge starts at 12 o'clock, where a clock face is
+         read from, rather than at 3 o'clock where conic-gradient defaults. */
+      background: conic-gradient(from -90deg,
+                  rgba(8, 12, 18, 0.72) calc(var(--ram-cool) * 360deg),
+                  transparent 0);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+    #poss-eat.ram-cooling::before { opacity: 1; }
+
+    /* Disabled has to read as disabled BEFORE it is pressed — a button that
+       looks live and does nothing reads as a broken game, not a cooldown. */
+    #poss-eat.ram-cooling,
+    #poss-eat.ram-dry {
+      cursor: default;
+      border-color: rgba(255,176,48,0.30);
+      color: rgba(255,176,48,0.45);
+      text-shadow: none;
+      box-shadow: none;
+    }
+    #poss-eat.ram-cooling:active,
+    #poss-eat.ram-dry:active {
+      transform: none;                       /* no press feedback when it cannot fire */
+      background: rgba(255,176,48,0.18);
+    }
+    #poss-eat.ram-dry {
+      border-style: dashed;
+      opacity: 0.5;
+    }
+
     /* ── Release button (appears during possession) ── */
     #poss-release {
       pointer-events: all;
@@ -1674,7 +1745,7 @@ function _buildUI() {
               <span class="gb-stat-value" id="gb-time">030/030</span>
             </div>
             <div class="gb-stat">
-              <span class="gb-stat-label" id="gb-action-label">EAT</span>
+              <span class="gb-stat-label" id="gb-action-label">AMMO</span>
               <span class="gb-stat-value" id="gb-action-value">000</span>
             </div>
           </div>
@@ -1691,7 +1762,7 @@ function _buildUI() {
       </div>
       <div id="poss-joy-knob"></div>
     </div>
-    <button id="poss-eat">EAT</button>
+    <button id="poss-eat">FIRE</button>
     <button id="poss-flap">FLAP</button>
     <button id="poss-pounce">POUNCE</button>
     <button id="poss-dive">STEAL<br>CHIPS</button>
@@ -1749,6 +1820,8 @@ function _buildUI() {
     eaten:            root.querySelector('#poss-eaten'),
     eatenCount:       root.querySelector('#poss-eaten-count'),
     // Game Boy Color in-card readouts
+    gbActionLabel:    root.querySelector('#gb-action-label'),
+    gbActionValue:    root.querySelector('#gb-action-value'),
     gbTitle:          root.querySelector('#gb-title'),
     gbTimer:          root.querySelector('#gb-timer'),
     vidWrap:          root.querySelector('#poss-video-wrap'),
@@ -1788,8 +1861,8 @@ function _buildUI() {
   _ui.openBox.addEventListener('click',    _openBox);
   _ui.release.addEventListener('click',    _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
-  _ui.eat.addEventListener('touchstart',    e => { e.preventDefault(); _eat();          }, { passive: false });
-  _ui.eat.addEventListener('click',         _eat);
+  _ui.eat.addEventListener('touchstart',    e => { e.preventDefault(); _fire();         }, { passive: false });
+  _ui.eat.addEventListener('click',         _fire);
   _ui.flap.addEventListener('touchstart',   e => { e.preventDefault(); _flap();         }, { passive: false });
   _ui.flap.addEventListener('click',        _flap);
   _ui.pounce.addEventListener('touchstart', e => { e.preventDefault(); _pounce();       }, { passive: false });
@@ -1972,9 +2045,74 @@ function _releasePossession() {
   _onEnded();   // optimistic — server will confirm with the matching ended message
 }
 
-function _eat() {
+// The RAM's launch. Still sends sheep_eat — the verb is the possession's
+// "primary action" slot rather than a description of eating, and renaming it
+// would break every phone on an older build for no gain.
+function _fire() {
   if (!_possessed || _creatureType !== 'sheep') return;
+  if (_ramShots <= 0 || _ramReadyAt > Date.now()) return;   // spent or cooling
   send(`sheep_eat|${CLIENT_ID}`);
+}
+
+// Ammo and cooldown, mirrored from Unity. Unity is the authority — these only
+// gate the button so a player cannot spam a launch that will be refused anyway.
+let _ramShots      = 2;
+let _ramReadyAt    = 0;
+let _ramCooldownMs = 0;   // the full cooldown, so the sweep knows its own scale
+let _ramTicker     = null;
+
+function _onRamFired(shotsLeft, cooldown) {
+  _ramShots       = shotsLeft;
+  _ramCooldownMs  = (cooldown || 0) * 1000;
+  _ramReadyAt     = Date.now() + _ramCooldownMs;
+  _renderRam();
+
+  clearInterval(_ramTicker);
+  // 100ms rather than 250: the sweep is a moving wedge, and at 4fps the eye
+  // reads it as stepping rather than draining.
+  _ramTicker = setInterval(() => {
+    _renderRam();
+    if (Date.now() >= _ramReadyAt) { clearInterval(_ramTicker); _ramTicker = null; }
+  }, 100);
+}
+
+function _resetRam() {
+  _ramShots      = 2;
+  _ramReadyAt    = 0;
+  _ramCooldownMs = 0;
+  clearInterval(_ramTicker);
+  _ramTicker = null;
+  _renderRam();
+}
+
+function _renderRam() {
+  const msLeft = Math.max(0, _ramReadyAt - Date.now());
+  const cool   = Math.ceil(msLeft / 1000);
+  const spent  = _ramShots <= 0;
+  const cooling = !spent && msLeft > 0;
+
+  if (_ui && _ui.gbActionValue) {
+    // Cooldown wins the readout while it runs: the count of shots left does not
+    // change during it, so showing the number would look frozen rather than busy.
+    _ui.gbActionValue.textContent = spent ? 'DRY'
+                                  : cooling ? `${cool}s`
+                                  : `${_ramShots}/2`;
+  }
+  if (_ui && _ui.gbActionLabel) {
+    _ui.gbActionLabel.textContent = cooling ? 'RELOAD' : 'AMMO';
+  }
+  if (!_ui || !_ui.eat) return;
+
+  const btn = _ui.eat;
+  // Fraction still to wait, so the wedge shrinks to nothing as it becomes ready.
+  const frac = _ramCooldownMs > 0 ? Math.min(1, msLeft / _ramCooldownMs) : 0;
+  btn.style.setProperty('--ram-cool', frac.toFixed(3));
+
+  btn.classList.toggle('ram-cooling', cooling);
+  btn.classList.toggle('ram-dry',     spent);
+  btn.disabled    = spent || cooling;
+  // The countdown on the face, so the button answers "how long?" by itself.
+  btn.textContent = spent ? 'DRY' : cooling ? `${cool}` : 'FIRE';
 }
 
 function _flap() {
@@ -1996,6 +2134,11 @@ function _onGranted(duration, creature) {
   _possessed     = true;
   _creatureType  = creature;   // 'sheep' | 'duck' | 'fox'
   _grantDuration = duration;
+
+  // Ordnance reloads with the possession, matching Unity's BeginPossession.
+  // Without this the second inhabit starts locked out by the first one's
+  // spent ammo and half-finished cooldown.
+  if (creature === 'sheep') _resetRam();
 
   // Hide ALL inhabit buttons during a possession (regardless of which one
   // was just granted). They come back via _onEnded if credits are still live.
@@ -2808,6 +2951,18 @@ function _onBoxSpawned() {
     _refreshCamPreview();
     console.log('[possession.js] Blind Box spawned — inhabit button unlocked');
   }
+}
+
+// Another player took the box. Withdraw the offer on this phone.
+function _onBoxLocked() {
+  _blindBoxAvailable = false;
+  if (!_ui) return;
+  _ui.boxBtn.classList.add('poss-hidden');
+  // Refreshed rather than simply hidden: this phone may still have a sheep or
+  // duck available, and the preview window should fall back to showing that
+  // instead of vanishing entirely.
+  if (!_possessed) _refreshCamPreview();
+  console.log('[possession.js] Blind Box claimed by another player — offer withdrawn');
 }
 
 function _onBoxGranted(duration) {

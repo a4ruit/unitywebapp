@@ -1110,20 +1110,45 @@ function send(msg) {
 // Soul Tree objectives, straight through to the Main Task row. Both messages
 // already existed — the site's per-flower count was being broadcast and simply
 // had nothing listening on the phone.
+// Guards against the relay echoing a reward, or a late-joining phone replaying
+// one it has already been paid for. Keyed on stage name because each stage is
+// reached exactly once per tree.
+const _soulRewardsPaid = new Set();
+
 function handleSoulTreeGoal(data) {
   if (typeof data !== 'string') return false;
   const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+
+  // soultree_reward|stageName|stars — the room is paid for reaching a stage.
+  // Handled BEFORE the TaskTracker guard below: the payout does not depend on
+  // the task UI existing, and a missing TaskTracker should not cost the room
+  // its stars.
+  if (msg.startsWith('soultree_reward|')) {
+    const p     = msg.split('|');
+    const stage = p[1] || '';
+    const stars = parseInt(p[2]) || 0;
+    if (stars > 0 && !_soulRewardsPaid.has(stage)) {
+      _soulRewardsPaid.add(stage);
+      if (typeof addStars === 'function') addStars(stars);
+      if (typeof showRewardToast === 'function')
+        showRewardToast(`<${stage.toUpperCase()}> REACHED`, stars);
+    }
+    return true;
+  }
+
   if (typeof TaskTracker === 'undefined') return false;
 
   if (msg.startsWith('soultree_site|')) {
     const p = msg.split('|');
-    TaskTracker.setSeedProgress(parseInt(p[1]) || 0, parseInt(p[2]) || 0);
+    TaskTracker.setSeedProgress(parseInt(p[1]) || 0, parseInt(p[2]) || 0,
+                                parseInt(p[3]) || 0);
     return true;
   }
   if (msg.startsWith('soultree_goal|')) {
     const p = msg.split('|');
     TaskTracker.setTreeGoal(p[1] || '', parseInt(p[2]) || 0, parseInt(p[3]) || 0,
-                            parseInt(p[4]) || 0, p[5] === '1', p[6] === '1');
+                            parseInt(p[4]) || 0, p[5] === '1', p[6] === '1',
+                            parseInt(p[7]) || 0);
     return true;
   }
   return false;
@@ -1157,9 +1182,16 @@ function handleQuestMessage(msg) {
 function showQuestToast(quest, starsEarned) {
   const labels = { flowers: 'FLOWERS', sheep: 'SHEEP', ducks: 'DUCKS', all: 'ALL DONE', boss: 'BOSS SLAIN' };
   const label  = labels[quest] || quest.toUpperCase();
+  showRewardToast(`QUEST: ${label}`, starsEarned);
+}
+
+// The same toast, without the QUEST prefix. Split out because the soul tree
+// pays the room for reaching a stage, and "QUEST: SEEDLING" describes something
+// the player was never given.
+function showRewardToast(label, starsEarned) {
   const el = document.getElementById('questToast');
   if (!el) return;
-  el.textContent = `QUEST: ${label}  +${starsEarned} ★`;
+  el.textContent = `${label}  +${starsEarned} ★`;
   el.style.display    = 'block';
   el.style.opacity    = '0';
   el.style.transition = 'none';
@@ -1621,7 +1653,12 @@ function dropCard(card) {
   // proof of concept for batch-release cards; FLOCK_SIZE is fixed.
   if (card.flock) {
     if (typeof CLIENT_ID !== 'undefined') {
-      for (let n = 0; n < FLOCK_SIZE; n++) send(`spawn_small_cube|${CLIENT_ID}|critter`);
+      // 4th field carries the finish, 5th the origin. Both are trailing, so an
+      // older Unity build still spawns plain sheep rather than erroring.
+      // "flock" is what upgrades their missile to the splitting warhead.
+      const flockFinish = card.variant === 'holo' ? 'holo' : '';
+      for (let n = 0; n < FLOCK_SIZE; n++)
+        send(`spawn_small_cube|${CLIENT_ID}|critter|${flockFinish}|flock`);
     }
     resetToPackScreen();
     return;
@@ -1634,7 +1671,10 @@ function dropCard(card) {
   // convention as thornwire, which can also fail to find ground after being
   // claimed.
   if (card.ability && typeof Combo !== 'undefined' && typeof Combo.beginAbilityTrace === 'function') {
-    Combo.beginAbilityTrace(card.ability, card.name);
+    // The finish rides along, same convention as placement_request above: a HOLO
+    // pull makes the ability itself holo, not just the card art in the pack.
+    Combo.beginAbilityTrace(card.ability, card.name,
+                            card.variant === 'holo' ? 'holo' : '');
     resetToPackScreen();
     return;
   }

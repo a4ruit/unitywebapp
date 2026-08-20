@@ -237,7 +237,7 @@ const TaskTracker = (() => {
   let _main = null;   // { title, detail, have, need, ready }
 
   /// Germination: soultree_site|planted|required
-  function setSeedProgress(planted, required) {
+  function setSeedProgress(planted, required, reward) {
     _main = {
       title : 'THE SOUL SEED',
       detail: 'Germination Stage',
@@ -245,13 +245,14 @@ const TaskTracker = (() => {
       need  : required,
       ready : planted >= required,
       line  : `Plant ${required} flowers on the mound`,
+      reward: reward || 0,
     };
     _flagNew('seed:' + planted + '/' + required);
     _render();
   }
 
   /// After sprouting: soultree_goal|stage|plants|animals|fungi|combo|ready
-  function setTreeGoal(stage, plants, animals, fungi, combo, ready) {
+  function setTreeGoal(stage, plants, animals, fungi, combo, ready, reward) {
     const parts = [];
     if (plants  > 0) parts.push(`${plants} flowers`);
     if (animals > 0) parts.push(`${animals} animals`);
@@ -268,6 +269,7 @@ const TaskTracker = (() => {
       need  : null,
       ready : ready,
       line  : ready ? 'Ready to grow' : 'Needs ' + parts.join(', '),
+      reward: reward || 0,
     };
     // Only the STAGE seeds the badge, not every count. A pulsing marker that
     // returns on each flower would be noise, and players would stop reading it.
@@ -303,7 +305,13 @@ const TaskTracker = (() => {
         // a task rather than as a status line.
         `<div class="task-mission-line">` +
           `<span class="task-mission-box">${_main.ready ? '[✓]' : '[ ]'}</span>` +
-          `<span>${_main.line}</span>` +
+          `<span class="task-mission-text">${_main.line}</span>` +
+          // Same .task-rwd chip the personal tasks use, so the main task is
+          // priced in the same currency and the same visual language. The room
+          // should be able to see what the shared goal is worth without being
+          // told, exactly as it can for its own.
+          (_main.reward > 0
+            ? `<span class="task-rwd">+${_main.reward}★</span>` : '') +
         `</div>` +
         `<div class="task-mission-bar"><span style="width:${pct.toFixed(0)}%"></span></div>` +
       '</div>',

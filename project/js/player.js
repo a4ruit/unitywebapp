@@ -399,13 +399,22 @@ const Player = (() => {
 
     // The anchor is read from the tag's bounding rect, so anything that moves or
     // resizes it has to trigger a redraw.
-    window.addEventListener('resize', _renderBranches);
-    window.addEventListener('orientationchange', _renderBranches);
+    // Coalesced to one call per frame. A resize can fire dozens of times per
+    // second, and each one used to mean a full teardown and rebuild.
+    let _brQueued = false;
+    const queueBranches = () => {
+      if (_brQueued) return;
+      _brQueued = true;
+      requestAnimationFrame(() => { _brQueued = false; _renderBranches(); });
+    };
+
+    window.addEventListener('resize', queueBranches);
+    window.addEventListener('orientationchange', queueBranches);
     // The tag's rect changes when it's revealed, when the name is set, and again
     // when the pixel font finishes loading and reflows its width. Observing it
     // catches all three without polling.
     if (tag && typeof ResizeObserver !== 'undefined') {
-      new ResizeObserver(() => _renderBranches()).observe(tag);
+      new ResizeObserver(queueBranches).observe(tag);
     }
 
     _render();
@@ -470,6 +479,9 @@ const Player = (() => {
     return `<svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2 V18 M2 10 H18" ${s}/></svg>`;
   }
 
+  // Signature of the last drawn state. Null forces the next call to rebuild.
+  let _brSig = null;
+
   function _renderBranches() {
     if (!_built) return;
     const wrap = document.getElementById('pl-branches');
@@ -485,7 +497,11 @@ const Player = (() => {
     // fixed, so that check is unconditionally true and hides the branches
     // forever.
     const r = tag.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) { wrap.style.display = 'none'; return; }
+    if (r.width === 0 || r.height === 0) {
+      wrap.style.display = 'none';
+      _brSig = null;            // force a real rebuild when it comes back
+      return;
+    }
 
     // Vines stop short of the pack-type row at the bottom of the screen rather
     // than running under it.
@@ -495,6 +511,27 @@ const Player = (() => {
     const maxDrop = Math.max(0, floorY - r.bottom);
 
     wrap.style.display = 'block';
+
+    // ── Change guard ────────────────────────────────────────────────────────
+    // The comment below says to call this only when something changed, but
+    // nothing was enforcing it, and callers cannot know: the ResizeObserver on
+    // the name tag fires whenever anything nudges its box. During a possession
+    // the creature UI does that repeatedly, so the branches were torn down and
+    // rebuilt over and over — and since every node animates in on creation,
+    // that reads as flickering.
+    //
+    // The rect is rounded before comparing. Sub-pixel jitter from a reflow is
+    // not a change worth a rebuild, and comparing raw floats would let it
+    // through every time.
+    const sig = [
+      Math.round(r.left), Math.round(r.right),
+      Math.round(r.top),  Math.round(r.bottom),
+      Math.round(maxDrop),
+      ATTRS.map(a => _attr[a.key].level).join(','),
+    ].join('|');
+    if (sig === _brSig) return;
+    _brSig = sig;
+
     // Rebuilt wholesale each render. Cheap at this scale (≤3 branches × 5 nodes),
     // and it keeps the DOM a pure function of state rather than something that
     // has to be diffed — but it does mean the entry animation replays on every
