@@ -136,6 +136,16 @@ try { localStorage.removeItem('possession_sheep_pulled'); } catch (e) {}
 // NOT consumed — the same player can re-inhabit it until the box is eaten.
 let _blindBoxAvailable = false;
 
+// The player closed the cam preview by hand. Distinct from "nothing available":
+// a creature they cannot currently inhabit — because the streams are full — is
+// still available, so the preview had no reason to go away and no way to be
+// dismissed. It sat there occupying the pack screen with a button that only
+// said "wait".
+//
+// Cleared whenever a NEW creature becomes available, so dismissing it now does
+// not silently suppress the next pull.
+let _camDismissed = false;
+
 // ── Fungi spore-paint state ───────────────────────────────────────────────
 // Entirely independent of possession sessions — the mushroom keeps existing
 // on the ground after the possession timer expires. Instead of a one-tap
@@ -356,6 +366,26 @@ function handlePossessionMessage(data) {
     const spawnerId = parts[1];
     if (spawnerId === CLIENT_ID) _onSerpentSpawned();
     return true;
+  }
+
+  // duck_fuse|clientId|seconds — Unity confirming the fuse is lit and telling us
+  // how long it actually is. The button already started an optimistic countdown;
+  // this corrects it against the real value rather than a copy of the number
+  // that would drift the moment the fuse is retuned in the inspector.
+  if (msg.startsWith('duck_fuse|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) {
+      _duckArmed = true;
+      _startFuseCountdown(parseFloat(parts[2]) || 3);
+      return true;
+    }
+  }
+
+  // duck_landed|clientId|hits — the blast. The session ends with it, so Unity's
+  // possess_ended does the actual teardown; this is just the result.
+  if (msg.startsWith('duck_landed|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDuckLanded(Number(parts[2]) || 0); return true; }
   }
 
   // Format: ram_fired|clientId|shotsLeft|cooldownSecs
@@ -847,6 +877,50 @@ function _buildUI() {
       background: rgba(255,210,90,0.45);
       transform: scale(0.92);
     }
+
+    /* ── LAUNCH (duck only) ──────────────────────────────────────────────────
+       Sits ABOVE flap rather than replacing it: flapping is how the duck moves
+       and the player needs it right up to the moment they commit.
+
+       Red and smaller than FLAP. It ends the possession, so it should not be
+       the thing a thumb lands on by accident while trying to stay airborne. */
+    #poss-explode {
+      pointer-events: all;
+      position: absolute;
+      bottom: 156px;
+      right: 32px;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255, 96, 84, 0.18);
+      border: 2px solid rgba(255, 96, 84, 0.85);
+      color: #ff6054;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      text-shadow: 0 0 8px rgba(255, 96, 84, 0.7);
+      box-shadow: 0 0 12px rgba(255, 96, 84, 0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-explode:active {
+      background: rgba(255, 96, 84, 0.45);
+      transform: scale(0.92);
+    }
+
+    /* Armed: the duck is frozen and the stick does nothing, so the joystick
+       reads as disabled rather than merely urgent. A live-looking control that
+       ignores input is worse than one that admits it is off. */
+    #poss-joy-zone.armed { opacity: 0.3; pointer-events: none; }
 
     /* Legacy floating timer / eaten labels — kept in the DOM so existing JS
        references still resolve, but visually replaced by the in-card Game
@@ -1349,6 +1423,33 @@ function _buildUI() {
     }
 
     /* ── Eat button (right thumb, mirrors joystick) ── */
+    /* Close control on the cam preview. Sits on the card frame's corner rather
+       than inside the LCD, so it never covers the feed. display is driven from
+       JS: shown only in preview mode, never during a live possession where the
+       release button is what ends things. */
+    #poss-cam-close {
+      pointer-events: all;
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      z-index: 6;
+      display: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(8, 14, 18, 0.82);
+      border: 1px solid rgba(190, 225, 245, 0.55);
+      color: #cfeefb;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 14px;
+      line-height: 1;
+      padding: 0;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-cam-close:active { background: rgba(40, 60, 74, 0.92); }
+
     #poss-eat {
       pointer-events: all;
       position: absolute;
@@ -1751,6 +1852,9 @@ function _buildUI() {
           </div>
         </div>
       </div>
+      <!-- Only meaningful in preview mode; hidden during an actual possession,
+           where releasing is what closes the window. -->
+      <button id="poss-cam-close" aria-label="Close preview">X</button>
       <img id="poss-card-frame" src="assets/common-card-sheep-stream.png" alt="" />
     </div>
     <div id="poss-joy-zone">
@@ -1764,6 +1868,7 @@ function _buildUI() {
     </div>
     <button id="poss-eat">FIRE</button>
     <button id="poss-flap">FLAP</button>
+    <button id="poss-explode">EXPLODE</button>
     <button id="poss-pounce">POUNCE</button>
     <button id="poss-dive">STEAL<br>CHIPS</button>
     <button id="poss-bloom">BLOOM</button>
@@ -1814,6 +1919,7 @@ function _buildUI() {
     seagullBtn:       root.querySelector('#poss-seagull-btn'),
     serpentBtn:       root.querySelector('#poss-serpent-btn'),
     boxBtn:           root.querySelector('#poss-box-btn'),
+    camClose:         root.querySelector('#poss-cam-close'),
     blindScreen:      root.querySelector('#poss-blind-screen'),
     timer:            root.querySelector('#poss-timer'),
     secs:             root.querySelector('#poss-secs'),
@@ -1834,6 +1940,7 @@ function _buildUI() {
     openBox:          root.querySelector('#poss-open-box'),
     eat:              root.querySelector('#poss-eat'),
     flap:             root.querySelector('#poss-flap'),
+    explode:          root.querySelector('#poss-explode'),
     pounce:           root.querySelector('#poss-pounce'),
     dive:             root.querySelector('#poss-dive'),
     bloom:            root.querySelector('#poss-bloom'),
@@ -1861,10 +1968,18 @@ function _buildUI() {
   _ui.openBox.addEventListener('click',    _openBox);
   _ui.release.addEventListener('click',    _releasePossession);
   // Use 'touchstart' (with 'click' fallback) for zero-latency tactile feedback
+  if (_ui.camClose) {
+    _ui.camClose.addEventListener('touchstart', e => { e.preventDefault(); _dismissCamPreview(); }, { passive: false });
+    _ui.camClose.addEventListener('click', _dismissCamPreview);
+  }
   _ui.eat.addEventListener('touchstart',    e => { e.preventDefault(); _fire();         }, { passive: false });
   _ui.eat.addEventListener('click',         _fire);
   _ui.flap.addEventListener('touchstart',   e => { e.preventDefault(); _flap();         }, { passive: false });
   _ui.flap.addEventListener('click',        _flap);
+  if (_ui.explode) {
+    _ui.explode.addEventListener('touchstart', e => { e.preventDefault(); _explode(); }, { passive: false });
+    _ui.explode.addEventListener('click',      _explode);
+  }
   _ui.pounce.addEventListener('touchstart', e => { e.preventDefault(); _pounce();       }, { passive: false });
   _ui.pounce.addEventListener('click',      _pounce);
   _ui.dive.addEventListener('touchstart',   e => { e.preventDefault(); _dive();         }, { passive: false });
@@ -2115,6 +2230,64 @@ function _renderRam() {
   btn.textContent = spent ? 'DRY' : cooling ? `${cool}` : 'FIRE';
 }
 
+// Armed state. One shot per possession — it ends the session, so a second
+// press could never do anything, and spending the button immediately is what
+// stops it looking unresponsive during the three seconds of fuse.
+let _duckArmed   = false;
+let _fuseTicker  = null;
+
+function _explode() {
+  if (!_possessed || _creatureType !== 'duck' || _duckArmed) return;
+  _duckArmed = true;
+  send(`duck_explode|${CLIENT_ID}`);
+  // Optimistic. Unity confirms with duck_fuse and the countdown corrects itself
+  // against the real fuse length a moment later.
+  _startFuseCountdown(3);
+}
+
+// The countdown lives on the button face. A number somewhere else on screen
+// competes with the thing the player is actually watching — the duck.
+function _startFuseCountdown(seconds) {
+  const endsAt = Date.now() + seconds * 1000;
+  const joy = _ui && _ui.root && _ui.root.querySelector('#poss-joy-zone');
+  if (joy) joy.classList.add('armed');
+
+  clearInterval(_fuseTicker);
+  const paint = () => {
+    if (!_ui || !_ui.explode) return;
+    const left = Math.max(0, (endsAt - Date.now()) / 1000);
+    _ui.explode.disabled      = true;
+    _ui.explode.style.opacity = '1';
+    // One decimal near the end: the last second is where the joke lands and a
+    // whole-number countdown sits on "1" for the whole of it.
+    _ui.explode.textContent = left > 1 ? Math.ceil(left).toString() : left.toFixed(1);
+    if (left <= 0) { clearInterval(_fuseTicker); _fuseTicker = null; }
+  };
+  paint();
+  _fuseTicker = setInterval(paint, 80);
+}
+
+function _onDuckLanded(hits) {
+  clearInterval(_fuseTicker);
+  _fuseTicker = null;
+  if (_ui && _ui.explode) _ui.explode.textContent = hits > 0 ? `${hits} HIT` : 'BOOM';
+  // No teardown here. Unity ends the session on detonation and possess_ended
+  // follows — doing it in two places is how a session ends up half-closed.
+}
+
+function _resetDuckExplode() {
+  _duckArmed = false;
+  clearInterval(_fuseTicker);
+  _fuseTicker = null;
+  if (_ui && _ui.explode) {
+    _ui.explode.textContent   = 'EXPLODE';
+    _ui.explode.disabled      = false;
+    _ui.explode.style.opacity = '1';
+  }
+  const joy = _ui && _ui.root && _ui.root.querySelector('#poss-joy-zone');
+  if (joy) joy.classList.remove('armed');
+}
+
 function _flap() {
   if (!_possessed || _creatureType !== 'duck') return;
   send(`duck_flap|${CLIENT_ID}`);
@@ -2132,6 +2305,12 @@ function _setGbTimer(secsLeft) {
 
 function _onGranted(duration, creature) {
   _possessed     = true;
+  // Preview-only control. During a possession the release button is what ends
+  // the session, and two ways to close one window is one too many.
+  if (_ui && _ui.camClose) _ui.camClose.style.display = 'none';
+  // Fresh duck, fresh mortar. Without this the next possession starts with the
+  // joystick dimmed and LAUNCH already spent.
+  _resetDuckExplode();
   _creatureType  = creature;   // 'sheep' | 'duck' | 'fox'
   _grantDuration = duration;
 
@@ -2168,11 +2347,14 @@ function _onGranted(duration, creature) {
   // Show the action button that matches the creature (hide the rest).
   _ui.eat.style.display    = 'none';
   _ui.flap.style.display   = 'none';
+  if (_ui.explode) _ui.explode.style.display = 'none';
   _ui.pounce.style.display = 'none';
   _ui.dive.style.display   = 'none';
   _ui.bloom.style.display  = 'none';
   if (creature === 'duck') {
     _ui.flap.style.display   = 'flex';
+    if (_ui.explode) _ui.explode.style.display = 'flex';
+    _resetDuckExplode();
   } else if (creature === 'fox') {
     _ui.pounce.style.display = 'flex';
   } else if (creature === 'seagull') {
@@ -2241,7 +2423,7 @@ function _refreshCamPreview() {
   if (!_ui || _possessed) return;
   const box = _blindBoxAvailable;
   const any = _sheepAvailable || _duckAvailable || _foxAvailable || _seagullAvailable || _serpentAvailable || box;
-  if (!any) {
+  if (!any || _camDismissed) {
     _ui.vidWrap.classList.remove('cam-preview');
     _ui.vidWrap.style.display = 'none';
     return;
@@ -2256,10 +2438,27 @@ function _refreshCamPreview() {
   if (_ui.gbTitle) _ui.gbTitle.textContent = title;
   _ui.vidWrap.style.display = 'block';
   _ui.vidWrap.classList.add('cam-preview');
+  if (_ui.camClose) _ui.camClose.style.display = 'block';
   _showNametag(true);
 }
 
+// Close the preview by hand. The creature stays available — this hides the
+// window, it does not give up the inhabit.
+function _dismissCamPreview() {
+  _camDismissed = true;
+  if (!_ui) return;
+  if (_ui.camClose) _ui.camClose.style.display = 'none';
+  _refreshCamPreview();
+}
+
+// Any newly available creature brings the window back, so a dismissal only
+// applies to the offer that was on screen when it was made.
+function _undismissCam() {
+  _camDismissed = false;
+}
+
 function _onSheepSpawned() {
+  _undismissCam();
   _sheepAvailable = true;
   if (_ui && !_possessed) {
     _ui.btn.classList.remove('poss-hidden');
@@ -2273,6 +2472,7 @@ function _onSheepSpawned() {
  * Unlocks the duck inhabit button. Each duck card grants one possession.
  */
 function _onDuckSpawned() {
+  _undismissCam();
   _duckAvailable = true;
   if (_ui && !_possessed) {
     _ui.duckBtn.classList.remove('poss-hidden');
@@ -2311,6 +2511,7 @@ function _onDuckFlapped(total) {
  * Unlocks the fox inhabit button. Each fox card grants one possession.
  */
 function _onFoxSpawned() {
+  _undismissCam();
   _foxAvailable = true;
   if (_ui && !_possessed) {
     _ui.foxBtn.classList.remove('poss-hidden');
@@ -2324,6 +2525,7 @@ function _onFoxSpawned() {
  * Unlocks the seagull inhabit button. Each seagull card grants one flight.
  */
 function _onSeagullSpawned() {
+  _undismissCam();
   _seagullAvailable = true;
   if (_ui && !_possessed) {
     _ui.seagullBtn.classList.remove('poss-hidden');
@@ -2337,6 +2539,7 @@ function _onSeagullSpawned() {
  * (legendary-alpha critter pack). Unlocks the "Become the Serpent" button.
  */
 function _onSerpentSpawned() {
+  _undismissCam();
   _serpentAvailable = true;
   if (_ui && !_possessed) {
     _ui.serpentBtn.classList.remove('poss-hidden');
@@ -2945,6 +3148,7 @@ function _requestBoxPossession() {
 }
 
 function _onBoxSpawned() {
+  _undismissCam();
   _blindBoxAvailable = true;
   if (_ui && !_possessed) {
     _ui.boxBtn.classList.remove('poss-hidden');
@@ -3006,6 +3210,7 @@ function _onBoxGranted(duration) {
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
   _ui.eat.style.display        = 'none';
   _ui.flap.style.display       = 'none';
+  if (_ui.explode) _ui.explode.style.display = 'none';
   // OPEN BOX button — starts enabled; consumed once the lings are released
   _ui.openBox.style.display    = 'flex';
   _ui.openBox.disabled         = false;
@@ -3133,6 +3338,10 @@ function _onEnded() {
   _ui.release.style.display  = 'none';
   _ui.eat.style.display      = 'none';
   _ui.flap.style.display     = 'none';
+  // Duck-only control. Left visible it sits on the pack screen after the
+  // session and reappears on the next creature, which is the bug where LAUNCH
+  // outlived its encounter.
+  if (_ui.explode) _ui.explode.style.display = 'none';
   _ui.pounce.style.display   = 'none';
   _ui.dive.style.display     = 'none';
   _ui.bloom.style.display    = 'none';
