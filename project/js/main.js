@@ -1751,27 +1751,6 @@ initCounter();
 // action to fire + auto-close, tap outside to dismiss.
 // Remove this block + the HTML markup + the CSS rule before production.
 
-// ── Debug menu gate ──────────────────────────────────────────────────────────
-// The cogwheel starts hidden (class="debug-hidden" in the markup) and is only
-// revealed when the page is opened with ?debug — or #debug, since some QR and
-// link handlers strip query strings but keep the fragment.
-//
-// Markup-first rather than JS-first: the menu is hidden in the HTML and shown by
-// script, so a JS error leaves it OFF. The other way round, any failure before
-// this line would leave the debug controls sitting on a player's screen.
-(function _gateDebugMenu() {
-  const on = /(^|[?&])debug/.test(location.search) ||
-             /(^|#)debug/.test(location.hash);
-  if (!on) return;
-  const apply = () => {
-    const el = document.getElementById('debug-menu');
-    if (el) el.classList.remove('debug-hidden');
-  };
-  if (document.readyState === 'loading')
-    document.addEventListener('DOMContentLoaded', apply);
-  else apply();
-})();
-
 function debugMenuToggle(e) {
   e.stopPropagation();   // prevent the document handler below from immediately closing it
   document.getElementById('debug-menu').classList.toggle('open');

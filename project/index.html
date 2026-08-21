@@ -49,6 +49,26 @@
       <button onclick="debugForceCloseSoul(); debugMenuClose()">unstick soul screen</button>
     </div>
   </div>
+  <script>
+    // Reveals the cogwheel when the page is opened with ?debug (or #debug, for
+    // link handlers that keep the fragment but drop the query).
+    //
+    // INLINE, and immediately after the markup it controls, on purpose. The
+    // first version lived at the bottom of main.js — below connect(), initPack()
+    // and the rest of the init block — so any unrelated startup error on a phone
+    // stopped execution before the gate ever ran, and the debug menu could not
+    // be opened on the one device where something was going wrong.
+    //
+    // Here it depends on nothing: no other script, no load event, and the
+    // element above it already exists.
+    (function () {
+      var q = location.search || '';
+      var h = location.hash   || '';
+      if (!/(^|[?&])debug(=|&|$)/.test(q) && !/^#debug$/.test(h)) return;
+      var el = document.getElementById('debug-menu');
+      if (el) el.classList.remove('debug-hidden');
+    })();
+  </script>
   <div class="god-pack-banner hidden" id="godPackBanner">
     <span class="god-banner-star">★</span>
     <span class="god-banner-text">GOD PACK</span>
