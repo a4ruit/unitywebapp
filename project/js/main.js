@@ -376,10 +376,21 @@ function handleSoulMessage(data) {
   if (!_soulOpen) {
     _soulOpen  = true;
     _soulVoted = false;
-    const cur  = document.querySelector('.screen:not(.hidden)');
-    // Never return them to a placement screen — that session is already over.
-    _soulReturn = (cur && cur.id !== 'screen-soul' && cur.id !== 'screen-place')
-                ? cur.id : 'screen-pack';
+    const cur = document.querySelector('.screen:not(.hidden)');
+
+    // ALLOWLIST, not a blocklist.
+    //
+    // This used to return the player to whatever screen happened to be up. If
+    // the prompt arrived mid card-pull that was a transient reveal screen —
+    // screen-choose, screen-legendary, the ad or the horror spin — whose own
+    // completion handlers had already fired or never would. Returning to one
+    // left the player on a dead screen with no way forward, and no obvious
+    // cause, because the pull that owned it had finished minutes ago.
+    //
+    // The pack screen is the only place that is always safe to land: it owns no
+    // in-flight animation and every other flow starts from it.
+    const SAFE_RETURN = ['screen-pack', 'screen-shop', 'screen-empty'];
+    _soulReturn = (cur && SAFE_RETURN.indexOf(cur.id) !== -1) ? cur.id : 'screen-pack';
     _soulForceOut();
     showScreen('screen-soul');
     const sent = document.getElementById('soulSent');
@@ -410,6 +421,17 @@ function _soulForceOut() {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active', 'open');
   });
+
+  // Release the pack-open guard.
+  //
+  // A pull interrupted by the prompt never reaches its own completion path, so
+  // _packOpening stays true — and with it set, triggerPackOpen ignores every
+  // future tap. The player comes back from the vote to a pack screen that will
+  // not open anything, which is indistinguishable from being frozen.
+  //
+  // Called by name rather than through _endPackOpen's normal callers, because
+  // the whole point here is that those callers are the ones that did not run.
+  if (typeof _endPackOpen === 'function') _endPackOpen();
 }
 
 function submitSoulVote(yes) {
@@ -430,6 +452,10 @@ function submitSoulVote(yes) {
 // without waiting for Unity. It does not resolve the vote, it just stops one
 // person being trapped.
 function debugForceCloseSoul() {
+  // Also clears the pack guard and any half-open pull. Releasing the screen
+  // without this hands the player back a pack that refuses to open, which looks
+  // like the same bug and sends them straight back here.
+  _soulForceOut();
   _soulOpen = false;
   _soulVoted = false;
   showScreen(_soulReturn || 'screen-pack');
@@ -1317,8 +1343,27 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 // ─── Screen management ───────────────────────────────────────────────────────
 
 function showScreen(id) {
+  // The recovery prompt is MODAL. Nothing may navigate away from it.
+  //
+  // A card pull is a chain of deferred callbacks — reveal, choose, legendary,
+  // ad — and any of them can fire seconds after the prompt appeared. One of
+  // those firing moved the player off the vote and left them unable to answer.
+  //
+  // That is worse than it sounds. The vote needs a threshold of the room, so a
+  // player who cannot answer is not just stuck themselves — they hold the count
+  // below the line and EVERYONE sits on the prompt indefinitely. Which is
+  // exactly the "stuck perpetually" symptom, and why it looked like the screen
+  // was broken rather than one phone being missing from the tally.
+  //
+  // The two functions that legitimately close it clear _soulOpen first, so they
+  // pass through here normally.
+  if (typeof _soulOpen !== 'undefined' && _soulOpen && id !== 'screen-soul') {
+    console.warn(`[soul] Blocked navigation to ${id} — recovery vote is open`);
+    return;
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-  document.getElementById(id).classList.remove('hidden');
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('hidden');
 }
 
 // ─── Pack swipe ───────────────────────────────────────────────────────────────
