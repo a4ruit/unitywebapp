@@ -2786,6 +2786,11 @@ function _drawSporeMinimap() {
 }
 
 function _onPlacementGranted(cardName, cardType, ammo) {
+  // Belt and braces on the shared joystick. Placement does not own the armed
+  // state and must never start holding it, whatever happened in the session
+  // before this one.
+  _resetDuckExplode();
+
   _placing = true;
   _placeCardType = (cardType || '').toLowerCase();
   // Thornwire is AIMED, not steered: the player taps the map and the charge is
@@ -3244,6 +3249,14 @@ function _onBoxTick(secsLeft) {
 }
 
 function _onEnded() {
+  // Clear the armed state FIRST, before any early return below can skip it.
+  //
+  // #poss-joy-zone is shared with PLACEMENT, and the armed style sets
+  // pointer-events:none. Left on after a duck detonates, the very next
+  // placement inherits a dead joystick — with nothing on screen to explain it,
+  // because the duck it belonged to no longer exists.
+  _resetDuckExplode();
+
   // Fire the "full creature session" individual task if the timer ran to zero
   if (_possessionCompletedFull && typeof TaskTracker !== 'undefined') {
     TaskTracker.recordEvent('creature_full_duration');
