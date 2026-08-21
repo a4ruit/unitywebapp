@@ -384,13 +384,17 @@ function handleSoulMessage(data) {
     showScreen('screen-soul');
     const sent = document.getElementById('soulSent');
     if (sent) sent.classList.add('hidden');
+    // Restored here, not in submitSoulVote — the tree can wither more than once
+    // in a session and the second prompt has to be answerable.
+    const btns = document.querySelector('#screen-soul .soul-ask-btns');
+    if (btns) btns.classList.remove('hidden');
   }
 
-  const n = parseInt(needed) || 0, y = parseInt(yes) || 0, nn = parseInt(no) || 0;
-  const fill = document.getElementById('soulBarFill');
-  const cnt  = document.getElementById('soulCount');
-  if (fill) fill.style.width = (n > 0 ? Math.min(100, (y / n) * 100) : 0).toFixed(0) + '%';
-  if (cnt)  cnt.textContent = `${y} / ${n} CONFIRMED` + (nn > 0 ? `  ·  ${nn} DECLINED` : '');
+  // The tally is no longer displayed. It is still parsed, because Unity keeps
+  // sending it and the next person to reach for it should find it here rather
+  // than re-deriving it — but showing a running count under the question tells
+  // an undecided player what everyone else picked, which is the one thing a
+  // collective decision should not lead with.
   return true;
 }
 
@@ -412,6 +416,11 @@ function submitSoulVote(yes) {
   if (!_soulOpen || _soulVoted) return;
   _soulVoted = true;
   if (typeof CLIENT_ID !== 'undefined') send(`soul_vote|${CLIENT_ID}|${yes ? 'yes' : 'no'}`);
+
+  // Answered — swap the buttons for the acknowledgement rather than leaving a
+  // live-looking choice on screen that no longer does anything.
+  const btns = document.querySelector('#screen-soul .soul-ask-btns');
+  if (btns) btns.classList.add('hidden');
   const sent = document.getElementById('soulSent');
   if (sent) sent.classList.remove('hidden');
 }

@@ -4183,53 +4183,74 @@ body:has(#screen-horror-spin:not(.hidden))::before {
    window show up on the name screen. */
 #screen-soul {
   flex-direction: column;
-  padding: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
   background: #05060a;
 }
-.soul-term {
+
+/* No panel, no border, no chrome. The screen IS the window — a framed box
+   inside a black screen is two containers doing one container's job, and at
+   this moment the phone has exactly one thing to say. */
+.soul-ask {
   width: 100%;
-  max-width: 320px;
-  border: 1px solid rgba(120, 255, 190, 0.35);
-  background: rgba(6, 14, 12, 0.95);
-  box-shadow: 0 0 18px rgba(60, 220, 160, 0.15);
-  padding: 14px;
+  max-width: 300px;
+  text-align: center;
   font-family: 'lo-res', monospace;
-  color: rgba(150, 255, 210, 0.9);
+  color: rgba(150, 255, 210, 0.92);
 }
-.soul-term-head   { font-size: 8px; color: rgba(120, 255, 190, 0.55); letter-spacing: 0.14em; }
-.soul-term-line   { font-size: 10px; margin-top: 10px; line-height: 1.6; color: #ff6a5e; }
-.soul-term-prompt { font-size: 11px; margin-top: 12px; letter-spacing: 0.08em; }
 
-.soul-bar {
-  margin-top: 14px;
-  height: 10px;
-  border: 1px solid rgba(120, 255, 190, 0.35);
-  background: rgba(0, 0, 0, 0.6);
+.soul-ask-q {
+  font-size: 13px;
+  line-height: 1.9;
+  letter-spacing: 0.12em;
 }
-.soul-bar-fill {
-  display: block;
-  height: 100%;
-  width: 0%;
-  background: linear-gradient(90deg, rgba(60,220,160,0.9), rgba(160,255,210,0.9));
-  transition: width 0.25s linear;
-}
-.soul-count { font-size: 8px; margin-top: 6px; letter-spacing: 0.1em; color: rgba(150,255,210,0.7); }
 
-.soul-btns { display: flex; gap: 10px; margin-top: 16px; }
-.soul-btn {
+.soul-ask-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+/* Explicit, because there is NO generic `.hidden` rule in this stylesheet —
+   only `.page.hidden` and `.screen.hidden`. The old console relied on a bare
+   `.hidden` for its "RESPONSE LOGGED" line, which meant that line was on
+   screen the whole time, before anyone had answered anything. */
+.soul-ask-btns.hidden { display: none; }
+.soul-ask-sent.hidden { display: none; }
+
+/* Both answers weighted the SAME. A styled-up yes and a muted no is the
+   interface answering for the player, and whether the room continues is the
+   one decision the piece should not put its thumb on. */
+.soul-ask-btn {
   flex: 1;
-  padding: 10px 0;
+  padding: 18px 0;
   background: transparent;
   border: 1px solid rgba(120, 255, 190, 0.45);
-  color: rgba(150, 255, 210, 0.9);
+  color: rgba(150, 255, 210, 0.92);
   font-family: 'lo-res', monospace;
-  font-size: 12px;
-  letter-spacing: 0.1em;
+  font-size: 14px;
+  letter-spacing: 0.16em;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.soul-btn:active { background: rgba(120, 255, 190, 0.15); }
-.soul-btn--no    { border-color: rgba(255, 120, 110, 0.45); color: rgba(255, 160, 150, 0.9); }
-.soul-sent       { margin-top: 12px; font-size: 8px; letter-spacing: 0.12em; color: rgba(120,255,190,0.6); }
+.soul-ask-btn:active { background: rgba(120, 255, 190, 0.15); }
+
+.soul-ask-btn--no {
+  border-color: rgba(255, 120, 110, 0.45);
+  color: rgba(255, 160, 150, 0.92);
+}
+.soul-ask-btn--no:active { background: rgba(255, 120, 110, 0.15); }
+
+/* Replaces the buttons once answered, so the screen does not sit there
+   offering a choice that has already been made. */
+.soul-ask-sent {
+  margin-top: 26px;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: rgba(120, 255, 190, 0.55);
+}
 
 /* ── Main task (Soul Tree objective) ──────────────────────────────────────────
    Top of the TASKS panel. Styled to sit WITH the existing rows, not in a box of

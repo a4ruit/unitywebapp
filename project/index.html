@@ -474,19 +474,19 @@
            Force-shown over whatever the player was doing, because the prompt is
            the only way the session continues. -->
       <div class="screen hidden" id="screen-soul">
-        <div class="soul-term">
-          <div class="soul-term-head">&gt; SYSTEM</div>
-          <div class="soul-term-line" id="soulTermMsg">THE SOUL TREE HAS WITHERED.</div>
-          <div class="soul-term-prompt">DATA RECOVERABLE: CONTINUE?</div>
-
-          <div class="soul-bar"><span class="soul-bar-fill" id="soulBarFill"></span></div>
-          <div class="soul-count" id="soulCount">0 / 0 CONFIRMED</div>
-
-          <div class="soul-btns">
-            <button class="soul-btn soul-btn--yes" id="soulYesBtn" onclick="submitSoulVote(true)">[ Y ]</button>
-            <button class="soul-btn soul-btn--no"  onclick="submitSoulVote(false)">[ N ]</button>
+        <!-- Stripped to the question and two answers.
+             The terminal chrome, the progress bar and the live tally were all
+             describing a VOTE. Nobody reads a tally while deciding — it just
+             tells them what everyone else picked, which is the one thing a
+             collective decision should not lead with. The count still arrives
+             and is still used; it just does not sit under the question. -->
+        <div class="soul-ask">
+          <div class="soul-ask-q">DATA RECOVERABLE.<br>CONTINUE?</div>
+          <div class="soul-ask-btns">
+            <button class="soul-ask-btn" id="soulYesBtn" onclick="submitSoulVote(true)">YES</button>
+            <button class="soul-ask-btn soul-ask-btn--no" onclick="submitSoulVote(false)">NO</button>
           </div>
-          <div class="soul-sent hidden" id="soulSent">RESPONSE LOGGED</div>
+          <div class="soul-ask-sent hidden" id="soulSent">WAITING FOR THE ROOM</div>
         </div>
       </div>
 
