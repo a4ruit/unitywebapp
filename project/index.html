@@ -30,8 +30,14 @@
     </div>
   </div>
 
-  <!-- DEBUG: collapsible dropdown (temporary — remove before production) -->
-  <div id="debug-menu">
+  <!-- DEBUG: collapsible dropdown.
+       HIDDEN BY DEFAULT. Add ?debug to the URL to show it:
+           .../index.html?debug
+       A query param rather than a separate /admin page, because this is a static
+       single-page app — a second page would need server routing, and the debug
+       actions all talk to the same live WebSocket session this page owns.
+       Bookmark the ?debug link; players scanning the QR never get it. -->
+  <div id="debug-menu" class="debug-hidden">
     <button id="debug-menu-trigger" onclick="debugMenuToggle(event)">⚙</button>
     <div id="debug-menu-items">
       <button id="debugPhaseBtn" onclick="debugTogglePhase(); debugMenuClose()">▸ horror</button>

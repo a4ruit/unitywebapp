@@ -2522,6 +2522,11 @@ body.pristine-phase #packTypeAdpack:not(.active) .pack-type-icon { color: rgba(1
 
 /* ── DEBUG: collapsible dropdown (temporary) ─────────────────────────────── */
 
+/* Off unless the page was opened with ?debug — see index.html.
+   display:none rather than opacity or visibility, so the cogwheel cannot be
+   found by a curious thumb hunting for an invisible tap target. */
+#debug-menu.debug-hidden { display: none !important; }
+
 #debug-menu {
   position: fixed;
   top: 8px;
