@@ -516,30 +516,32 @@
         </div>
       </div>
 
+      <!-- WH4Ti5L0VE summons prompt.
+           RESKINNED AND REWORDED, and both were necessary. The first version
+           imitated a late-90s mail client and quoted a well-known email worm
+           verbatim, above a tile carrying a filename and a filesize. Content
+           classifiers match on exactly that shape, and the whole domain was
+           categorised as Malware on the strength of it.
+
+           Nothing here imitates a mail client, a file, or a delivery, and
+           the original strings are not repeated in these comments — markup is
+           served, so quoting them would defeat the point. -->
       <div class="screen hidden" id="screen-lovemail">
-        <div class="win2k">
-          <div class="win2k-title">
-            <span class="win2k-title-text">WH4Ti5L0VE - Message</span>
-            <button class="win2k-x" onclick="loveMailDecline()" aria-label="Close">&#10005;</button>
+        <div class="lovecall">
+          <div class="lovecall-head">
+            <span class="lovecall-tag">&lt;WH4Ti5L0VE&gt;</span>
+            <button class="lovecall-x" onclick="loveMailDecline()" aria-label="Dismiss">&#10005;</button>
           </div>
 
-          <div class="win2k-body">
-            <div class="win2k-hdr"><span>From:</span><i class="win2k-redact"></i></div>
-            <div class="win2k-hdr"><span>To:</span><i class="win2k-redact short"></i></div>
-            <div class="win2k-hdr"><span>Cc:</span><i class="win2k-redact tiny"></i></div>
-            <div class="win2k-hdr"><span>Subject:</span><b>WH4Ti5L0VE</b></div>
+          <div class="lovecall-sub">INCOMING SIGNAL</div>
 
-            <div class="win2k-message">kindly check the attached LOVELETTER coming from it.</div>
+          <div class="lovecall-body">
+            something is asking<br>if the room can hear it.
+          </div>
 
-            <div class="win2k-attach" onclick="loveMailOpen()">
-              <div class="win2k-attach-icon">&#128220;</div>
-              <div class="win2k-attach-name">LOVE-LET...<br><span>(10KB)</span></div>
-            </div>
-
-            <div class="win2k-buttons">
-              <button class="win2k-btn" onclick="loveMailReply()">Reply</button>
-              <button class="win2k-btn" onclick="loveMailOpen()">Open</button>
-            </div>
+          <div class="lovecall-buttons">
+            <button class="lovecall-btn" onclick="loveMailReply()">ANSWER</button>
+            <button class="lovecall-btn lovecall-btn--open" onclick="loveMailOpen()">LISTEN</button>
           </div>
         </div>
         <div class="lovemail-status" id="loveMailStatus"></div>

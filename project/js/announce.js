@@ -123,7 +123,7 @@ const Announce = (() => {
     }
     // Late-join sync, same contract as boss_state. Restores the live bar without
     // replaying the arrival banner — a player who just walked in shouldn't be
-    // told the attachment opened when the fight has been running for a minute.
+    // told the signal was answered when the fight has been running a minute.
     if (msg.startsWith('wh4t_state|')) {
       const p = msg.split('|');
       _mailStateSync(parseInt(p[1]), parseInt(p[2]));
@@ -220,8 +220,11 @@ const Announce = (() => {
     _mailUpdate();
 
     _enqueue({
-      type: 'boss', icon: '✉', title: 'WH4Ti5L0VE',
-      body: 'The attachment opened.<br>Something came through with it.',
+      type: 'boss', icon: '☍', title: 'WH4Ti5L0VE',
+      // Reworded. See the note on #screen-lovemail in style.css — the mail
+      // framing is what a malware classifier matches on, and it is not worth
+      // the domain's reputation.
+      body: 'The signal was answered.<br>Something came through with it.',
       duration: 6000, vibrate: [70, 50, 70],
       onDismiss: () => { if (_mailActive) _mailShow(); },
     });

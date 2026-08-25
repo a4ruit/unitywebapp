@@ -3969,117 +3969,114 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 /* NOTE: no `display` here. The base `.screen` rule already flex-centres, and an
    id-level display would beat `.screen.hidden { display:none }`, which is what
    made this window show up on the name screen. Same trap as #screen-legendary. */
+/* ── <WH4Ti5L0VE> summons prompt ──────────────────────────────────────────────
+   Was a late-90s mail client pastiche whose body copy quoted a well-known email
+   worm verbatim, above a tile carrying a filename and a filesize. That is
+   precisely the shape an automated classifier looks for, and it got the whole
+   domain categorised as Malware.
+
+   The offending strings are deliberately not repeated here — comments ship with
+   the stylesheet, so writing them down again would re-plant the token in the
+   file we are trying to get re-reviewed.
+
+   Rebuilt in the project's own pixel language instead — Pixelify Sans, the
+   pastel blue, the dark panel used by the other prompts. It reads as part of
+   the piece now rather than as a screenshot of somebody else's software, which
+   is both safer and, on reflection, the better design. */
 #screen-lovemail {
   flex-direction: column;
-  padding: 16px;
-  background: #1a1a1a;
+  align-items: center;
+  justify-content: center;
+  padding: 22px;
 }
 
-.win2k {
+.lovecall {
   width: 100%;
-  max-width: 340px;
-  background: #d4d0c8;
-  /* Classic 3D outset: light top-left, dark bottom-right, over a 1px black. */
-  border: 1px solid #000;
-  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
-  font-family: Tahoma, "MS Sans Serif", Geneva, sans-serif;
-  font-size: 11px;
-  color: #000;
-  padding: 2px;
+  max-width: 300px;
+  background: rgba(6, 12, 18, 0.94);
+  border: 1px solid rgba(123, 227, 255, 0.42);
+  border-radius: 10px;
+  box-shadow: 0 0 22px -6px rgba(123, 227, 255, 0.35);
+  padding: 14px 16px 16px;
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  color: #cfeefb;
 }
 
-.win2k-title {
+.lovecall-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(90deg, #0a246a 0%, #a6caf0 100%);
-  color: #fff;
-  font-weight: bold;
-  font-size: 11px;
-  padding: 3px 3px 3px 5px;
+  gap: 10px;
 }
 
-.win2k-x {
-  width: 18px;
-  height: 16px;
-  background: #d4d0c8;
-  border: 1px solid #000;
-  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
-  color: #000;
-  font-size: 9px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
+.lovecall-tag {
+  font-size: 15px;
+  letter-spacing: 0.06em;
+  color: #7be3ff;
+  text-shadow: 0 0 8px rgba(123, 227, 255, 0.5);
 }
-.win2k-x:active { box-shadow: inset -1px -1px 0 #fff, inset 1px 1px 0 #808080; }
 
-.win2k-body { padding: 6px; }
-
-.win2k-hdr {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 0;
-}
-.win2k-hdr > span { width: 48px; text-align: right; color: #000; }
-
-/* Redacted sender, as in every screenshot of the original that survives. */
-.win2k-redact {
-  display: inline-block;
-  height: 11px;
-  width: 150px;
-  background: #000;
-}
-.win2k-redact.short { width: 110px; }
-.win2k-redact.tiny  { width: 60px; }
-
-.win2k-message {
-  margin-top: 6px;
-  padding: 6px;
-  min-height: 84px;
-  background: #fff;
-  /* Sunken field, the inverse of the window's outset. */
-  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff;
-  border: 1px solid #808080;
-  font-family: "Courier New", monospace;
+/* Dismiss. Still a small x in the corner — closing it is a NO vote, and that
+   only reads if it looks like the ordinary way to get rid of something. */
+.lovecall-x {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid rgba(123, 227, 255, 0.35);
+  border-radius: 5px;
+  color: rgba(207, 238, 251, 0.75);
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
   font-size: 12px;
-  line-height: 1.4;
-}
-
-.win2k-attach {
-  margin-top: 6px;
-  padding: 6px;
-  background: #fff;
-  box-shadow: inset 1px 1px 0 #808080, inset -1px -1px 0 #fff;
-  border: 1px solid #808080;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  line-height: 1;
+  padding: 0;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.win2k-attach:active { background: #e8e8e8; }
-.win2k-attach-icon { font-size: 26px; line-height: 1; }
-.win2k-attach-name { font-size: 11px; line-height: 1.3; }
-.win2k-attach-name span { color: #444; }
+.lovecall-x:active { background: rgba(123, 227, 255, 0.16); }
 
-.win2k-buttons {
-  margin-top: 8px;
+.lovecall-sub {
+  margin-top: 10px;
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: rgba(123, 227, 255, 0.6);
+}
+
+.lovecall-body {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.85;
+  color: rgba(207, 238, 251, 0.92);
+}
+
+.lovecall-buttons {
   display: flex;
-  justify-content: flex-end;
-  gap: 6px;
+  gap: 10px;
+  margin-top: 20px;
 }
 
-.win2k-btn {
-  min-width: 74px;
-  padding: 4px 10px;
-  background: #d4d0c8;
-  border: 1px solid #000;
-  box-shadow: inset 1px 1px 0 #fff, inset -1px -1px 0 #808080;
-  font-family: Tahoma, "MS Sans Serif", sans-serif;
-  font-size: 11px;
+.lovecall-btn {
+  flex: 1;
+  padding: 13px 0;
+  background: transparent;
+  border: 1px solid rgba(123, 227, 255, 0.45);
+  border-radius: 7px;
+  color: #cfeefb;
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.12em;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
-.win2k-btn:active { box-shadow: inset -1px -1px 0 #fff, inset 1px 1px 0 #808080; }
+.lovecall-btn:active { background: rgba(123, 227, 255, 0.16); }
+
+/* The summoning half of the choice, warmer so the two are not interchangeable. */
+.lovecall-btn--open {
+  border-color: rgba(255, 154, 208, 0.5);
+  color: #ff9ad0;
+}
+.lovecall-btn--open:active { background: rgba(255, 154, 208, 0.16); }
 
 .lovemail-status {
   margin-top: 14px;
