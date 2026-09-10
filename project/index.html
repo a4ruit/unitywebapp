@@ -3,6 +3,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+  <!-- Narrow-device viewport clamp.
+       Every size in style.css is a fixed pixel value authored against an
+       iPhone. Plenty of Android handsets report 360 CSS pixels, and older ones
+       320, so the layout had nowhere to go and elements collided.
+
+       Rather than adding breakpoints to a stylesheet with none, pin the layout
+       width to 375 on anything narrower and let the browser scale the whole
+       page down to fit. Narrow phones then render EXACTLY what an iPhone
+       renders, just slightly smaller physically.
+
+       375 specifically, because that is the narrowest iPhone (SE and mini).
+       Every iPhone is therefore at or above the clamp and nothing about the
+       iOS rendering changes, while 360 and 320 devices are pulled onto a width
+       the design is known to survive.
+
+       Runs inline in the head so it applies before first paint. -->
+  <script>
+  (function () {
+    var TARGET = 375;
+    var m = document.querySelector('meta[name="viewport"]');
+    if (!m) return;
+    var w = window.innerWidth || document.documentElement.clientWidth || TARGET;
+    if (!w || w >= TARGET) return;
+    m.setAttribute('content', 'width=' + TARGET + ', user-scalable=no');
+  })();
+  </script>
   <title>PACK MENTALITY</title>
   <link rel="stylesheet" href="https://use.typekit.net/yki8oca.css">
   <link rel="stylesheet" href="css/style.css">
@@ -42,6 +69,7 @@
     <div id="debug-menu-items">
       <button id="debugPhaseBtn" onclick="debugTogglePhase(); debugMenuClose()">▸ horror</button>
       <button onclick="debugSpawnBoss(); debugMenuClose()">spawn boss</button>
+      <button onclick="debugKillBoss(); debugMenuClose()">kill boss</button>
       <button onclick="debugSpawnFleshling(); debugMenuClose()">spawn fleshling</button>
       <button onclick="debugSpawnBlindBox(); debugMenuClose()">spawn blind box</button>
       <button onclick="debugAddStars(); debugMenuClose()">+25 stars</button>
@@ -494,8 +522,6 @@
       </div>
 
       <!-- PRISTINE OUT-OF-PACKS SCREEN — calm cooldown, no ads ──────────── -->
-      <!-- LOVE MAIL. Deliberately not styled like the rest of the app. It has to
-           look like something that arrived rather than something we built. -->
       <!-- SOUL RECOVERY — shown to everyone the moment the Soul Tree dies.
            Force-shown over whatever the player was doing, because the prompt is
            the only way the session continues. -->
@@ -516,36 +542,6 @@
         </div>
       </div>
 
-      <!-- WH4Ti5L0VE summons prompt.
-           RESKINNED AND REWORDED, and both were necessary. The first version
-           imitated a late-90s mail client and quoted a well-known email worm
-           verbatim, above a tile carrying a filename and a filesize. Content
-           classifiers match on exactly that shape, and the whole domain was
-           categorised as Malware on the strength of it.
-
-           Nothing here imitates a mail client, a file, or a delivery, and
-           the original strings are not repeated in these comments — markup is
-           served, so quoting them would defeat the point. -->
-      <div class="screen hidden" id="screen-lovemail">
-        <div class="lovecall">
-          <div class="lovecall-head">
-            <span class="lovecall-tag">&lt;WH4Ti5L0VE&gt;</span>
-            <button class="lovecall-x" onclick="loveMailDecline()" aria-label="Dismiss">&#10005;</button>
-          </div>
-
-          <div class="lovecall-sub">INCOMING SIGNAL</div>
-
-          <div class="lovecall-body">
-            something is asking<br>if the room can hear it.
-          </div>
-
-          <div class="lovecall-buttons">
-            <button class="lovecall-btn" onclick="loveMailReply()">ANSWER</button>
-            <button class="lovecall-btn lovecall-btn--open" onclick="loveMailOpen()">LISTEN</button>
-          </div>
-        </div>
-        <div class="lovemail-status" id="loveMailStatus"></div>
-      </div>
 
       <div class="screen hidden" id="screen-empty">
         <div class="empty-wrapper">

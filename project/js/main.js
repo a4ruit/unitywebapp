@@ -275,72 +275,6 @@ function handleCleanseMessage(data) {
   return true;
 }
 
-// ─── Love mail ────────────────────────────────────────────────────────────────
-// Post-boss phase. Unity sends "lovemail|needed|opened|secondsLeft|declined"
-// while a window is open and "lovemail_end" when it closes either way.
-//
-// Reply and Open are the same message with a different verb, because there is no
-// answer to this mail that isn't a yes. The X is the only refusal, and it does
-// not lower what the room needs.
-
-let _loveMailOpen    = false;   // a window is live
-let _loveMailAnswered = false;  // this phone has already clicked something
-let _loveMailReturn  = null;    // screen to restore when it closes
-
-function handleLoveMailMessage(data) {
-  if (typeof data !== 'string') return false;
-  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
-
-  if (msg === 'lovemail_end') {
-    if (!_loveMailOpen) return true;
-    _loveMailOpen = false;
-    _loveMailAnswered = false;
-    // Don't yank a player out of whatever they moved on to.
-    if (document.getElementById('screen-lovemail') &&
-        !document.getElementById('screen-lovemail').classList.contains('hidden')) {
-      showScreen(_loveMailReturn || 'screen-pack');
-    }
-    _loveMailReturn = null;
-    return true;
-  }
-
-  if (!msg.startsWith('lovemail|')) return false;
-
-  const [, needed, opened, secs] = msg.split('|');
-
-  if (!_loveMailOpen) {
-    _loveMailOpen = true;
-    _loveMailAnswered = false;
-    // Remember where they were so closing returns them there.
-    const current = document.querySelector('.screen:not(.hidden)');
-    _loveMailReturn = current ? current.id : 'screen-pack';
-    showScreen('screen-lovemail');
-  }
-
-  const status = document.getElementById('loveMailStatus');
-  if (status) {
-    status.textContent = _loveMailAnswered
-      ? `SENT.  ${opened}/${needed}`
-      : `${opened}/${needed} OPENED   ${secs}s`;
-  }
-  return true;
-}
-
-function _loveMailSend(action) {
-  if (!_loveMailOpen || _loveMailAnswered) return;
-  _loveMailAnswered = true;
-  if (typeof CLIENT_ID !== 'undefined') send(`lovemail_click|${CLIENT_ID}|${action}`);
-}
-
-function loveMailOpen()    { _loveMailSend('open');  _loveMailDismiss(); }
-function loveMailReply()   { _loveMailSend('reply'); _loveMailDismiss(); }
-function loveMailDecline() { _loveMailSend('no');    _loveMailDismiss(); }
-
-// Whatever they chose, the window goes away for them. The room's count keeps
-// running on the shared screen.
-function _loveMailDismiss() {
-  showScreen(_loveMailReturn || 'screen-pack');
-}
 
 // ─── Soul recovery ────────────────────────────────────────────────────────────
 // Unity sends "soul_recovery|needed|yes|no" while the vote is open and
@@ -1119,7 +1053,6 @@ function connect() {
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleSoulTreeGoal(e.data)) return;
       if (handleQuestMessage(e.data)) return;
-      if (handleLoveMailMessage(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
@@ -1688,7 +1621,22 @@ function dropCard(card) {
     corruptionLevel++;
     updatePersonalPhase();
     if (typeof CLIENT_ID !== 'undefined') send(`${card.command}|${CLIENT_ID}|flesh`);
+
+    // Its OWN chain, not the pack chain below. A Glitchling is not a placement
+    // in the sense that one measures — it is the moment a player chooses
+    // corruption — so it gets counted apart, in the boss's typography.
+    //
+    // It lives here rather than at the shared hook because this branch returns
+    // before reaching it. That early return is why the Glitchling had no
+    // reaction on the phone at all.
+    //
+    // After the screen reset, and wrapped. The chain is decoration; the
+    // placement is the game. If it ever throws, the player must still get their
+    // screen back rather than being stranded on the choose screen.
     resetToPackScreen();
+    try {
+      if (typeof Player !== 'undefined' && Player.hitGlitch) Player.hitGlitch();
+    } catch (e) { console.warn('[chain] glitch step failed', e); }
     return;
   }
 
@@ -1700,8 +1648,24 @@ function dropCard(card) {
   // Session collection — the card is now claimed
   if (typeof Collection !== 'undefined') Collection.record(card);
 
-  // Player progression — releasing a critter into the world feeds Presence.
-  if (typeof Player !== 'undefined') Player.gainXP('presence', 12);
+  // Streak — releasing something into the world extends the chain, unless it
+  // repeats the last card. Keyed on the card's identity rather than its rarity,
+  // so alternating two commons still counts and spamming one legendary does not.
+  if (typeof Player !== 'undefined' && Player.hit) {
+    // Keyed on NAME, not id. Ids are reused across packs — 'small_cube' is
+    // Thornwire in one and Mystery Meat in another — so keying on the id would
+    // read two different cards as a repeat and drop the chain unfairly.
+    //
+    // Never corrupted here — that branch returned above and runs its own,
+    // separate chain.
+    //
+    // Wrapped for the same reason as the corrupted branch: everything below this
+    // point sends the actual placement to Unity, and a cosmetic counter must
+    // never be able to stop that from happening.
+    try {
+      Player.hit(card.name || card.id);
+    } catch (e) { console.warn('[chain] step failed', e); }
+  }
 
   // Flock o' Sheep — releases a small flock instead of one sheep. Kept as a
   // proof of concept for batch-release cards; FLOCK_SIZE is fixed.
@@ -1852,6 +1816,14 @@ function debugSpawnBoss() {
   console.log('[DEBUG] requested boss spawn');
 }
 
+// Kills whichever boss is up, so the defeat sequence can be tested without
+// fighting one down from full health first. Unity routes it through the normal
+// damage path, so the title card, cleanse and broadcasts all run.
+function debugKillBoss() {
+  send('debug_kill_boss');
+  console.log('[DEBUG] requested boss kill');
+}
+
 // Direct fleshling spawn — same idea for the small horror minions. Each call
 // spawns one fleshling at a random ground point.
 function debugSpawnFleshling() {
@@ -1872,20 +1844,15 @@ function debugAddStars() {
   console.log('[DEBUG] +25 stars granted');
 }
 
-// Grants one attribute level so the stat branches on the name tag can be seen
-// without grinding XP. Cycles DEX → PRE → VIG, so the first three taps fan out
-// one branch each and every tap after that stacks another node onto an existing
-// branch — which is both behaviours the branch UI needs to prove.
+// Adds one step to the chain, so the counter and the vine can be seen without
+// placing cards. Tap it repeatedly to watch the vine grow, the badge scale and
+// the colour step through its tiers.
 //
-// For a single long limb (to check the off-screen clamp), call it directly:
-//   Player.debugLevel('dexterity', 5)
-let _debugStatIdx = 0;
-const DEBUG_STAT_ORDER = ['dexterity', 'presence', 'vigor'];
+// For a long chain in one go (to check the vine's off-screen clamp):
+//   Player.debugLevel(null, 8)
 function debugStatLevel() {
   if (typeof Player === 'undefined' || !Player.debugLevel) return;
-  const attr = DEBUG_STAT_ORDER[_debugStatIdx % DEBUG_STAT_ORDER.length];
-  _debugStatIdx++;
-  Player.debugLevel(attr, 1);
+  Player.debugLevel(null, 1);
 }
 
 // ── Horror Phase Roulette (Three.js) ──────────────────────────────────────

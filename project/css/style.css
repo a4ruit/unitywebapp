@@ -30,6 +30,13 @@
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body {
   height:100%; width:100%; overflow:hidden;
+  /* Chrome on Android inflates font sizes on its own when it decides a text
+     block is in a wide container. It ignores the authored size entirely, which
+     is why the UI came out larger and overlapping there while iOS was fine.
+     iOS already behaves as if this were set once a viewport meta is present,
+     so this changes nothing for iPhone users. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: #0a100a;
   font-family:'lo-res', sans-serif;
   color:var(--cream);
@@ -3959,132 +3966,6 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   font-size: 8px;
   letter-spacing: 0.06em;
   color: rgba(200, 180, 230, 0.45);
-}
-
-/* ─── LOVE MAIL ───────────────────────────────────────────────────────────────
-   Windows 2000 mail window, faithful to the era of the virus it borrows from.
-   Deliberately alien to the rest of the app's styling, because the point is that
-   it looks like it arrived rather than like we made it. */
-
-/* NOTE: no `display` here. The base `.screen` rule already flex-centres, and an
-   id-level display would beat `.screen.hidden { display:none }`, which is what
-   made this window show up on the name screen. Same trap as #screen-legendary. */
-/* ── <WH4Ti5L0VE> summons prompt ──────────────────────────────────────────────
-   Was a late-90s mail client pastiche whose body copy quoted a well-known email
-   worm verbatim, above a tile carrying a filename and a filesize. That is
-   precisely the shape an automated classifier looks for, and it got the whole
-   domain categorised as Malware.
-
-   The offending strings are deliberately not repeated here — comments ship with
-   the stylesheet, so writing them down again would re-plant the token in the
-   file we are trying to get re-reviewed.
-
-   Rebuilt in the project's own pixel language instead — Pixelify Sans, the
-   pastel blue, the dark panel used by the other prompts. It reads as part of
-   the piece now rather than as a screenshot of somebody else's software, which
-   is both safer and, on reflection, the better design. */
-#screen-lovemail {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 22px;
-}
-
-.lovecall {
-  width: 100%;
-  max-width: 300px;
-  background: rgba(6, 12, 18, 0.94);
-  border: 1px solid rgba(123, 227, 255, 0.42);
-  border-radius: 10px;
-  box-shadow: 0 0 22px -6px rgba(123, 227, 255, 0.35);
-  padding: 14px 16px 16px;
-  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-  color: #cfeefb;
-}
-
-.lovecall-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.lovecall-tag {
-  font-size: 15px;
-  letter-spacing: 0.06em;
-  color: #7be3ff;
-  text-shadow: 0 0 8px rgba(123, 227, 255, 0.5);
-}
-
-/* Dismiss. Still a small x in the corner — closing it is a NO vote, and that
-   only reads if it looks like the ordinary way to get rid of something. */
-.lovecall-x {
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  background: transparent;
-  border: 1px solid rgba(123, 227, 255, 0.35);
-  border-radius: 5px;
-  color: rgba(207, 238, 251, 0.75);
-  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-  font-size: 12px;
-  line-height: 1;
-  padding: 0;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.lovecall-x:active { background: rgba(123, 227, 255, 0.16); }
-
-.lovecall-sub {
-  margin-top: 10px;
-  font-size: 9px;
-  letter-spacing: 0.22em;
-  color: rgba(123, 227, 255, 0.6);
-}
-
-.lovecall-body {
-  margin-top: 14px;
-  font-size: 13px;
-  line-height: 1.85;
-  color: rgba(207, 238, 251, 0.92);
-}
-
-.lovecall-buttons {
-  display: flex;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.lovecall-btn {
-  flex: 1;
-  padding: 13px 0;
-  background: transparent;
-  border: 1px solid rgba(123, 227, 255, 0.45);
-  border-radius: 7px;
-  color: #cfeefb;
-  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-  font-size: 13px;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.lovecall-btn:active { background: rgba(123, 227, 255, 0.16); }
-
-/* The summoning half of the choice, warmer so the two are not interchangeable. */
-.lovecall-btn--open {
-  border-color: rgba(255, 154, 208, 0.5);
-  color: #ff9ad0;
-}
-.lovecall-btn--open:active { background: rgba(255, 154, 208, 0.16); }
-
-.lovemail-status {
-  margin-top: 14px;
-  font-family: "Courier New", monospace;
-  font-size: 12px;
-  color: #ff6a5e;
-  letter-spacing: 0.06em;
-  text-align: center;
 }
 
 /* ── <WH4Ti5L0VE> HUD tint ────────────────────────────────────────────────────

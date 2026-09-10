@@ -3077,7 +3077,8 @@ function _sporePointerMove(e) {
   _sporeTrail.push(n);
   send(`spore_paint|${CLIENT_ID}|${n.x.toFixed(3)}|${n.y.toFixed(3)}`);
   // Player progression — dispersing spores feeds Dexterity.
-  if (typeof Player !== 'undefined') Player.gainXP('dexterity', 1);
+  // Painting no longer feeds progression. It fires continuously, and a chain
+  // that climbs while a finger is held down measures nothing.
   _updateSporeBar();
   _drawSporeMinimap();
 

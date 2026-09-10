@@ -1,19 +1,34 @@
 // player.js — lightweight, session-based player progression. Plain script, no
 // modules. Load BEFORE main.js (it calls Player.observe / Player.gainXP).
 //
-// Design: play-driven XP. Doing things in the Unity world feeds the attribute
-// that action belongs to — there's no "spend points" screen at all. Each level
+// REPLACED. This used to be three attributes levelling on a hidden XP curve.
+// Nobody noticed it in playtesting, and the reason was structural rather than
+// presentational: every reward it paid out was a MULTIPLIER, and a 5% change is
+// below what anyone can perceive. A gallery visitor who opens four packs never
+// levelled once.
+//
+// It is now a single personal CHAIN. Placements extend it while they keep
+// changing, and it lapses if you stop. The chain is loud, immediate and yours.
+// What it earns — pooled Presence, which speeds up everyone's placement and
+// possession — is still collective, so the fun is personal and the payoff is
+// not. That split is deliberate; see PlayerMods.cs on why a private permanent
+// upgrade path would argue against the piece.
+//
+// Legacy note. Doing things in the Unity world used to feed the attribute
+// that action belonged to — there was no "spend points" screen at all. Each level
 // grants a small modifier. All state is in-memory (wiped on refresh), consistent
 // with stars + the collection.
 //
-//   Attributes
-//     dexterity → bigger spore budget    (earned by dispersing spores)
-//     presence  → the ROOM's movement speed — placement and possession. Earned
-//                 individually, pooled collectively; see PlayerMods.cs in Unity.
-//     vigor     → more stars per reward  (earned by time possessing)
+//   The chain
+//     Placements extend it. Repeating the same card drops it to one, so it
+//     rewards varying what you play rather than sheer volume. It lapses after
+//     STREAK.window seconds of nothing.
+//     Every STREAK.perPresence steps grants a level of pooled Presence, which
+//     is the ROOM's placement and possession speed. Earned individually,
+//     spent collectively; see PlayerMods.cs in Unity.
 //
 // Exposes:
-//   Player.gainXP(attr, amount)   accumulate XP, level up
+//   Player.hit(cardKey)           extend the chain (or drop it, on a repeat)
 //   Player.observe(wsMessage)     watch the WS stream for "playing" signals
 //   Player.handleMessage(msg)     consume Unity's room_mods broadcast
 //   window.PlayerMods             { sporeBudgetMult, starGainMult, roomMoveMult }
@@ -30,7 +45,6 @@ window.PlayerMods = { sporeBudgetMult: 1, starGainMult: 1, roomMoveMult: 1 };
 const Player = (() => {
 
   // ── Tuning ──────────────────────────────────────────────────────────────────
-  const XP = { vigorTick: 4, presenceSpawn: 12, dexPaint: 1, dexFungi: 6 };
   // PERKS REMOVED. There used to be a "choose a boon" modal every 4 total levels
   // offering SHEPHERD / BLOOM / TITHE — three private, permanent, individually
   // accumulated upgrades.
@@ -43,11 +57,10 @@ const Player = (() => {
   // players should be looking at the shared world, for an arc a walk-up gallery
   // audience will almost never complete.
   //
-  // BLOOM and TITHE are not lost: sporeBudgetMult and starGainMult still scale
-  // with Dexterity and Vigor, just without the perk term. SHEPHERD had no
-  // attribute equivalent left once Presence stopped feeding flock size, so flock
-  // is now a flat 3.
-  const xpForLevel = (lv) => 50 + lv * 35;    // cost to go from level lv → lv+1
+  // The attributes went the same way, for the same reason, one step further on.
+  // Dexterity and Vigor only ever paid out multipliers nobody could feel, so
+  // sporeBudgetMult and starGainMult are flat 1 now and the chain took their
+  // place. Presence survives because it was already the pooled one.
 
   // Each attribute grows a vine that drops out of the name tag, swings out to
   // one side, and hangs down the gutter between the pack card and that side's
@@ -64,38 +77,143 @@ const Player = (() => {
   // `glyph` names an SVG shape rather than a character on purpose: the pixel font
   // renders most symbol codepoints as blanks or boxes (the same problem that hit
   // the Soul Tree's emoji requirements), so the icons are drawn as geometry.
-  const ATTRS = [
-    { key: 'dexterity', short: 'DEX', color: '#7ad0ff', side: 'left',  drop:   0, phase: 0.0, glyph: 'diamond' },
-    { key: 'presence',  short: 'PRE', color: '#ff9ad0', side: 'right', drop:   0, phase: 1.7, glyph: 'ring'    },
-    { key: 'vigor',     short: 'VIG', color: '#9af0a0', side: 'left',  drop: 190, phase: 3.4, glyph: 'cross'   },
-  ];
 
-  // ── Vine geometry ───────────────────────────────────────────────────────────
-  const BR = {
-    // `gap` must stay larger than `bend`, so the first node lands after the vine
-    // has finished swinging out. Any closer and it hangs mid-swing, still over
-    // the top corner of the card.
-    gap:       58,  // px below the tag before a vine's first node
-    step:      30,  // px between chained nodes down the same vine
-    node:      18,  // node diameter
-    maxNodes:   5,  // visible chain length — the +N badge carries the true count
-    minStep:   16,  // tightest spacing before nodes read as one blob
-    bend:      46,  // descent over which a vine swings from the tag into its lane
-    waver:    3.5,  // px of horizontal wobble, so it hangs rather than plumbs
-    laneInset: 26,  // px out from the card's edge to the vine's lane
-    sample:     6,  // px between polyline samples when drawing the string
+  // ── Streak tuning ───────────────────────────────────────────────────────────
+  // Placements chain while they keep CHANGING. Repeat the same card and the
+  // chain drops to one, because a counter that rewards volume rewards holding
+  // the button down, and that is the behaviour this is meant to replace.
+  const STREAK = {
+    // Seconds of inactivity before the chain lapses.
+    //
+    // 60, not the 14 this started at. 14 was picked from nothing and it was far
+    // too short to survive the actual loop: opening a pack, the 3D animation,
+    // the choice grid, the 400ms drop delay and then the placement modal is
+    // comfortably 15 to 30 seconds per card. The chain was lapsing to zero
+    // between every single placement, so every number read x1 and the whole
+    // counter looked broken. Detouring through a Glitchling widens that gap,
+    // which is why it showed up there first.
+    //
+    // A lapse should mean the player WALKED AWAY, not that they played normally.
+    window:      60,
+    perPresence:  5,   // chain steps per level of pooled Presence, and the
+                       // step that fires a burst. One number, so the thing
+                       // the player SEES and the thing the room GETS are
+                       // the same event rather than two rhythms drifting.
+    maxPresence: 12,   // ceiling, mirroring the old level cap
   };
+
+  // ── The Glitchling's own chain ──────────────────────────────────────────────
+  // Counted separately from the pack chain and never mixed with it.
+  //
+  // They measure opposite things. The pack chain rewards VARIETY — it drops if
+  // you repeat a card — and pays into the room's pooled speed. This one is the
+  // same card every time by definition, so a repeat rule would be nonsense, and
+  // it pays into nothing. It is a tally of how far a player has gone toward
+  // corruption, and the only honest reward for that is being shown the number.
+  //
+  // A longer window than the pack chain because a Glitchling appears at most
+  // once per pack, so 14 seconds would lapse between two consecutive takes.
+  const GLITCH = {
+    window:     45,   // seconds before this chain lapses
+    burstEvery:  3,   // steps between bursts
+  };
+
+  // Fixed, not the pack theme. Separating the counters is pointless if they
+  // still wear the same colour — corruption looks like corruption regardless of
+  // which pack it crawled out of.
+  const GLITCH_COLOR = '#e02020';
+
+  // ── Pack identity ───────────────────────────────────────────────────────────
+  // The chain wears the colour of the pack being played, not a generic tier
+  // ramp. A player cannot be told how the chain works, but they can notice that
+  // it turns pink when they are on critters and green on fungi, and that noticing
+  // is the whole lesson: the chain is about WHAT you are placing.
+  //
+  // Colours are lifted from .star-counter-value's per-theme rules in style.css
+  // rather than picked fresh, so the chain and the star counter agree about what
+  // colour a pack is. If those change, change these.
+  //
+  // `motif` names an SVG shape, never a character. The pixel font renders most
+  // symbol codepoints as blanks or boxes — the same trap that forced the old
+  // stat icons to be drawn as geometry.
+  const THEMES = {
+    'nature-active':  { color: '#81d4fa', motif: 'flower' },
+    'critter-active': { color: '#f0b8d0', motif: 'blob'   },
+    'fungi-active':   { color: '#78c660', motif: 'cap'    },
+    'flesh-active':   { color: '#e85c1a', motif: 'shard'  },
+    'scourge-active': { color: '#8bc820', motif: 'bolt'   },
+    'ritual-active':  { color: '#b060e8', motif: 'eye'    },
+  };
+  const THEME_FALLBACK = { color: '#e8e0c8', motif: 'flower' };
+
+  function _theme() {
+    const b = document.body;
+    for (const k in THEMES) if (b.classList.contains(k)) return THEMES[k];
+    return THEME_FALLBACK;
+  }
+
+  function _streakColor() { return _theme().color; }
+
+  // Motifs pulled from the card faces themselves. The flora card already has
+  // flowers drifting around it, so a chain on that pack throwing the same flower
+  // reads as the card doing it rather than as a separate UI layer.
+  function _motifSvg(kind, color) {
+    const c = color;
+    switch (kind) {
+      case 'flower':
+        return `<svg viewBox="0 0 20 20" width="100%" height="100%">` +
+          [0, 72, 144, 216, 288].map(a =>
+            `<ellipse cx="10" cy="4.6" rx="2.5" ry="4.2" fill="${c}"` +
+            ` transform="rotate(${a} 10 10)"/>`).join('') +
+          `<circle cx="10" cy="10" r="2.4" fill="#fff7d0"/></svg>`;
+      case 'blob':
+        return `<svg viewBox="0 0 20 20" width="100%" height="100%">` +
+          `<path d="M10 3c4 0 7 3 7 7s-3 7-7 7-7-3-7-7 3-7 7-7z" fill="${c}"/>` +
+          `<circle cx="7.4" cy="8.6" r="1.2" fill="#2a1520"/>` +
+          `<circle cx="12.6" cy="8.6" r="1.2" fill="#2a1520"/></svg>`;
+      case 'cap':
+        return `<svg viewBox="0 0 20 20" width="100%" height="100%">` +
+          `<path d="M2 11c0-5 3.6-8 8-8s8 3 8 8z" fill="${c}"/>` +
+          `<rect x="8" y="11" width="4" height="6" rx="1.6" fill="#f0e6c8"/></svg>`;
+      case 'shard':
+        return `<svg viewBox="0 0 20 20" width="100%" height="100%">` +
+          `<path d="M10 1 15 9 11 19 8 10 5 7z" fill="${c}"/></svg>`;
+      case 'bolt':
+        return `<svg viewBox="0 0 20 20" width="100%" height="100%">` +
+          `<path d="M12 1 4 11h5l-2 8 9-11h-5z" fill="${c}"/></svg>`;
+      case 'eye':
+        return `<svg viewBox="0 0 20 20" width="100%" height="100%">` +
+          `<path d="M1 10s3.6-5.5 9-5.5S19 10 19 10s-3.6 5.5-9 5.5S1 10 1 10z" fill="${c}"/>` +
+          `<circle cx="10" cy="10" r="2.6" fill="#150a20"/></svg>`;
+      default:
+        return `<svg viewBox="0 0 20 20"><circle cx="10" cy="10" r="7" fill="${c}"/></svg>`;
+    }
+  }
+
 
   // ── State (session only) ──────────────────────────────────────────────────────
+  // `level` is the live chain length. The vine renderer reads it, so the vine
+  // grows and collapses with the streak for free.
   const _attr = {
-    dexterity: { xp: 0, level: 0 },
-    presence:  { xp: 0, level: 0 },
-    vigor:     { xp: 0, level: 0 },
+    combo: { xp: 0, level: 0 },
   };
-  let   _statsOpen    = false;
   let   _built        = false;
 
-  function _totalLevel() { return _attr.dexterity.level + _attr.presence.level + _attr.vigor.level; }
+  // Streak state. _last is the card key that extended the chain — repeating it
+  // is what breaks it.
+  let   _last         = null;
+  let   _best         = 0;
+  let   _lapseTimer   = null;
+  let   _presenceLv   = 0;   // pooled Presence earned from milestones
+
+  // The Glitchling chain. Deliberately its own everything — sharing so much as
+  // the lapse timer would couple two things that are supposed to be read as
+  // unrelated.
+  let   _gLevel       = 0;
+  let   _gBest        = 0;
+  let   _gTimer       = null;
+
+  function _totalLevel() { return _attr.combo.level; }
 
   // ── Modifiers ─────────────────────────────────────────────────────────────────
   // The room's pooled Presence, mirrored back from Unity. Display only — Unity is
@@ -105,9 +223,12 @@ const Player = (() => {
   let _roomPlayers    = 0;
 
   function _recompute() {
+    // Dexterity and Vigor are gone, so their multipliers are flat. Left in place
+    // rather than deleted because other modules read this object, and a missing
+    // key would read as undefined and poison the arithmetic downstream.
     window.PlayerMods = {
-      sporeBudgetMult: 1 + 0.06 * _attr.dexterity.level,
-      starGainMult:    1 + 0.05 * _attr.vigor.level,
+      sporeBudgetMult: 1,
+      starGainMult:    1,
       // Mirrored, not computed here — see above.
       roomMoveMult:    _roomMoveMult,
     };
@@ -121,7 +242,7 @@ const Player = (() => {
   // room bonus is. Unity owns it and broadcasts the result back.
   let _sentPresence = -1;
   function _pushPresence() {
-    const lv = _attr.presence.level;
+    const lv = _presenceLv;
     if (lv === _sentPresence) return;          // only on an actual change
     _sentPresence = lv;
     if (typeof CLIENT_ID !== 'undefined' && typeof send === 'function') {
@@ -209,32 +330,148 @@ const Player = (() => {
     }
   }
 
-  // ── XP / levelling ──────────────────────────────────────────────────────────────
-  function gainXP(attr, amount) {
-    const a = _attr[attr];
-    if (!a || !(amount > 0)) return;
-    a.xp += amount;
-    let leveled = false;
-    while (a.xp >= xpForLevel(a.level)) {
-      a.xp -= xpForLevel(a.level);
-      a.level++;
-      leveled = true;
+  // ── Streak ──────────────────────────────────────────────────────────────────
+  // One placement extends the chain, unless it repeats the last one. Called from
+  // the placement path in main.js with something that identifies the card.
+  //
+  // Deliberately NOT called from the paint loop or the possession tick. Those
+  // fire continuously, and a chain that climbs while you hold still is a chain
+  // that measures presence rather than play.
+  // Set Player.debugChain = true in the console to see why the number did what
+  // it did. Cheaper than guessing at a counter that only misbehaves in a real
+  // session on a real phone.
+  let _debugChain = false;
+
+  function hit(key) {
+    const k = String(key == null ? '' : key);
+
+    if (_debugChain) {
+      console.log('[chain] hit', JSON.stringify(k),
+                  '| was x' + _attr.combo.level,
+                  '| last', JSON.stringify(_last),
+                  '|', (_last !== null && k !== '' && k === _last) ? 'REPEAT' : 'extend');
     }
-    if (leveled) {
-      _recompute();
+
+    if (_last !== null && k !== '' && k === _last) {
+      // Same card again. It HOLDS — the chain neither grows nor collapses.
+      //
+      // This used to drop to 1, and that was wrong for how the game actually
+      // deals. A pack offers a handful of cards, so wanting the same one twice
+      // is ordinary play, not spam. Worse, a detour through a Glitchling sits
+      // between two placements and hides the repetition from the player, so the
+      // collapse arrived with no visible cause and read as the counter being
+      // broken.
+      //
+      // Holding still does the anti-spam job it was there for. Repeating one
+      // card gets you nothing, so volume is not a strategy — but it also does
+      // not take away what you already earned for varying.
+      _render();
+      _pop(_attr.combo.level, 'held');
+      if (typeof Sound !== 'undefined') Sound.play('deny');
+    } else {
+      _attr.combo.level++;
+      if (_attr.combo.level > _best) _best = _attr.combo.level;
+      _award();
+      _render();
+      _pop(_attr.combo.level, false);
       if (typeof Sound !== 'undefined') Sound.play('star');
-      _pulse();
+      // A milestone is worth a bigger reaction than a step, and the phone
+      // buzzing is the one channel that reaches a player looking at the wall
+      // instead of their hand.
+      if (_attr.combo.level % STREAK.perPresence === 0 && navigator.vibrate) {
+        navigator.vibrate([25, 40, 55]);
+      }
     }
+
+    _last = k;
+    _arm();
+  }
+
+  // ── The Glitchling chain ────────────────────────────────────────────────────
+  // Taking a Glitchling. No repeat rule, because it is always the same card, and
+  // no payout, because there is nothing good about this number going up. It only
+  // counts, in the boss's own typography, and lapses if the player stops.
+  //
+  // Does NOT touch the pack chain. Choosing corruption is not a placement in the
+  // sense the pack chain measures, and breaking a clean chain for it would make
+  // the two counters argue about the same event.
+  function hitGlitch() {
+    _gLevel++;
+    if (_gLevel > _gBest) _gBest = _gLevel;
+
+    _popGlitch(_gLevel);
+    if (typeof Sound !== 'undefined') Sound.play('deny');
+
+    if (_gTimer !== null) clearTimeout(_gTimer);
+    _gTimer = setTimeout(() => { _gTimer = null; _gLevel = 0; _render(); },
+                         GLITCH.window * 1000);
+
+    // Forget which card the pack chain last saw.
+    //
+    // `_last` means "the card that extended the chain, with NOTHING in between".
+    // A Glitchling is something in between. Leaving it set meant the pack chain
+    // remembered a card from before the detour, so coming back and picking that
+    // card again was judged a repeat — the counter appeared to revert for no
+    // reason the player could see. This is the tangle the two-counter split
+    // introduced, and it is the whole of it.
+    _last = null;
+
+    // Re-arm the PACK chain without extending it.
+    //
+    // The two chains stay separate, but a player taking Glitchlings is still
+    // playing, and the pack chain's lapse timer had no way to know that. Since
+    // a Glitchling is offered on almost every pack, taking two or three in a row
+    // silently ran the pack chain out while the player was busy — which reads as
+    // the combo system breaking the moment you touch a Glitchling.
+    //
+    // Only when there is a chain to keep. Arming from zero would start a timer
+    // counting down on nothing.
+    if (_attr.combo.level > 0) _arm();
+
     _render();
   }
+
+  // Pooled Presence is the payoff, so the fun is personal and the reward is not.
+  function _award() {
+    const want = Math.min(STREAK.maxPresence,
+                          Math.floor(_attr.combo.level / STREAK.perPresence));
+    if (want <= _presenceLv) return;
+    _presenceLv = want;
+    _recompute();
+  }
+
+  function _arm() {
+    if (_lapseTimer !== null) clearTimeout(_lapseTimer);
+    // A lapse is silent on purpose. Nothing is on screen by then, so throwing a
+    // number to announce that a number went away would be the only time the
+    // chain interrupts a player who has already stopped playing.
+    _lapseTimer = setTimeout(() => {
+      _lapseTimer = null;
+      if (_debugChain) console.log('[chain] LAPSED from x' + _attr.combo.level);
+      _break(0);
+      _render();
+    }, STREAK.window * 1000);
+  }
+
+  // The chain lapses but the Presence it earned does NOT. Taking the room's
+  // speed away because one player stopped placing would make everyone else pay
+  // for it, which is the opposite of how the pool is supposed to work.
+  function _break(to) {
+    _attr.combo.level = to;
+    _last = to > 0 ? _last : null;
+    if (_lapseTimer !== null && to === 0) { clearTimeout(_lapseTimer); _lapseTimer = null; }
+  }
+
+  // Kept as a no-op so any caller still passing the old attribute names is inert
+  // rather than throwing. Remove once nothing references it.
+  function gainXP() {}
 
   // ── Observe the WS stream for "playing in Unity" signals ──────────────────────
   // Vigor accrues for every possession tick (any creature) addressed to us — a
   // clean per-second heartbeat that means the player is actively inhabiting.
   function observe(data) {
-    if (typeof data !== 'string') return;
-    const id = (typeof CLIENT_ID !== 'undefined') ? CLIENT_ID : null;
-    if (id && data.indexOf('possess_tick|' + id) !== -1) gainXP('vigor', XP.vigorTick);
+    // Vigor is gone and possession ticks deliberately do not extend a streak.
+    // Left as a stub because main.js calls it on every message.
   }
 
   // ── UI ──────────────────────────────────────────────────────────────────────────
@@ -244,469 +481,465 @@ const Player = (() => {
 
     const style = document.createElement('style');
     style.textContent = `
-      /* ── Persistent LV badge — sits just above the player name tag, styled to
-         match it and tinted to the player's colour. Lives inside #screen-pack so
-         it shows/hides with the tag. Tapping it opens the stats window. ── */
-      #pl-level {
-        position: fixed; top: 172px; left: 50%;
-        transform: translateX(-50%);
-        z-index: 5;
-        display: none;                 /* revealed alongside the name tag */
-        pointer-events: auto; cursor: pointer;
-        font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-        font-size: 10px; letter-spacing: 0.14em; white-space: nowrap;
-        color: #cfeefb;                /* recoloured to the player's tag colour */
-        padding: 1px 11px;
-        background: rgba(6, 14, 18, 0.75);
-        border: 1px solid currentColor; border-radius: 8px;
-        text-shadow: 0 0 6px rgba(0,0,0,0.85);
-        box-shadow: 0 0 8px -3px currentColor;
-        -webkit-tap-highlight-color: transparent;
-      }
-      #pl-level.pl-pulse { animation: pl-pulse 0.55s ease-out; }
-      @keyframes pl-pulse {
-        0%   { box-shadow: 0 0 0 0 rgba(150,240,255,0.6); }
-        100% { box-shadow: 0 0 0 12px rgba(150,240,255,0); }
-      }
 
-      /* ── Stats window — opened by tapping the name tag / LV badge ── */
-      #pl-stats {
-        position: fixed; inset: 0; z-index: 10055;
-        display: none; align-items: center; justify-content: center;
-        background: rgba(4, 7, 10, 0.78);
-        font-family: 'Pixelify Sans', monospace;
-      }
-      #pl-stats.pl-open { display: flex; }
-      #pl-stats-card {
-        width: min(86vw, 320px);
-        background: rgba(8, 14, 20, 0.98);
-        border: 2px solid rgba(150, 240, 255, 0.45);
-        border-radius: 10px; padding: 16px;
-        box-shadow: 0 0 24px rgba(120, 200, 255, 0.22);
-      }
-      #pl-stats-name {
-        font-size: 15px; letter-spacing: 1.5px; text-align: center;
-        color: #cfeefb; text-shadow: 1px 1px 0 #000;
-      }
-      #pl-stats-lv {
-        font-size: 11px; letter-spacing: 2px; text-align: center;
-        color: #ffe7a0; margin: 2px 0 12px; text-transform: uppercase;
-      }
-      .pl-stat { margin: 9px 0; }
-      .pl-stat-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
-      .pl-stat-name { font-size: 11px; letter-spacing: 1px; }
-      .pl-stat-buff { font-size: 9px; letter-spacing: 0.5px; color: rgba(200,235,255,0.7); }
-      .pl-stat-bar {
-        position: relative; height: 7px;
-        background: rgba(255,255,255,0.08);
-        border: 1px solid rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden;
-      }
-      .pl-stat-fill { position: absolute; inset: 0; transform-origin: left; }
-      #pl-stats-hint {
-        margin-top: 14px; text-align: center; font-size: 9px; letter-spacing: 1px;
-        color: rgba(180,230,255,0.5); text-transform: uppercase;
-      }
 
-      /* ── Stat vines ───────────────────────────────────────────────────────
-         Icons on vines hanging out of the name tag, down the gutters either
-         side of the card. Replaces the need to open the stats window at all:
-         what you've invested in is legible at a glance, permanently, without
-         a tap.
+      /* ── The chain pop. One per step, thrown at a random point loosely ringing
+         the card, then gone.
 
-         A full-viewport fixed overlay rather than a box positioned near the tag,
-         because the tag's width changes with the player's name — anchoring in
-         absolute viewport coordinates read from its bounding rect avoids having
-         to keep a wrapper in sync with it. pointer-events:none throughout so it
-         never intercepts a tap meant for the pack. */
-      #pl-branches {
-        position: fixed; inset: 0;
-        z-index: 3;                    /* under the tag (4) and LV badge (5) */
-        display: none;                 /* revealed with the name tag */
+         Nothing persistent. A counter that sits on screen becomes furniture
+         within about a minute and stops being read at all; one that appears,
+         demands a glance and leaves keeps costing the player attention, which is
+         the only currency this piece actually deals in.
+
+         pf-pixelscript at 44px is the star counter's face, one size up. Reusing
+         it means the chain reads as the same KIND of thing as a reward rather
+         than as a new system to learn.
+
+         --pl-tint  tier colour   --pl-rot  a small static tilt
+
+         It does not travel. It arrives, holds where it landed long enough to be
+         read, and goes. Drifting it away from the spot it was thrown at only
+         pulls the eye off the card, which is the thing the player came to look
+         at.
+
+         position:fixed and appended to #screen-pack, so it inherits the screen's
+         show/hide but is positioned against the viewport, which is the frame the
+         card's bounding rect is measured in. ── */
+      .pl-pop {
+        position: fixed;
+        z-index: 6;
         pointer-events: none;
-        overflow: visible;
+        font-family: 'pf-pixelscript', cursive;
+        font-size: 44px; line-height: 1;
+        letter-spacing: 0.04em;
+        font-variant-numeric: tabular-nums;
+        color: var(--pl-tint, #e8e0c8);
+        text-shadow:
+          0 0 10px var(--pl-tint, #e8e0c8),
+          0 0 22px rgba(0, 0, 0, 0.55),
+          2px 2px 0 rgba(0, 0, 0, 0.8);
+        will-change: transform, opacity;
+        /* Visible, not hidden. When the sheet turns past edge-on the number
+           shows mirrored, which is what a real page does and what sells the
+           turn. Hiding the back face would make it blink out mid-flip. */
+        backface-visibility: visible;
+        animation: pl-pop 2.6s linear forwards;
       }
-      #pl-branch-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
 
-      .pl-node {
-        position: absolute;
-        width: ${BR.node}px; height: ${BR.node}px;
-        margin-left: ${-BR.node / 2}px; margin-top: ${-BR.node / 2}px;
-        display: flex; align-items: center; justify-content: center;
-        /* Scale/fade in so a newly earned branch announces itself rather than
-           silently appearing between frames. */
-        animation: pl-node-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) both;
-      }
-      @keyframes pl-node-in {
-        0%   { opacity: 0; transform: scale(0.2); }
-        100% { opacity: 1; transform: scale(1); }
+      /* One animation for the whole life rather than a pop followed by a fade.
+         Two chained animations meant the handoff frame could land anywhere and
+         the number visibly hitched at the join.
+
+         Punch in, hold, go. Most of the duration is the hold, because that is
+         the only part the player actually reads.
+
+         There was a paper-flutter here — perspective, a rotateY that turned the
+         glyph edge-on, a decaying sway. It was the better animation in
+         isolation and the worse one in place: a number drifting down the screen
+         drags the eye off the card, and the card is what the player came to
+         look at. It now goes where it stood. */
+      @keyframes pl-pop {
+        0% {
+          opacity: 0;
+          animation-timing-function: cubic-bezier(0.16, 1.5, 0.3, 1);
+          transform: translate(-50%, -50%) scale(0.3) rotate(var(--pl-rot, 0deg));
+        }
+        9% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1.34) rotate(var(--pl-rot, 0deg));
+        }
+        /* Settled, and then held here for most of the animation. This is the
+           frame the player actually reads the number on, so it is the one that
+           gets the time. */
+        17% {
+          animation-timing-function: linear;
+          transform: translate(-50%, -50%) scale(1) rotate(var(--pl-rot, 0deg));
+        }
+        70% {
+          opacity: 1;
+          transform: translate(-50%, -50%) scale(1) rotate(var(--pl-rot, 0deg));
+        }
+        /* Goes where it stood. No drift, no fall — the number belongs to the
+           moment it was thrown, and moving it away from that spot only pulls the
+           eye off the card. */
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(1.16) rotate(var(--pl-rot, 0deg));
+        }
       }
 
-      /* Do NOT set a 'color' on this element. 'background: currentColor'
-         resolves against the element's OWN color, so declaring a dark color
-         here to tint the text made the background dark too — the badge was
-         rendering near-black on near-black and vanishing. The colour is
-         inherited from .pl-node (set inline to the attribute's colour) and the
-         text tint goes on the inner span instead. */
-      .pl-node-badge {
-        position: absolute; right: -9px; top: -8px;
-        font-family: 'Pixelify Sans', 'lo-res', sans-serif;
-        font-size: 11px; line-height: 1;
-        padding: 1px 4px;
-        background: currentColor;
-        border: 1px solid rgba(4, 10, 14, 0.9);
-        border-radius: 6px;
-        white-space: nowrap;
+      /* ── Milestone spark. One motif, thrown outward and left to drift. ── */
+      .pl-spark {
+        position: fixed;
+        z-index: 6;
+        pointer-events: none;
+        opacity: 0;
+        will-change: transform, opacity;
+        filter: drop-shadow(0 0 5px currentColor);
+        animation: pl-spark 2s cubic-bezier(0.1, 0.72, 0.2, 1) forwards;
       }
-      .pl-node-badge > span { color: #06121a; font-weight: 700; }
+      @keyframes pl-spark {
+        0%   { opacity: 0;
+               transform: translate(-50%, -50%) scale(0.3) rotate(0deg); }
+        10%  { opacity: 1;
+               transform: translate(calc(-50% + var(--sx) * 0.3),
+                                    calc(-50% + var(--sy) * 0.3))
+                          scale(1.12) rotate(calc(var(--sr) * 0.24)); }
+        /* Nearly all of the travel is done by here; the rest of the animation is
+           the motif hanging in the air and slowly going. Petals settle, they do
+           not vanish at the end of their arc. */
+        42%  { opacity: 0.95;
+               transform: translate(calc(-50% + var(--sx) * 0.82),
+                                    calc(-50% + var(--sy) * 0.82))
+                          scale(1) rotate(calc(var(--sr) * 0.68)); }
+        100% { opacity: 0;
+               transform: translate(calc(-50% + var(--sx)), calc(-50% + var(--sy)))
+                          scale(0.62) rotate(var(--sr)); }
+      }
+
+      /* A milestone number arrives harder and lingers, so the burst has
+         something at its centre for the eye to come back to. */
+      .pl-pop.pl-pop--milestone {
+        animation-duration: 3.4s;
+        text-shadow:
+          0 0 16px var(--pl-tint, #e8e0c8),
+          0 0 34px var(--pl-tint, #e8e0c8),
+          2px 2px 0 rgba(0, 0, 0, 0.85);
+      }
+
+      /* The Glitchling's variant. No entrance animation at all — the character
+         resolve IS the entrance, and a scale-up on top of it just blurred the
+         one thing worth watching. It holds still and jitters instead.
+
+         font-variant-numeric is dropped here: tabular figures line the digits up
+         neatly, and neat is the opposite of what junk should look like. */
+      .pl-pop.pl-pop--glitch {
+        animation: none;
+        opacity: 1;
+        font-variant-numeric: normal;
+        transform: translate(calc(-50% + var(--pl-jx, 0px)), calc(-50% + var(--pl-jy, 0px)));
+        text-shadow:
+          0 0 10px var(--pl-tint, #e8e0c8),
+          2px 0 0 rgba(255, 40, 40, 0.55),
+         -2px 0 0 rgba(0, 220, 255, 0.45),
+          2px 2px 0 rgba(0, 0, 0, 0.8);
+      }
+
+      /* A repeat that did not count. Same fall, drained of colour and glow, and
+         over quickly. It has to be visible — the player pressed something and
+         deserves an answer — without looking like an award or an error. The
+         absence of the burst and the absence of colour ARE the message. */
+      .pl-pop.pl-pop--held {
+        animation-duration: 1.25s;
+        font-weight: 400;
+        text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.75);
+      }
+
+      /* ── A broken chain does not get the same throw. ──
+
+         The award arc is smooth, rises, and resolves. Reusing it in red said
+         "here is a smaller reward", which is the opposite of the message.
+
+         This one is QUANTISED. steps(1, end) means every keyframe holds its
+         value and then snaps to the next with nothing in between, so the number
+         judders rather than travels. That is the same trick the boss assembly
+         and the spawn stretch use in Unity, and it is the project's existing
+         vocabulary for something going wrong.
+
+         It also falls instead of rising, flickers out and back twice, and ends
+         abruptly at 0.62s rather than settling over one and a half seconds. A
+         failure should be over before the player has finished registering it —
+         the flinch IS the feedback. */
+      .pl-pop.pl-pop--break {
+        animation: pl-pop-break 0.62s steps(1, end) forwards;
+      }
+      @keyframes pl-pop-break {
+        /* Arrives already too big and skewed, as if it were knocked sideways
+           rather than thrown. */
+        0%   { opacity: 0; transform: translate(-50%, -50%) scale(1.7) skewX(16deg); }
+        7%   { opacity: 1; transform: translate(calc(-50% - 15px), -50%) scale(1.2) skewX(-11deg);
+               text-shadow: 5px 0 0 rgba(255,40,40,0.9), -5px 0 0 rgba(0,220,255,0.75); }
+        15%  { opacity: 1; transform: translate(calc(-50% + 13px), calc(-50% + 3px)) scale(1.02) skewX(9deg);
+               text-shadow: -6px 0 0 rgba(255,40,40,0.9), 6px 0 0 rgba(0,220,255,0.75); }
+        /* Dropped frames. The gap is the point — a flicker reads as a fault in
+           a way that a fade never does. */
+        23%  { opacity: 0; }
+        30%  { opacity: 1; transform: translate(calc(-50% - 6px), calc(-50% + 7px)) scale(0.97) skewX(-5deg);
+               text-shadow: 3px 0 0 rgba(255,40,40,0.85), -3px 0 0 rgba(0,220,255,0.6); }
+        44%  { opacity: 1; transform: translate(calc(-50% + 4px), calc(-50% + 12px)) scale(0.94) skewX(3deg); }
+        52%  { opacity: 0; }
+        60%  { opacity: 0.9; transform: translate(-50%, calc(-50% + 18px)) scale(0.9) skewX(0deg);
+               text-shadow: 2px 2px 0 rgba(0,0,0,0.8); }
+        /* Gone on a frame boundary, not faded out. */
+        100% { opacity: 0; transform: translate(-50%, calc(-50% + 24px)) scale(0.88); }
+      }
+
+
+        margin-top: 14px; text-align: center; font-size: 9px; letter-spacing:
+
+      
     `;
     document.head.appendChild(style);
 
-    // LV badge — into the pack screen so it inherits the tag's visibility.
-    const screen = document.getElementById('screen-pack') || document.body;
-    const lvBadge = document.createElement('div');
-    lvBadge.id = 'pl-level';
-    lvBadge.textContent = 'LV 0';
-    lvBadge.addEventListener('click', _openStats);
-    screen.appendChild(lvBadge);
-
-    // Tapping the name tag itself also opens the stats window.
-    const tag = document.getElementById('playerNametag');
-    if (tag) tag.addEventListener('click', _openStats);
-
-    // Stats window — read-only attribute breakdown, tap anywhere to close.
-    const stats = document.createElement('div');
-    stats.id = 'pl-stats';
-    stats.innerHTML =
-      `<div id="pl-stats-card">` +
-      `<div id="pl-stats-name">STATS</div>` +
-      `<div id="pl-stats-lv">LV 0</div>` +
-      `<div id="pl-stats-rows"></div>` +
-      `<div id="pl-stats-hint">tap to close</div>` +
-      `</div>`;
-    stats.addEventListener('click', _closeStats);
-    document.body.appendChild(stats);
-
-    // Branch overlay — strings + icon nodes growing out of the name tag. Goes
-    // into #screen-pack alongside the LV badge, NOT document.body: .shell is
-    // `position:relative; z-index:1`, which makes it a stacking context, so a
-    // body-level child at z-index 3 would paint over the entire app instead of
-    // slipping behind the tag. Sharing the tag's parent also means it inherits
-    // the screen's show/hide for free.
-    const branches = document.createElement('div');
-    branches.id = 'pl-branches';
-    branches.innerHTML = `<svg id="pl-branch-svg"><g id="pl-branch-strings"></g></svg>`;
-    screen.appendChild(branches);
-
-    // The anchor is read from the tag's bounding rect, so anything that moves or
-    // resizes it has to trigger a redraw.
-    // Coalesced to one call per frame. A resize can fire dozens of times per
-    // second, and each one used to mean a full teardown and rebuild.
-    let _brQueued = false;
-    const queueBranches = () => {
-      if (_brQueued) return;
-      _brQueued = true;
-      requestAnimationFrame(() => { _brQueued = false; _renderBranches(); });
-    };
-
-    window.addEventListener('resize', queueBranches);
-    window.addEventListener('orientationchange', queueBranches);
-    // The tag's rect changes when it's revealed, when the name is set, and again
-    // when the pixel font finishes loading and reflows its width. Observing it
-    // catches all three without polling.
-    if (tag && typeof ResizeObserver !== 'undefined') {
-      new ResizeObserver(queueBranches).observe(tag);
-    }
+    // No persistent counter element. Each step throws its own and takes it away
+    // again; see .pl-pop.
 
     _render();
   }
 
-  function _render() {
-    if (!_built) return;
-    const badge = document.getElementById('pl-level');
-    if (badge) badge.textContent = 'LV ' + _totalLevel();
-    _renderBranches();
-    if (_statsOpen) _renderStats();
+  // Nothing persistent is drawn any more — every number spawns, plays and
+  // removes itself. Kept as a no-op so the call sites read the same and a future
+  // persistent element has somewhere to go.
+  function _render() {}
+
+  // Throw one number at the screen and forget about it. The ordinary language:
+  // a clean overshoot that rises and resolves. See _ringPoint for where it goes,
+  // _popGlitch for what a Glitchling gets instead.
+  // mode: falsy for an ordinary step, 'held' for a repeat that did not count.
+  // The break style is no longer reachable from hit(); it is kept because the
+  // keyframes are still the right answer if a hard failure is ever needed again.
+  function _pop(n, mode) {
+    if (!_built) _build();
+    // Deferred a frame. dropCard calls this BEFORE resetToPackScreen(), so at
+    // this instant the pack screen can still be hidden — and a hidden element
+    // measures 0x0, which sent _ringPoint down its fallback path and dropped
+    // every number in the middle of the viewport instead of around the card.
+    // Waiting one frame lets the screen switch land, and reading the rect inside
+    // the callback forces the fresh layout we need.
+    requestAnimationFrame(() => _popNow(n, mode));
   }
 
-  // ── Stat vines ──────────────────────────────────────────────────────────────
-  // One vine per attribute the player has invested in, dropping out of the name
-  // tag and hanging down the gutter beside the card. Each level adds another
-  // node further down the SAME vine, so the shape is a readable picture of how
-  // they've played: one long vine means commitment, three short ones mean
-  // they've spread.
+  function _popNow(n, mode) {
+    const broken = mode === 'break';
+    const held   = mode === 'held';
+    const host = document.getElementById('screen-pack') || document.body;
+    const { x, y } = _ringPoint();
 
-  // The lane a vine hangs in: the strip between the pack card and that side's
-  // slide-out tab. Measured rather than hardcoded, because the gutter is only a
-  // few px wide on a phone and hundreds of px wide in a desktop browser window.
-  // Biased to hug the card rather than sitting dead-centre in the gutter, so the
-  // vines stay visually attached to the card at any width — then pushed back in
-  // if that would put them under the tab.
-  function _laneX(side) {
-    const vw    = window.innerWidth;
-    const half  = BR.node / 2 + 4;
-    const stage = document.querySelector('.pack-carousel-stage');
-    const trig  = document.querySelector(side === 'left' ? '.coll-panel-trigger' : '.task-panel-trigger');
-    const tR    = trig  ? trig.getBoundingClientRect()  : null;
-    const sR    = stage ? stage.getBoundingClientRect() : null;
+    // A held repeat is never a milestone. The number did not change, so
+    // celebrating it would say the opposite of what just happened.
+    const milestone = !broken && !held && n > 0 && n % STREAK.perPresence === 0;
 
-    if (side === 'left') {
-      const tab  = (tR && tR.width)  ? tR.right : 60;
-      const card = (sR && sR.width)  ? sR.left  : vw / 2 - 132;
-      return Math.max(tab + half, card - BR.laneInset);
+    const el = document.createElement('div');
+    el.className = 'pl-pop'
+      + (broken ? ' pl-pop--break' : '')
+      + (held ? ' pl-pop--held' : '')
+      + (milestone ? ' pl-pop--milestone' : '');
+    el.textContent = '\u00d7' + n;
+    el.style.left = x + 'px';
+    el.style.top  = y + 'px';
+    el.style.setProperty('--pl-tint',
+      broken ? '#c8402e' : held ? 'rgba(232,224,200,0.55)' : _streakColor());
+    // A static tilt, set once. The number does not travel, so this is the only
+    // thing keeping two pops in the same place from looking stamped.
+    el.style.setProperty('--pl-rot', (broken ? _rand(-18, 18) : _rand(-7, 7)).toFixed(1) + 'deg');
+
+    // Bigger numbers arrive bigger. Capped, because past about 1.5 the glyph
+    // starts overhanging the clamp above and gets cut by the viewport edge.
+    el.style.fontSize = (44 * Math.min(1.5, 1 + n * 0.035)).toFixed(0) + 'px';
+
+    // Removed by the animation ending rather than a timer, so a backgrounded tab
+    // that never runs the animation does not silently accumulate elements.
+    el.addEventListener('animationend', () => el.remove());
+    host.appendChild(el);
+
+    // Centred on the number, so the burst and the count read as one event.
+    if (milestone) _burst(x, y);
+  }
+
+  function _rand(a, b) { return a + Math.random() * (b - a); }
+
+
+  // ── Milestone burst ─────────────────────────────────────────────────────────
+  // Thrown at every STREAK.perPresence steps, in the pack's own motif.
+  //
+  // Not StarFX.burst: that one flies stars into the star counter and is built
+  // around having a destination. This has nowhere to go — it is an exclamation,
+  // not a transfer — so the particles just leave and stop existing.
+  // motif/color override the pack theme, for the Glitchling chain.
+  function _burst(x, y, motif, color) {
+    const host = document.getElementById('screen-pack') || document.body;
+    const base = _theme();
+    const th   = { motif: motif || base.motif, color: color || base.color };
+    const n    = 12;
+
+    for (let i = 0; i < n; i++) {
+      const el = document.createElement('div');
+      el.className = 'pl-spark';
+      el.innerHTML = _motifSvg(th.motif, th.color);
+
+      // Evenly spaced around the circle with a little jitter, rather than fully
+      // random angles. Pure randomness clumps, and a clumped burst reads as a
+      // few stray particles instead of one event.
+      const ang  = (i / n) * Math.PI * 2 + _rand(-0.26, 0.26);
+      const dist = _rand(46, 104);
+      const size = _rand(11, 21);
+
+      // currentColor is what the drop-shadow in .pl-spark reads. Without this it
+      // inherits the screen's text colour and every pack glows the same white.
+      el.style.color  = th.color;
+      el.style.left   = x + 'px';
+      el.style.top    = y + 'px';
+      el.style.width  = size + 'px';
+      el.style.height = size + 'px';
+      el.style.setProperty('--sx', (Math.cos(ang) * dist).toFixed(1) + 'px');
+      // Biased upward, so the burst drifts rather than falling. Gravity would
+      // make it debris; drift makes it petals.
+      el.style.setProperty('--sy', (Math.sin(ang) * dist - _rand(10, 30)).toFixed(1) + 'px');
+      el.style.setProperty('--sr', _rand(-220, 220).toFixed(0) + 'deg');
+      el.style.animationDelay = (i * 8) + 'ms';
+
+      el.addEventListener('animationend', () => el.remove());
+      host.appendChild(el);
     }
-    const tab  = (tR && tR.width) ? tR.left   : vw - 60;
-    const card = (sR && sR.width) ? sR.right  : vw / 2 + 132;
-    return Math.min(tab - half, card + BR.laneInset);
   }
 
-  // Horizontal position of a vine at `d` px below the tag. Eases from the tag's
-  // edge into the lane over the whole descent to the first node, so a vine with
-  // a big `drop` takes a long diagonal instead of snapping across and then
-  // running parallel to its neighbour in the same gutter.
-  function _vineX(a, d, startX, laneX) {
-    const t     = Math.min(1, d / (a.drop + BR.bend));
-    const ease  = 1 - t * t * (3 - 2 * t);
-    const waver = Math.sin(d * 0.05 + a.phase) * BR.waver * Math.min(1, d / 50);
-    return laneX + (startX - laneX) * ease + waver;
+  // ── The Glitchling's answer ─────────────────────────────────────────────────
+  // A port of BossTitleCard's reveal from Unity: the number does not appear, it
+  // RESOLVES, one character at a time out of junk and in randomised order, then
+  // comes apart the same way.
+  //
+  // Why this card gets its own language. Taking the Glitchling is the moment a
+  // player chooses corruption, and until now the phone answered it with the same
+  // pop as a wildflower. Giving it the boss's own typography is the cheapest way
+  // to say that the two are the same thing at different scales — and the player
+  // meets the effect here, on a common card, long before the boss uses it.
+  //
+  // Zero-padded to ×0N so there are three glyphs to scramble. A bare ×3 resolves
+  // in two characters, which is over before it registers as an effect at all.
+  const _JUNK = '!@#$%&*<>/\\|=+-_?§±░▒▓■□◊0123456789';
+
+  function _popGlitch(n) {
+    if (!_built) _build();
+    requestAnimationFrame(() => _popGlitchNow(n));   // see _pop
   }
 
-  // Blocky SVG glyphs rather than font characters — see the note on ATTRS.glyph.
-  function _glyphSvg(kind, color) {
-    const c = color;
-    const s = `stroke="${c}" fill="none" stroke-width="2.4" stroke-linejoin="miter"`;
-    if (kind === 'diamond') return `<svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2 L18 10 L10 18 L2 10 Z" ${s}/></svg>`;
-    if (kind === 'ring')    return `<svg viewBox="0 0 20 20" width="18" height="18"><rect x="3.5" y="3.5" width="13" height="13" ${s}/></svg>`;
-    return `<svg viewBox="0 0 20 20" width="18" height="18"><path d="M10 2 V18 M2 10 H18" ${s}/></svg>`;
-  }
+  function _popGlitchNow(n) {
+    const host = document.getElementById('screen-pack') || document.body;
+    const at   = _ringPoint();
 
-  // Signature of the last drawn state. Null forces the next call to rebuild.
-  let _brSig = null;
+    const text = '×' + String(n).padStart(2, '0');
+    const el   = document.createElement('div');
+    el.className = 'pl-pop pl-pop--glitch';
+    el.style.left = at.x + 'px';
+    el.style.top  = at.y + 'px';
+    el.style.setProperty('--pl-tint', GLITCH_COLOR);
+    el.textContent = text;
+    host.appendChild(el);
 
-  function _renderBranches() {
-    if (!_built) return;
-    const wrap = document.getElementById('pl-branches');
-    const svg  = document.getElementById('pl-branch-strings');
-    const tag  = document.getElementById('playerNametag');
-    if (!wrap || !svg || !tag) return;
+    // Shards in the corruption colour, not the pack's motif. This burst belongs
+    // to the other chain and has to look like it does.
+    if (n % GLITCH.burstEvery === 0) _burst(at.x, at.y, 'shard', GLITCH_COLOR);
 
-    // Nothing to hang branches off until the tag is actually on screen — a
-    // hidden element reports a zero rect, which would anchor everything at 0,0.
-    //
-    // The rect IS the visibility test. Do not reach for offsetParent here: it is
-    // specified to return null for any `position:fixed` element, and the tag is
-    // fixed, so that check is unconditionally true and hides the branches
-    // forever.
-    const r = tag.getBoundingClientRect();
-    if (r.width === 0 || r.height === 0) {
-      wrap.style.display = 'none';
-      _brSig = null;            // force a real rebuild when it comes back
-      return;
+    // Resolve order, shuffled. The '×' is deliberately in the pool rather than
+    // fixed: in Unity the brackets resolve first because they frame the name, but
+    // three characters is too few to have any of them arrive for free.
+    const order = text.split('').map((_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = order[i]; order[i] = order[j]; order[j] = t;
     }
 
-    // Vines stop short of the pack-type row at the bottom of the screen rather
-    // than running under it.
-    const row     = document.querySelector('#screen-pack .pack-type-row');
-    const rowR    = row ? row.getBoundingClientRect() : null;
-    const floorY  = (rowR && rowR.height) ? rowR.top - 12 : window.innerHeight - 96;
-    const maxDrop = Math.max(0, floorY - r.bottom);
+    const RESOLVE = 520, HOLD = 1250, DISSOLVE = 620, TICK = 55;
+    const shown = new Array(text.length).fill(false);
+    const t0 = performance.now();
+    let raf = 0, lastTick = 0;
 
-    wrap.style.display = 'block';
+    function frame(now) {
+      const t = now - t0;
 
-    // ── Change guard ────────────────────────────────────────────────────────
-    // The comment below says to call this only when something changed, but
-    // nothing was enforcing it, and callers cannot know: the ResizeObserver on
-    // the name tag fires whenever anything nudges its box. During a possession
-    // the creature UI does that repeatedly, so the branches were torn down and
-    // rebuilt over and over — and since every node animates in on creation,
-    // that reads as flickering.
-    //
-    // The rect is rounded before comparing. Sub-pixel jitter from a reflow is
-    // not a change worth a rebuild, and comparing raw floats would let it
-    // through every time.
-    const sig = [
-      Math.round(r.left), Math.round(r.right),
-      Math.round(r.top),  Math.round(r.bottom),
-      Math.round(maxDrop),
-      ATTRS.map(a => _attr[a.key].level).join(','),
-    ].join('|');
-    if (sig === _brSig) return;
-    _brSig = sig;
+      // Junk is re-rolled on a fixed interval rather than every frame. At 60fps
+      // per-frame noise strobes; the same lesson the Unity assembly learned.
+      if (now - lastTick >= TICK) {
+        lastTick = now;
 
-    // Rebuilt wholesale each render. Cheap at this scale (≤3 branches × 5 nodes),
-    // and it keeps the DOM a pure function of state rather than something that
-    // has to be diffed — but it does mean the entry animation replays on every
-    // redraw, so only call this when something actually changed.
-    // Cleared child-by-child rather than with innerHTML: innerHTML on an SVG
-    // element is a late addition (Safari 14+) and this runs on phones.
-    while (svg.firstChild) svg.removeChild(svg.firstChild);
-    wrap.querySelectorAll('.pl-node').forEach(n => n.remove());
-
-    ATTRS.forEach(a => {
-      const lv = _attr[a.key].level;
-      if (lv <= 0) return;
-
-      // The vine leaves the bottom corner on its own side, so it drops away from
-      // the name rather than across it.
-      const laneX  = _laneX(a.side);
-      const startX = a.side === 'left' ? r.left + 5 : r.right - 5;
-
-      // A long vine would run past the pack-type row at the bottom of the
-      // screen. First tighten the spacing to whatever depth is left, and only if
-      // the nodes would start overlapping drop some off the end — the +N badge
-      // still carries the true count either way.
-      const avail = maxDrop - a.drop - BR.gap;
-      if (avail < 0) return;
-      const fits  = Math.max(1, Math.floor(avail / BR.minStep) + 1);
-
-      const shown = Math.min(lv, BR.maxNodes, fits);
-      const need  = BR.step * (shown - 1);
-      const step  = (shown > 1 && need > avail) ? avail / (shown - 1) : BR.step;
-
-      const pts = [];
-      for (let i = 0; i < shown; i++) {
-        const dd = a.drop + BR.gap + step * i;
-        pts.push({ x: _vineX(a, dd, startX, laneX), y: r.bottom + dd });
-      }
-
-      // String: sampled along the same curve the nodes sit on, so the vine
-      // actually passes through every icon instead of cutting corners between
-      // them. Fine enough to read as a curve, coarse enough to stay cheap.
-      const endD = a.drop + BR.gap + step * (shown - 1);
-      let d = `M ${startX} ${r.bottom}`;
-      for (let s = BR.sample; s < endD; s += BR.sample) {
-        d += ` L ${_vineX(a, s, startX, laneX).toFixed(1)} ${(r.bottom + s).toFixed(1)}`;
-      }
-      d += ` L ${pts[pts.length - 1].x.toFixed(1)} ${pts[pts.length - 1].y.toFixed(1)}`;
-
-      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('d', d);
-      path.setAttribute('stroke-linecap', 'round');
-      path.setAttribute('stroke-linejoin', 'round');
-      path.setAttribute('stroke', a.color);
-      path.setAttribute('stroke-width', '1.4');
-      path.setAttribute('fill', 'none');
-      path.setAttribute('opacity', '0.75');
-      svg.appendChild(path);
-
-      pts.forEach((p, i) => {
-        const node = document.createElement('div');
-        node.className = 'pl-node';
-        node.style.left  = p.x + 'px';
-        node.style.top   = p.y + 'px';
-        node.style.color = a.color;          // .pl-node-badge inherits this
-        // Stagger so a multi-node vine grows downward rather than popping whole.
-        node.style.animationDelay = (i * 0.06) + 's';
-        node.innerHTML = _glyphSvg(a.glyph, a.color);
-
-        // The count rides the LOWEST node only. One badge per node would just be
-        // the same number repeated down the vine, and the chain already shows
-        // the magnitude — the badge is there to make it exact.
-        if (i === shown - 1) {
-          const badge = document.createElement('div');
-          badge.className = 'pl-node-badge';
-          badge.innerHTML = `<span>+${lv}</span>`;
-          node.appendChild(badge);
+        if (t <= RESOLVE) {
+          const want = Math.floor(order.length * (t / RESOLVE));
+          for (let i = 0; i < order.length; i++) shown[order[i]] = i < want;
+        } else if (t <= RESOLVE + HOLD) {
+          shown.fill(true);
+        } else {
+          const k = Math.min(1, (t - RESOLVE - HOLD) / DISSOLVE);
+          const gone = Math.floor(order.length * k);
+          for (let i = 0; i < order.length; i++) shown[order[i]] = i >= gone;
         }
-        wrap.appendChild(node);
-      });
-    });
-  }
 
-  // Build the stats window's attribute rows + headers.
-  function _renderStats() {
-    const nameEl = document.getElementById('pl-stats-name');
-    if (nameEl) {
-      const nm = (typeof playerName !== 'undefined' && playerName) ? `<${playerName}>` : 'STATS';
-      nameEl.textContent = nm;
-      if (typeof playerColor !== 'undefined' && playerColor) nameEl.style.color = playerColor;
+        el.textContent = text
+          .split('')
+          .map((c, i) => (shown[i] ? c : _JUNK[Math.floor(Math.random() * _JUNK.length)]))
+          .join('');
+
+        // Jitter, held between ticks for the same reason the junk is.
+        el.style.setProperty('--pl-jx', _rand(-3, 3).toFixed(1) + 'px');
+        el.style.setProperty('--pl-jy', _rand(-3, 3).toFixed(1) + 'px');
+      }
+
+      if (t >= RESOLVE + HOLD + DISSOLVE) { el.remove(); return; }
+      raf = requestAnimationFrame(frame);
     }
-    const lvEl = document.getElementById('pl-stats-lv');
-    if (lvEl) lvEl.textContent = 'LV ' + _totalLevel();
+    raf = requestAnimationFrame(frame);
+  }
 
-    const m = window.PlayerMods || {};
-    const buff = {
-      dexterity: `+${Math.round(((m.sporeBudgetMult || 1) - 1) * 100)}% spore`,
-      // Shows the ROOM's bonus, not this player's contribution — the number you
-      // benefit from is the pooled one, and seeing it move when someone else
-      // levels up is the point of pooling it.
-      presence:  _roomPlayers > 0
-                   ? `room ×${_roomMoveMult.toFixed(2)} speed · ${_roomPlayers} playing`
-                   : `room ×${_roomMoveMult.toFixed(2)} speed`,
-      vigor:     `+${Math.round(((m.starGainMult || 1) - 1) * 100)}% stars`,
+  // Where a pop lands. Shared by both, so the two languages occupy the same
+  // space and only differ in how they behave once they are there.
+  //
+  // A loose ring around the card, not anywhere in the viewport. Fully random
+  // placement puts numbers in corners nobody is looking at; centred placement
+  // covers the card art the player is trying to see. A ring stays inside the
+  // eye's existing focus without landing on the thing that focus is for.
+  function _ringPoint() {
+    // The card if we can find it, the viewport centre if we cannot — the stage
+    // has zero size before the first pack is dealt.
+    const stage = document.getElementById('packCarouselStage');
+    const r = stage ? stage.getBoundingClientRect() : null;
+    const cx = r && r.width  ? r.left + r.width  / 2 : window.innerWidth  / 2;
+    const cy = r && r.height ? r.top  + r.height / 2 : window.innerHeight / 2;
+    const rx = r && r.width  ? r.width  / 2 : window.innerWidth  * 0.32;
+    const ry = r && r.height ? r.height / 2 : window.innerHeight * 0.28;
+
+    const ang  = Math.random() * Math.PI * 2;
+    const band = 0.72 + Math.random() * 0.45;
+
+    // Clamped so a number never lands half off the screen, which on a narrow
+    // phone is otherwise the common case rather than the edge case.
+    //
+    // The bottom reserve is much deeper than the top one because the number now
+    // FALLS. Spawning at 46px from the bottom used to be fine when it drifted
+    // upward; with up to 175px of descent it would leave the screen mid-flutter
+    // and the whole effect would be spent off-frame.
+    const pad    = 46;
+    const bottom = 190;
+    return {
+      x: Math.max(pad, Math.min(window.innerWidth - pad, cx + Math.cos(ang) * rx * band)),
+      y: Math.max(pad + 40,
+           Math.min(window.innerHeight - bottom, cy + Math.sin(ang) * ry * band)),
     };
-    const rows = document.getElementById('pl-stats-rows');
-    if (!rows) return;
-    rows.innerHTML = ATTRS.map(a => {
-      const st   = _attr[a.key];
-      const frac = Math.max(0, Math.min(1, st.xp / xpForLevel(st.level)));
-      return `<div class="pl-stat">` +
-        `<div class="pl-stat-top">` +
-          `<span class="pl-stat-name" style="color:${a.color}">${a.short} · LV ${st.level}</span>` +
-          `<span class="pl-stat-buff">${buff[a.key]}</span>` +
-        `</div>` +
-        `<div class="pl-stat-bar"><span class="pl-stat-fill" style="background:${a.color};transform:scaleX(${frac})"></span></div>` +
-      `</div>`;
-    }).join('');
-  }
-
-  function _openStats() {
-    if (!_built) return;
-    _statsOpen = true;
-    _renderStats();
-    const el = document.getElementById('pl-stats');
-    if (el) el.classList.add('pl-open');
-    if (typeof Sound !== 'undefined') Sound.play('uiOpen');
-  }
-
-  function _closeStats() {
-    _statsOpen = false;
-    const el = document.getElementById('pl-stats');
-    if (el) el.classList.remove('pl-open');
   }
 
   // Reveal the LV badge alongside the name tag (called from submitPlayerName),
   // tinted to the player's colour so it reads as part of the tag.
   function reveal(color) {
     if (!_built) _build();
-    const badge = document.getElementById('pl-level');
-    if (badge) {
-      badge.style.display = 'block';
-      if (color) badge.style.color = color;
-    }
-    // The tag is pointer-events:none by default — make it tappable so it can
-    // open the stats window. The branches now show the same information without
-    // a tap, so this is a detail view rather than the only way in.
-    const tag = document.getElementById('playerNametag');
-    if (tag) { tag.style.pointerEvents = 'auto'; tag.style.cursor = 'pointer'; }
-
-    // The tag has just been shown, but layout may not have settled this frame —
-    // its rect would still be zero and every branch would anchor to 0,0.
-    requestAnimationFrame(_renderBranches);
+    // The name tag stays pointer-events:none. There is nothing to open — the
+    // chain speaks only in the numbers it throws.
     _render();
   }
 
   // ── DEBUG (temporary — remove with the debug menu before production) ────────
-  // Grants levels outright, skipping the XP curve, so the vine fan can be driven
-  // to any shape by hand. Goes through the same _recompute path as a real level,
-  // which also pushes the new Presence level to Unity's pooled room bonus.
+  // Adds chain steps outright so the counter, its punch and its tier colours can
+  // be driven by hand. Goes through the same _award path as a real step, so it
+  // also pushes the resulting Presence level to Unity's pooled room bonus.
+  // Kept under the old name so the debug button keeps working; the attribute
+  // argument is ignored, because there is only one chain now.
   function debugLevel(attr, n) {
     if (!_built) _build();
-    const a = _attr[attr];
-    if (!a) return;
-    a.level += (n || 1);
-    _recompute();
+    _attr.combo.level += (n || 1);
+    if (_attr.combo.level > _best) _best = _attr.combo.level;
+    _award();
+    _arm();
     if (typeof Sound !== 'undefined') Sound.play('star');
-    _pulse();
     _render();
-    console.log('[DEBUG] ' + attr + ' → LV ' + a.level, window.PlayerMods);
-  }
-
-  function _pulse() {
-    const badge = document.getElementById('pl-level');
-    if (!badge) return;
-    badge.classList.remove('pl-pulse');
-    void badge.offsetWidth;
-    badge.classList.add('pl-pulse');
+    _pop(_attr.combo.level, false);
+    console.log('[DEBUG] chain → ×' + _attr.combo.level, window.PlayerMods);
   }
 
   _recompute();
@@ -718,5 +951,22 @@ const Player = (() => {
     }
   }
 
-  return { gainXP, observe, reveal, debugLevel, handleMessage };
+  // Drives the Glitchling chain by hand, so its pop, its colour and its burst
+  // can be checked without taking a corrupted card over and over.
+  //   Player.debugGlitch()      one step
+  //   Player.debugGlitch(3)     three, to reach a burst
+  function debugGlitch(n) {
+    if (!_built) _build();
+    for (let i = 0; i < (n || 1); i++) hitGlitch();
+    console.log('[DEBUG] glitchlings → ×' + _gLevel);
+  }
+
+  return { gainXP, hit, hitGlitch, observe, reveal, debugLevel, debugGlitch,
+           handleMessage,
+           set debugChain(v) { _debugChain = !!v; },
+           get debugChain()  { return _debugChain; },
+           get streak()      { return _attr.combo.level; },
+           get best()        { return _best; },
+           get glitchStreak(){ return _gLevel; },
+           get glitchBest()  { return _gBest; } };
 })();

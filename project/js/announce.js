@@ -221,9 +221,6 @@ const Announce = (() => {
 
     _enqueue({
       type: 'boss', icon: '☍', title: 'WH4Ti5L0VE',
-      // Reworded. See the note on #screen-lovemail in style.css — the mail
-      // framing is what a malware classifier matches on, and it is not worth
-      // the domain's reputation.
       body: 'The signal was answered.<br>Something came through with it.',
       duration: 6000, vibrate: [70, 50, 70],
       onDismiss: () => { if (_mailActive) _mailShow(); },
