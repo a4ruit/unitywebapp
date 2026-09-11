@@ -3968,6 +3968,42 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   color: rgba(200, 180, 230, 0.45);
 }
 
+/* ── Leaf Storm's trace panel ─────────────────────────────────────────────────
+   The SAME panel serves both traceable abilities, and until now both wore the
+   purple that belongs to the Spiky Sheep charge. Two different cards asking for
+   the same gesture in the same colour is the one place this UI could genuinely
+   confuse someone mid-pull, because the gesture is identical and the colour was
+   the only thing left to tell them apart.
+
+   Amber rather than the app's --orange (#cc1515), which is really a red and
+   already means corruption everywhere else in this interface. Leaf Storm is a
+   pristine legendary; it should not borrow the horror palette to distinguish
+   itself from a sheep. */
+.combo-path--leafstorm .combo-path-card {
+  background: linear-gradient(160deg, rgba(64, 34, 10, 0.98), rgba(26, 14, 6, 0.98));
+  border-color: rgba(255, 154, 60, 0.7);
+  box-shadow: 0 0 26px -4px rgba(255, 140, 40, 0.7);
+}
+.combo-path--leafstorm .combo-path-title  { color: #ffe6c8; }
+.combo-path--leafstorm .combo-path-hint   { color: rgba(255, 226, 190, 0.75); }
+.combo-path--leafstorm .combo-path-btn {
+  color: rgba(255, 232, 208, 0.85);
+  border-color: rgba(255, 154, 60, 0.4);
+}
+.combo-path--leafstorm .combo-path-btn--go {
+  color: #2a1204;
+  background: linear-gradient(180deg, #ffc27a, #f08a2c);
+  border-color: rgba(255, 200, 150, 0.95);
+  box-shadow: 0 0 14px -3px rgba(255, 150, 50, 0.9);
+}
+.combo-path--leafstorm .combo-path-btn--go:disabled {
+  color: rgba(255, 232, 208, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 154, 60, 0.25);
+  box-shadow: none;
+}
+.combo-path--leafstorm .combo-path-cancel { color: rgba(240, 210, 175, 0.45); }
+
 /* ── <WH4Ti5L0VE> HUD tint ────────────────────────────────────────────────────
    Same bar, same layout, different hue — matching how the two bosses are told
    apart in Unity. Applied to the HUD root so the fill and the readout shift

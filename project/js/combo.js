@@ -389,11 +389,42 @@ const Combo = (() => {
     if (typeof Sound !== 'undefined') Sound.play('deny');
   }
 
+  // One panel, two abilities, and the gesture is identical for both — so the
+  // colour is the only thing telling a player which one they are about to
+  // unleash. The stroke on the canvas and the panel chrome are driven from the
+  // same entry so they can never disagree.
+  const TRACE_SKINS = {
+    leafstorm: {
+      cls:    'combo-path--leafstorm',
+      stroke: 'rgba(255, 165, 70, 0.95)',
+      glow:   'rgba(255, 140, 40, 0.9)',
+      start:  '#ffdcae',
+    },
+  };
+  const TRACE_DEFAULT = {            // the Spiky Sheep charge, unchanged
+    cls:    null,
+    stroke: 'rgba(200, 150, 255, 0.95)',
+    glow:   'rgba(200, 150, 255, 0.9)',
+    start:  '#e8ccff',
+  };
+
+  function _traceSkin() {
+    const id = _pending && _pending.card && _pending.card.comboId;
+    return TRACE_SKINS[id] || TRACE_DEFAULT;
+  }
+
   function _openPathDraw(card) {
     const panel = _el('comboPath');
     if (!panel) return;
     _path    = [];
     _drawing = false;
+
+    // Every skin class is cleared before one is applied, so a sheep charge
+    // opened straight after a Leaf Storm does not inherit its amber.
+    Object.keys(TRACE_SKINS).forEach(k => panel.classList.remove(TRACE_SKINS[k].cls));
+    const skin = TRACE_SKINS[card && card.comboId];
+    if (skin) panel.classList.add(skin.cls);
+
     panel.classList.add('combo-path--open');
     _updatePathUI();
     _drawPathMap();
@@ -497,12 +528,14 @@ const Combo = (() => {
 
     if (!_path.length) return;
 
+    const skin = _traceSkin();
+
     ctx.save();
-    ctx.strokeStyle = 'rgba(200,150,255,0.95)';
+    ctx.strokeStyle = skin.stroke;
     ctx.lineWidth   = 3;
     ctx.lineJoin    = 'round';
     ctx.lineCap     = 'round';
-    ctx.shadowColor = 'rgba(200,150,255,0.9)';
+    ctx.shadowColor = skin.glow;
     ctx.shadowBlur  = 6;
     ctx.beginPath();
     _path.forEach((p, i) => {
@@ -513,7 +546,7 @@ const Combo = (() => {
 
     // Start marker, so the direction of travel is unambiguous
     const s = _normToMapXY(_path[0].x, _path[0].y, W, H);
-    ctx.fillStyle = '#e8ccff';
+    ctx.fillStyle = skin.start;
     ctx.beginPath(); ctx.arc(s.px, s.py, 4, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }

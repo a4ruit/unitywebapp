@@ -24,7 +24,14 @@
 // while a laptop on 5G could. Recategorised as Entertainment-and-Arts and now
 // reachable. If a venue blocks it again, flip this AND WS_Client.wsUrl in Unity
 // to the Render URL together, and verify both readouts agree.
-const WS_PRIMARY = 'wss://packmentality.cc';
+//
+// Moved to packmentalitygame.com after Telstra Broadband Protect was found
+// DNS-redirecting packmentality.cc to its warning server on a venue's consumer
+// line, long after Palo Alto had cleared it. A .cc carries a poor TLD reputation
+// before anyone reads the content; a .com does not. Both hostnames are served by
+// the SAME droplet and the same relay process, so a phone on one and Unity on
+// the other still meet in one room — the old name only survives as ?server=cc.
+const WS_PRIMARY = 'wss://packmentalitygame.com';
 // Kept ONLY for the ?server=render manual override. Nothing selects it
 // automatically — automatic failover is what caused the silent split.
 const WS_BACKUP  = 'wss://unitywebapp.onrender.com';
@@ -36,7 +43,8 @@ const _wsOverride = (() => {
     // the active relay changes, and a ?server=render that quietly meant .cc is
     // exactly the kind of confusion this whole bug was made of.
     if (v === 'render') return 'wss://unitywebapp.onrender.com';
-    if (v === 'do' || v === 'cc' || v === 'packmentality') return 'wss://packmentality.cc';
+    if (v === 'com' || v === 'do') return 'wss://packmentalitygame.com';
+    if (v === 'cc' || v === 'packmentality') return 'wss://packmentality.cc';
   } catch (e) {}
   return null;
 })();
@@ -855,6 +863,7 @@ function setStatus(connected) {
   // said "live". The host is the one fact that would have caught it instantly.
   const host = (() => {
     try { return new URL(WS_URL).host.replace('unitywebapp.onrender.com', 'render')
+                                     .replace('packmentalitygame.com', 'com')
                                      .replace('packmentality.cc', 'cc'); }
     catch (e) { return '?'; }
   })();
