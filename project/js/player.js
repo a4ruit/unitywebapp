@@ -699,6 +699,8 @@ const Player = (() => {
   // The break style is no longer reachable from hit(); it is kept because the
   // keyframes are still the right answer if a hard failure is ever needed again.
   function _pop(n, mode) {
+    if (mode !== 'held' && mode !== 'break') _sendCombo(n, _streakColor(), 'pack');
+    if (!LOCAL_POPS) return;
     if (!_built) _build();
     // Deferred a frame. dropCard calls this BEFORE resetToPackScreen(), so at
     // this instant the pack screen can still be hidden — and a hidden element
@@ -747,6 +749,27 @@ const Player = (() => {
   }
 
   function _rand(a, b) { return a + Math.random() * (b - a); }
+
+  // ── Where the chain is SHOWN ────────────────────────────────────────────────
+  // On the projection, not here. The number, the burst and the buzz all fired at
+  // the moment of placement and pulled every head DOWN at exactly the second the
+  // object appeared on the wall. A piece about a room watching one world cannot
+  // put its best feedback on two dozen private screens.
+  //
+  // The phone still COUNTS the chain, because the rules are per-player. It just
+  // does not draw it. Unity throws the number over the object that earned it,
+  // with the player's name under it — see ComboPop.cs.
+  //
+  // Set true to bring the on-phone pops back for debugging.
+  const LOCAL_POPS = false;
+
+  function _sendCombo(n, colorHex, kind) {
+    if (typeof CLIENT_ID === 'undefined' || typeof send !== 'function') return;
+    // Colour travels with the message so the wall and the handset cannot drift
+    // apart. Unity holding its own copy of this palette would be a second source
+    // of truth for something that already changes per pack.
+    send(`combo|${CLIENT_ID}|${n}|${String(colorHex).replace('#', '')}|${kind}`);
+  }
 
 
   // ── Milestone burst ─────────────────────────────────────────────────────────
@@ -809,6 +832,8 @@ const Player = (() => {
   const _JUNK = '!@#$%&*<>/\\|=+-_?§±░▒▓■□◊0123456789';
 
   function _popGlitch(n) {
+    _sendCombo(n, GLITCH_COLOR, 'glitch');
+    if (!LOCAL_POPS) return;
     if (!_built) _build();
     requestAnimationFrame(() => _popGlitchNow(n));   // see _pop
   }

@@ -144,7 +144,6 @@ const CardTextures = (() => {
   _loadSkin('symbol-duck',       'assets/duck-card.png');
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
-  _loadSkin('symbol-thornwire',  'assets/thornwire-symbol.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -562,43 +561,54 @@ const CardTextures = (() => {
   }
 
   // ─── Thornwire sprite ───────────────────────────────────────────────────────
-  // A single barbed horn: thick at the root, tapering to a point, curving as it
-  // rises, with three barbs growing off the outer edge.
+  // A barbed ring: a circle of wire with eight spikes growing off it.
   //
-  // Authored row by row rather than fitted to a curve. Four attempts at solving
-  // it from beziers produced either a banana or a blob, and at 19px the
-  // silhouette is small enough that stating it outright is both quicker and more
-  // accurate than describing it mathematically.
+  // Replaces both the single horn that was here and the PNG that was drawn over
+  // it, so this card is authored the same way Lightning Iris and Leaf Storm are
+  // — one grid of hand-set pixels, no image to load and no second source of
+  // truth to keep in sync.
   //
-  // Every barb starts ON the body's own edge. One column of daylight and it
-  // reads as a speck floating beside the thorn instead of growing out of it.
+  // The hole in the middle is the whole symbol. The first pass had a thicker
+  // band and fatter spikes, which closed the centre up and turned the shape into
+  // a flower. A ring only reads as a ring if you can see through it, so the band
+  // is under two pixels and the spikes are one.
+  //
+  // The four diagonal spikes are stepped as integers rather than sampled off an
+  // angle. Sampled, they rounded onto cells that touched nothing and read as
+  // specks floating beside the ring — the same trap the old horn's barbs had.
   const THORN_ART = [
-    '..........D.',
-    '.........DMD',
-    '.........DMD',
-    '........DMMD',
-    '......DDMHMD',
-    '.....DDMLHMD',
-    '.......DMMD.',
-    '......DMHMD.',
-    '......DMHMD.',
-    '...DDDLLHMD.',
-    '...DMMLHMD..',
-    '....DMLHMD..',
-    '....DMLHMD..',
-    '...DMLHMD...',
-    '.DDMLLHMD...',
-    'DDMLLLHMD...',
-    '..DMLHMD....',
-    '.DMMMMMD....',
-    '.DDDDDD.....',
+    '..........D..........',
+    '.........DHD.........',
+    '...D.....DHD.....D...',
+    '..DHD...DDHDD...DLD..',
+    '...DHDDDHHHHHDDDLD...',
+    '....DHHHHHHHHLLLD....',
+    '....DHHHDDDDDLLLD....',
+    '....DHHD.....DLLD....',
+    '...DHHD.......DMMD...',
+    '.DDDHHD.......DMMDDD.',
+    'DHHHHHD.......DMMMMMD',
+    '.DDDHHD.......DMMDDD.',
+    '...DHHD.......DMMD...',
+    '....DLLD.....DMMD....',
+    '....DLLLDDDDDMMMD....',
+    '....DLLLMMMMMMMMD....',
+    '...DLDDDMMMMMDDDMD...',
+    '..DLD...DDMDD...DMD..',
+    '...D.....DMD.....D...',
+    '.........DMD.........',
+    '..........D..........',
   ];
 
+  // Green, not the old brass. Thornwire is the nature pack's common, and every
+  // other symbol on that side of the deck is green — a gold ring sat with the
+  // horror cards at a glance, which is the one thing a player must never misread
+  // when choosing between nature and corruption.
   const THORN_PAL = {
-    D: '#2e2216',   // outline
-    M: '#6b5326',   // shaded side
-    L: '#a8842f',   // body
-    H: '#d8b558',   // lit inner curve
+    D: '#123a12',   // outline
+    M: '#2a7a2a',   // shaded side
+    L: '#4aa83a',   // body
+    H: '#8fdc63',   // lit edge
   };
 
   // ─── Leaf Storm sprite ──────────────────────────────────────────────────────
@@ -659,22 +669,9 @@ const CardTextures = (() => {
     }
 
     if (rarity === 'common') {
-      // The PNG is the real symbol; THORN_ART below was the placeholder it
-      // replaces. Kept as the fallback rather than deleted, so a card mid-flight
-      // when the image has not decoded yet still renders something.
-      const th = _cardSkins['symbol-thornwire'];
-      if (th && th.complete && th.naturalWidth > 0) {
-        ctx.imageSmoothingEnabled = false;
-        const targetH = LAYOUT.symbolHeight;
-        const targetW = targetH * (th.naturalWidth / th.naturalHeight);
-        // Whole pixels. A half-pixel destination on a nearest-neighbour draw is
-        // what turns crisp pixel art into a smeared column.
-        ctx.drawImage(th,
-                      Math.round(128 - targetW / 2),
-                      Math.round(LAYOUT.symbolCenterY - targetH / 2),
-                      Math.round(targetW), Math.round(targetH));
-        return;
-      }
+      // The sprite IS the symbol now. The PNG that used to take priority here is
+      // gone, so there is no image-decode race and no second version of the art
+      // to keep in step with this one.
       drawSprite(ctx, getSprite('thorn', THORN_ART, THORN_PAL));
       return;
     }
@@ -1973,7 +1970,148 @@ const CardTextures = (() => {
 
   // ─── FUNGI shape drawers ───────────────────────────────────────────────────────
 
+  // ─── Fungi sprites ──────────────────────────────────────────────────────────
+  // The four adpack-pristine symbols, in the same hand-set pixel language as
+  // Thornwire, Lightning Iris and Leaf Storm. They were the last pack still
+  // drawing its symbols as vectors, and a smooth cap sat visibly apart from a
+  // pixel ring on the card beside it.
+  //
+  // All four share one silhouette rule: cap, gill line, stem. Mushrooms differ
+  // from each other in width and cap curve, not in construction, and stating
+  // that outright is what makes a set of four read as one family rather than
+  // four unrelated drawings.
+  //
+  // W is a spot or speckle in every palette, so the same character means the
+  // same thing whichever fungus you are reading.
+
+  // White Mushroom — the plain one. Broad dome, thick straight stem, and a ring
+  // on the stem picked out in shadow rather than outline, because a full outline
+  // there cut the stem in half at this size.
+  const FUNGI_WHITE_ART = [
+    '.......DDDDDDD.......',
+    '.....DDHHHHHHHDD.....',
+    '...DDHHHHHHHHHHHDD...',
+    '..DHHHHHHHHHHHHHHHD..',
+    '.DHHHHHHHHHHHHHHHHHD.',
+    'DHHHHHHHHHHHHHHHHHHHD',
+    'DLLLLLLLLLLLLLLLLLLLD',
+    'DMMMMMMMMMMMMMMMMMMMD',
+    '.DDMMMMMMMMMMMMMMMDD.',
+    '...DDDDMMMMMMMDDDD...',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '......DDMLLLMDD......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DDDDDDD.......',
+  ];
+  const FUNGI_WHITE_PAL = {
+    D: '#3a4a3a', M: '#8f9a88', L: '#c6c6bc', H: '#e8e8dc', W: '#ffffff',
+  };
+
+  // Fairy Cap — wider and flatter than the white, with scattered spots. The
+  // spots are deliberately off-grid rather than evenly spaced: a regular pattern
+  // read as a pattern instead of as a fly agaric.
+  const FUNGI_FAIRY_ART = [
+    '........DDDDD........',
+    '......DDHHWHHDD......',
+    '....DDHHHHHHHHHDD....',
+    '..DDHHWHHHHHHHWHHDD..',
+    '.DHHHHHHHHWHHHHHHHHD.',
+    'DHHWHHHHHHHHHHHHWHHHD',
+    'DLLLLLLLLLLLLLLLLLLLD',
+    '.DMMMMMMMMMMMMMMMMMD.',
+    '..DDMMMMMMMMMMMMMDD..',
+    '.....DDDDMMMDDDD.....',
+    '.......DLLLLLD.......',
+    '......DDLLLLLDD......',
+    '......DMLLLLLMD......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DDDDDDD.......',
+  ];
+  const FUNGI_FAIRY_PAL = {
+    D: '#1d3a4a', M: '#2f6f8f', L: '#4a8aaa', H: '#7cc3dd', W: '#eaf6ff',
+  };
+
+  // Puffball — no stem at all. The whole card is the sphere, which is the one
+  // fungus here that does not follow the cap-and-stem rule, and that break is
+  // what makes it instantly tellable from the other three in a row of cards.
+  const FUNGI_PUFF_ART = [
+    '.......DDDDD.......',
+    '.....DDHHHHHDD.....',
+    '...DDHHHHWHHHHDD...',
+    '..DHHHWHHHHHHHHHD..',
+    '.DHHHHHHHHHHWHHHHD.',
+    '.DHHHHHHHHHHHHHHHD.',
+    'DHHHHWHHHHHHHHHHHHD',
+    'DLLLLLLLLLWLLLLLLLD',
+    'DLLLLLLLLLLLLLLLLLD',
+    'DMMMMMWMMMMMMMMMMMD',
+    '.DMMMMMMMMMMMMMMMD.',
+    '.DDMMMMMMMMMMMMMDD.',
+    '..DDMMMMMMMMMMMDD..',
+    '....DDDMMMMMDDD....',
+    '.......DDDDD.......',
+  ];
+  const FUNGI_PUFF_PAL = {
+    D: '#2c3a2a', M: '#6f8a63', L: '#9fb58c', H: '#cddcbb', W: '#eef6e2',
+  };
+
+  // Blue Angel — a tall cone rather than a dome. The legendary has to be
+  // readable as the odd one out from across a room, and silhouette does that at
+  // any size where colour and detail have already stopped working.
+  const FUNGI_ANGEL_ART = [
+    '..........D..........',
+    '.........DHD.........',
+    '........DHHHD........',
+    '.......DHHHHHD.......',
+    '......DHHHHHHHD......',
+    '.....DHHHHHHHHHD.....',
+    '....DHHHHHHHHHHHD....',
+    '...DHHHHHHHHHHHHHD...',
+    '..DHHHHHHHHHHHHHHHD..',
+    '.DLLLLLLLLLLLLLLLLLD.',
+    '..DMMMMMMMMMMMMMMMD..',
+    '....DDDDMMMMMDDDD....',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '......DDLLLLLDD......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DLLLLLD.......',
+    '.......DDDDDDD.......',
+  ];
+  const FUNGI_ANGEL_PAL = {
+    D: '#16284a', M: '#3a6bb5', L: '#5f97e0', H: '#a8d4ff', W: '#ffffff',
+  };
+
   function drawShapeFungi(ctx, rarity, t) {
+    // Pixel symbols first, and each returns — drawn BEFORE the shared translate
+    // below so they land on LAYOUT.symbolCenterY with the rest of the pack,
+    // exactly as the nature pack does it.
+    if (rarity === 'common') {
+      drawSprite(ctx, getSprite('fungiWhite', FUNGI_WHITE_ART, FUNGI_WHITE_PAL));
+      return;
+    }
+    if (rarity === 'uncommon') {
+      drawSprite(ctx, getSprite('fungiFairy', FUNGI_FAIRY_ART, FUNGI_FAIRY_PAL));
+      return;
+    }
+    if (rarity === 'rare') {
+      drawSprite(ctx, getSprite('fungiPuff', FUNGI_PUFF_ART, FUNGI_PUFF_PAL));
+      return;
+    }
+    if (rarity === 'legendary') {
+      drawSprite(ctx, getSprite('fungiAngel', FUNGI_ANGEL_ART, FUNGI_ANGEL_PAL));
+      return;
+    }
+
+    // Vector fallback, still reached by any rarity above legendary (mythical,
+    // god-pack tiers) which has no sprite of its own yet.
     ctx.save();
     ctx.translate(128, 148);
     ctx.lineCap = 'round';
