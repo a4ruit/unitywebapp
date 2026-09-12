@@ -4095,82 +4095,6 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 
 .shop-item--big { border-color: rgba(255, 170, 90, 0.35); }
 
-/* ── Soul recovery console ────────────────────────────────────────────────────
-   Terminal register, matching the name screen and the Unity overlay. No
-   `display` at the id level — .screen already flex-centres, and an id-level
-   display beats `.screen.hidden { display:none }`, which is what made the mail
-   window show up on the name screen. */
-#screen-soul {
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: #05060a;
-}
-
-/* No panel, no border, no chrome. The screen IS the window — a framed box
-   inside a black screen is two containers doing one container's job, and at
-   this moment the phone has exactly one thing to say. */
-.soul-ask {
-  width: 100%;
-  max-width: 300px;
-  text-align: center;
-  font-family: 'lo-res', monospace;
-  color: rgba(150, 255, 210, 0.92);
-}
-
-.soul-ask-q {
-  font-size: 13px;
-  line-height: 1.9;
-  letter-spacing: 0.12em;
-}
-
-.soul-ask-btns {
-  display: flex;
-  gap: 12px;
-  margin-top: 34px;
-}
-
-/* Explicit, because there is NO generic `.hidden` rule in this stylesheet —
-   only `.page.hidden` and `.screen.hidden`. The old console relied on a bare
-   `.hidden` for its "RESPONSE LOGGED" line, which meant that line was on
-   screen the whole time, before anyone had answered anything. */
-.soul-ask-btns.hidden { display: none; }
-.soul-ask-sent.hidden { display: none; }
-
-/* Both answers weighted the SAME. A styled-up yes and a muted no is the
-   interface answering for the player, and whether the room continues is the
-   one decision the piece should not put its thumb on. */
-.soul-ask-btn {
-  flex: 1;
-  padding: 18px 0;
-  background: transparent;
-  border: 1px solid rgba(120, 255, 190, 0.45);
-  color: rgba(150, 255, 210, 0.92);
-  font-family: 'lo-res', monospace;
-  font-size: 14px;
-  letter-spacing: 0.16em;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-}
-.soul-ask-btn:active { background: rgba(120, 255, 190, 0.15); }
-
-.soul-ask-btn--no {
-  border-color: rgba(255, 120, 110, 0.45);
-  color: rgba(255, 160, 150, 0.92);
-}
-.soul-ask-btn--no:active { background: rgba(255, 120, 110, 0.15); }
-
-/* Replaces the buttons once answered, so the screen does not sit there
-   offering a choice that has already been made. */
-.soul-ask-sent {
-  margin-top: 26px;
-  font-size: 9px;
-  letter-spacing: 0.18em;
-  color: rgba(120, 255, 190, 0.55);
-}
-
 /* ── Main task (Soul Tree objective) ──────────────────────────────────────────
    Top of the TASKS panel. Styled to sit WITH the existing rows, not in a box of
    its own — no border, no panel, same rhythm as the sections below it.
@@ -4233,6 +4157,21 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   height: 100%;
   background: #a8d8ff;
   transition: width 0.3s linear;
+}
+
+/* The main objective's bar, once it stopped being a footnote under a sentence
+   and became the objective itself. Tall enough to read at a glance, with the
+   same inner glow the growth bar on the projection uses so the phone and the
+   wall are recognisably showing one thing. */
+.task-mission-bar--lg {
+  height: 10px;
+  margin-top: 8px;
+  border: 1px solid rgba(168, 216, 255, 0.35);
+  background: rgba(0, 0, 0, 0.35);
+}
+.task-mission-bar--lg > span {
+  background: linear-gradient(180deg, #d8f0ff 0%, #a8d8ff 45%, #6fb6e8 100%);
+  box-shadow: 0 0 6px rgba(168, 216, 255, 0.55);
 }
 .task-mission--ready .task-mission-line { color: #cfeaff; }
 

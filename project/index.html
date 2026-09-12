@@ -522,25 +522,6 @@
       </div>
 
       <!-- PRISTINE OUT-OF-PACKS SCREEN — calm cooldown, no ads ──────────── -->
-      <!-- SOUL RECOVERY — shown to everyone the moment the Soul Tree dies.
-           Force-shown over whatever the player was doing, because the prompt is
-           the only way the session continues. -->
-      <div class="screen hidden" id="screen-soul">
-        <!-- Stripped to the question and two answers.
-             The terminal chrome, the progress bar and the live tally were all
-             describing a VOTE. Nobody reads a tally while deciding — it just
-             tells them what everyone else picked, which is the one thing a
-             collective decision should not lead with. The count still arrives
-             and is still used; it just does not sit under the question. -->
-        <div class="soul-ask">
-          <div class="soul-ask-q">DATA RECOVERABLE.<br>CONTINUE?</div>
-          <div class="soul-ask-btns">
-            <button class="soul-ask-btn" id="soulYesBtn" onclick="submitSoulVote(true)">YES</button>
-            <button class="soul-ask-btn soul-ask-btn--no" onclick="submitSoulVote(false)">NO</button>
-          </div>
-          <div class="soul-ask-sent hidden" id="soulSent">WAITING FOR THE ROOM</div>
-        </div>
-      </div>
 
 
       <div class="screen hidden" id="screen-empty">

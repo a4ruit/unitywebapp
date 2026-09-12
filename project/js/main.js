@@ -284,126 +284,6 @@ function handleCleanseMessage(data) {
 }
 
 
-// ─── Soul recovery ────────────────────────────────────────────────────────────
-// Unity sends "soul_recovery|needed|yes|no" while the vote is open and
-// "soul_recovery_end" when it closes either way.
-//
-// This screen is force-shown over WHATEVER the player is doing. An earlier
-// version queued it until the current action finished, which is why a playtest
-// stranded everyone who was mid-placement or steering a creature when the tree
-// died: the action they were waiting to finish could never finish, because the
-// world it belonged to was gone.
-
-let _soulOpen   = false;
-let _soulVoted  = false;
-let _soulReturn = null;
-
-function handleSoulMessage(data) {
-  if (typeof data !== 'string') return false;
-  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
-
-  if (msg === 'soul_recovery_end') {
-    if (!_soulOpen) return true;
-    _soulOpen = false;
-    _soulVoted = false;
-    showScreen(_soulReturn || 'screen-pack');
-    _soulReturn = null;
-    return true;
-  }
-
-  if (!msg.startsWith('soul_recovery|')) return false;
-
-  const [, needed, yes, no] = msg.split('|');
-
-  if (!_soulOpen) {
-    _soulOpen  = true;
-    _soulVoted = false;
-    const cur = document.querySelector('.screen:not(.hidden)');
-
-    // ALLOWLIST, not a blocklist.
-    //
-    // This used to return the player to whatever screen happened to be up. If
-    // the prompt arrived mid card-pull that was a transient reveal screen —
-    // screen-choose, screen-legendary, the ad or the horror spin — whose own
-    // completion handlers had already fired or never would. Returning to one
-    // left the player on a dead screen with no way forward, and no obvious
-    // cause, because the pull that owned it had finished minutes ago.
-    //
-    // The pack screen is the only place that is always safe to land: it owns no
-    // in-flight animation and every other flow starts from it.
-    const SAFE_RETURN = ['screen-pack', 'screen-shop', 'screen-empty'];
-    _soulReturn = (cur && SAFE_RETURN.indexOf(cur.id) !== -1) ? cur.id : 'screen-pack';
-    _soulForceOut();
-    showScreen('screen-soul');
-    const sent = document.getElementById('soulSent');
-    if (sent) sent.classList.add('hidden');
-    // Restored here, not in submitSoulVote — the tree can wither more than once
-    // in a session and the second prompt has to be answerable.
-    const btns = document.querySelector('#screen-soul .soul-ask-btns');
-    if (btns) btns.classList.remove('hidden');
-  }
-
-  // The tally is no longer displayed. It is still parsed, because Unity keeps
-  // sending it and the next person to reach for it should find it here rather
-  // than re-deriving it — but showing a running count under the question tells
-  // an undecided player what everyone else picked, which is the one thing a
-  // collective decision should not lead with.
-  return true;
-}
-
-// Tears down anything that owns the screen or an input loop. Unity has already
-// ended the underlying sessions; this is the phone catching up so the prompt
-// isn't drawn underneath a joystick.
-function _soulForceOut() {
-  // DOM level only, on purpose. Unity's CancelAllSessions already broadcast
-  // placement_done, which possession.js handles through its own teardown — this
-  // is only here in case that message is lost or arrives late, so it must not
-  // depend on any function inside another module.
-  ['poss-place-overlay', 'comboPath', 'comboPrompt'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.classList.remove('active', 'open');
-  });
-
-  // Release the pack-open guard.
-  //
-  // A pull interrupted by the prompt never reaches its own completion path, so
-  // _packOpening stays true — and with it set, triggerPackOpen ignores every
-  // future tap. The player comes back from the vote to a pack screen that will
-  // not open anything, which is indistinguishable from being frozen.
-  //
-  // Called by name rather than through _endPackOpen's normal callers, because
-  // the whole point here is that those callers are the ones that did not run.
-  if (typeof _endPackOpen === 'function') _endPackOpen();
-}
-
-function submitSoulVote(yes) {
-  if (!_soulOpen || _soulVoted) return;
-  _soulVoted = true;
-  if (typeof CLIENT_ID !== 'undefined') send(`soul_vote|${CLIENT_ID}|${yes ? 'yes' : 'no'}`);
-
-  // Answered — swap the buttons for the acknowledgement rather than leaving a
-  // live-looking choice on screen that no longer does anything.
-  const btns = document.querySelector('#screen-soul .soul-ask-btns');
-  if (btns) btns.classList.add('hidden');
-  const sent = document.getElementById('soulSent');
-  if (sent) sent.classList.remove('hidden');
-}
-
-// Failsafe. If the console is ever shown with no way out — a dropped connection,
-// a Unity crash, a bug we have not found — this releases the phone locally
-// without waiting for Unity. It does not resolve the vote, it just stops one
-// person being trapped.
-function debugForceCloseSoul() {
-  // Also clears the pack guard and any half-open pull. Releasing the screen
-  // without this hands the player back a pack that refuses to open, which looks
-  // like the same bug and sends them straight back here.
-  _soulForceOut();
-  _soulOpen = false;
-  _soulVoted = false;
-  showScreen(_soulReturn || 'screen-pack');
-  _soulReturn = null;
-  console.warn('[soul] force-closed locally');
-}
 
 function updatePersonalPhase() {
   const level      = corruptionLevel;
@@ -1057,11 +937,11 @@ function connect() {
       if (typeof Player !== 'undefined') Player.observe(e.data);
       // Order matters: corruption messages are checked first because they're
       // high-frequency (every 0.5s) and we want to short-circuit early.
-      if (handleSoulMessage(e.data)) return;
       if (handleCleanseMessage(e.data)) return;
       if (typeof handleCorruptionMessage === 'function' && handleCorruptionMessage(e.data)) return;
       if (handleSoulTreeGoal(e.data)) return;
       if (handleQuestMessage(e.data)) return;
+      if (handleGrantTitle(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
@@ -1123,12 +1003,52 @@ function handleSoulTreeGoal(data) {
   }
   if (msg.startsWith('soultree_goal|')) {
     const p = msg.split('|');
+    // Fields 8 and 9 are the room's live placement total and what the next
+    // stage costs. Trailing, so an older Unity build that sends seven fields
+    // still works — they just arrive as 0 and the counter falls back to the
+    // category wording.
     TaskTracker.setTreeGoal(p[1] || '', parseInt(p[2]) || 0, parseInt(p[3]) || 0,
                             parseInt(p[4]) || 0, p[5] === '1', p[6] === '1',
-                            parseInt(p[7]) || 0);
+                            parseInt(p[7]) || 0,
+                            parseInt(p[8]) || 0, parseInt(p[9]) || 0);
     return true;
   }
   return false;
+}
+
+// ─── Granted titles ───────────────────────────────────────────────────────────
+// Unity awards a title to everyone present — currently <THE PROTECTOR>, for
+// surviving a boss with the tree still standing.
+//
+// Titles normally travel the other way (phone → Unity on set_name), so this is
+// the one case where Unity is the author. The phone adopts it and immediately
+// re-broadcasts, which keeps set_name the single source of truth: every other
+// surface still learns titles exactly one way, and a reconnect replays it
+// without any special case.
+function handleGrantTitle(data) {
+  if (typeof data !== 'string') return false;
+  // Same normalisation every other handler does. The relay prefixes messages
+  // bound for the web, and without stripping it this never matched at all.
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+  if (!msg.startsWith('grant_title|')) return false;
+
+  const title = msg.split('|')[1] || '';
+  if (!title) return true;
+
+  // Never downgrade. A player who bought a title chose it, and overwriting that
+  // with one the room handed out would read as losing something they paid for.
+  if (playerTitle && playerTitle === title) return true;
+  if (playerTitle) {
+    if (typeof showRewardToast === 'function')
+      showRewardToast(`&lt;${title}&gt; EARNED`, 0);
+    return true;
+  }
+
+  playerTitle = title;
+  if (typeof applyTitleNametag === 'function') applyTitleNametag();
+  if (typeof reSendSetName    === 'function') reSendSetName();
+  if (typeof showRewardToast  === 'function') showRewardToast(`&lt;${title}&gt;`, 0);
+  return true;
 }
 
 function handleQuestMessage(msg) {
@@ -1285,24 +1205,6 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
 // ─── Screen management ───────────────────────────────────────────────────────
 
 function showScreen(id) {
-  // The recovery prompt is MODAL. Nothing may navigate away from it.
-  //
-  // A card pull is a chain of deferred callbacks — reveal, choose, legendary,
-  // ad — and any of them can fire seconds after the prompt appeared. One of
-  // those firing moved the player off the vote and left them unable to answer.
-  //
-  // That is worse than it sounds. The vote needs a threshold of the room, so a
-  // player who cannot answer is not just stuck themselves — they hold the count
-  // below the line and EVERYONE sits on the prompt indefinitely. Which is
-  // exactly the "stuck perpetually" symptom, and why it looked like the screen
-  // was broken rather than one phone being missing from the tally.
-  //
-  // The two functions that legitimately close it clear _soulOpen first, so they
-  // pass through here normally.
-  if (typeof _soulOpen !== 'undefined' && _soulOpen && id !== 'screen-soul') {
-    console.warn(`[soul] Blocked navigation to ${id} — recovery vote is open`);
-    return;
-  }
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   const el = document.getElementById(id);
   if (el) el.classList.remove('hidden');

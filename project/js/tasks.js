@@ -244,7 +244,11 @@ const TaskTracker = (() => {
       have  : planted,
       need  : required,
       ready : planted >= required,
-      line  : `Plant ${required} flowers on the mound`,
+      // No instruction line. The mound stopped mattering — every placement
+      // anywhere feeds this — and the sentence was the last thing still telling
+      // players to walk to a specific spot. The bar says the rest: a number, a
+      // target, and how far between them the room is.
+      line  : '',
       reward: reward || 0,
     };
     _flagNew('seed:' + planted + '/' + required);
@@ -252,12 +256,33 @@ const TaskTracker = (() => {
   }
 
   /// After sprouting: soultree_goal|stage|plants|animals|fungi|combo|ready
-  function setTreeGoal(stage, plants, animals, fungi, combo, ready, reward) {
+  function setTreeGoal(stage, plants, animals, fungi, combo, ready, reward,
+                       have, need) {
+    // ── Counter, not a checklist ────────────────────────────────────────────
+    // The old wording asked for a MIX — "Needs 3 flowers, 3 fungi" — which was
+    // accurate and went unread. Playtesters described the game as planting
+    // flowers with no goal, which is what a task list gets you when nobody
+    // opens it.
+    //
+    // When Unity sends a live total, this row becomes the same counter that is
+    // now on the projection: one number, climbing, with what it is for. The
+    // phone and the wall then say exactly the same thing, so looking up costs
+    // the player nothing and looking down gains them nothing.
+    const counting = need > 0;
+
     const parts = [];
     if (plants  > 0) parts.push(`${plants} flowers`);
     if (animals > 0) parts.push(`${animals} animals`);
     if (fungi   > 0) parts.push(`${fungi} fungi`);
     if (combo)       parts.push('a player combo');
+
+    let line;
+    // Empty while counting, so this row matches the seed's: a stage, a fraction
+    // and a bar, with no sentence between them. Only the states a bar cannot
+    // express get words.
+    if (ready)          line = combo ? 'Needs a player combo' : 'Ready to grow';
+    else if (counting)  line = '';
+    else                line = 'Needs ' + parts.join(', ');
 
     _main = {
       title : 'THE SOUL TREE',
@@ -265,10 +290,10 @@ const TaskTracker = (() => {
       // never appears here — Unity only broadcasts a goal while a NEXT stage
       // exists — so there is no last-stage case to special-case.
       detail: stage ? stage + ' Stage' : '',
-      have  : null,
-      need  : null,
+      have  : counting ? have : null,
+      need  : counting ? need : null,
       ready : ready,
-      line  : ready ? 'Ready to grow' : 'Needs ' + parts.join(', '),
+      line  : line,
       reward: reward || 0,
     };
     // Only the STAGE seeds the badge, not every count. A pulsing marker that
@@ -300,20 +325,31 @@ const TaskTracker = (() => {
       '<div class="task-section-hdr task-section-hdr--mission">── Main Task</div>',
       '<div class="task-mission' + (_main.ready ? ' task-mission--ready' : '') + '">' +
         `<div class="task-mission-title">&lt;${_main.title}&gt;${count}</div>` +
-        `<div class="task-mission-stage">${_main.detail}</div>` +
-        // Same [ ] / [✓] indicator the other rows use, so the objective reads as
-        // a task rather than as a status line.
-        `<div class="task-mission-line">` +
-          `<span class="task-mission-box">${_main.ready ? '[✓]' : '[ ]'}</span>` +
-          `<span class="task-mission-text">${_main.line}</span>` +
+        `<div class="task-mission-stage">${_main.detail}` +
+          // With the line gone the reward had nowhere to sit, and a goal whose
+          // payout is invisible is a goal nobody weighs.
+          (!_main.line && _main.reward > 0
+            ? `<span class="task-rwd">+${_main.reward}★</span>` : '') +
+        `</div>` +
+        // The line row is skipped entirely when there is nothing to say, so the
+        // bar sits directly under the stage instead of below an empty checkbox.
+        (_main.line
+          ? `<div class="task-mission-line">` +
+              `<span class="task-mission-box">${_main.ready ? '[✓]' : '[ ]'}</span>` +
+              `<span class="task-mission-text">${_main.line}</span>` +
           // Same .task-rwd chip the personal tasks use, so the main task is
           // priced in the same currency and the same visual language. The room
           // should be able to see what the shared goal is worth without being
           // told, exactly as it can for its own.
-          (_main.reward > 0
-            ? `<span class="task-rwd">+${_main.reward}★</span>` : '') +
-        `</div>` +
-        `<div class="task-mission-bar"><span style="width:${pct.toFixed(0)}%"></span></div>` +
+              (_main.reward > 0
+                ? `<span class="task-rwd">+${_main.reward}★</span>` : '') +
+            `</div>`
+          : '') +
+        // Taller than the 3px hairline it was. This IS the objective now rather
+        // than a decoration under a sentence, and a bar nobody notices is the
+        // same failure the task list already had.
+        `<div class="task-mission-bar task-mission-bar--lg">` +
+          `<span style="width:${pct.toFixed(0)}%"></span></div>` +
       '</div>',
     ];
   }
