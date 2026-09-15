@@ -155,6 +155,359 @@ const CardTextures = (() => {
 
   // â”€â”€â”€ Shape drawers â€” reskinned as waste items â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  // ═══ HORROR PACK SYMBOLS ═══════════════════════════════════════════════════
+  //
+  // Three pools, four tiers each, authored the same way as Thornwire, Lightning
+  // Iris, Leaf Storm and the fungi: one grid of hand-set characters against a
+  // five-key palette, D darkest through W brightest.
+  //
+  // Each pool keeps ONE palette across all its tiers. Rarity is already carried
+  // by the card frame and by silhouette; giving every card its own hue as well
+  // meant a pack of five read as five unrelated things. The exception is a card
+  // whose subject is a different material from the rest of its pool — bone is
+  // not meat, and painting it in the meat palette loses the one thing that makes
+  // it legible.
+  //
+  // Silhouette does the work. These are seen at a glance on a phone, mid pull,
+  // usually next to four other cards. Anything that depends on reading interior
+  // detail is decoration.
+
+  // Flesh — wet reds, one value away from black at the outline.
+  const FLESH_PAL      = { D: '#2a0f12', M: '#7a2f30', L: '#b0504a', H: '#d9806e', W: '#ffd9c4' };
+  // Bone gets its own greys. See the note above about material.
+  const FLESH_BONE_PAL = { D: '#241a16', M: '#6f6255', L: '#a89881', H: '#d8cdb4', W: '#fdf6e3' };
+
+  // Mystery Meat — an irregular cut, marbled through the middle. No symmetry
+  // anywhere: a symmetrical blob reads as an organ with a purpose, and this one
+  // is specifically a thing whose origin is unclear.
+  const FLESH_MEAT_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.......DDDDDDD.......',
+    '.....DDMMMMMMMDD.....',
+    '....DMMMLLLLLMMMD....',
+    '...DMMLLLHHHLLLMMD...',
+    '...DMLLHHHWHHHLLMD...',
+    '...DMLLHHHHHHHLLMD...',
+    '...DMMLLHHHHHLLMMD...',
+    '...DMMMLLLHLLLMMMD...',
+    '....DMMMLLLLLMMMD....',
+    '....DDMMMMMMMMMDD....',
+    '......DDMMMMMDD......',
+    '........DDDDD........',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // Gristle Knot — two loops passing through each other. The gap in the middle
+  // of each loop is what makes it a knot rather than a lump; close it up and the
+  // card becomes a second Mystery Meat.
+  const FLESH_KNOT_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '....DDDDD...DDDDD....',
+    '...DMMMMMD.DMMMMMD...',
+    '..DMLLLLLMDMLLLLLMD..',
+    '..DMLHHHLMDMLHHHLMD..',
+    '..DMLH.HLMMMLH.HLMD..',
+    '..DMLHHHLMWMLHHHLMD..',
+    '..DMLLLLLMMMLLLLLMD..',
+    '...DMMMMMD.DMMMMMD...',
+    '....DDMMMDDDMMMDD....',
+    '.....DMMMMMMMMMD.....',
+    '......DMMMMMMMD......',
+    '.......DDDDDDD.......',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // Blind Box — a sealed container with an aperture. Hard straight edges, which
+  // nothing else in this pool has: the flesh cards are all soft, so the one
+  // manufactured shape is unmistakable at any size.
+  const FLESH_BOX_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '......DDDDDDDDD......',
+    '.....DMMMMMMMMMD.....',
+    '....DMLLLLLLLLLMD....',
+    '...DMLLLLLLLLLLLMD...',
+    '...DMLLDDDDDDDLLMD...',
+    '...DMLLDHHHHHDLLMD...',
+    '...DMLLDHWWWHDLLMD...',
+    '...DMLLDHWWWHDLLMD...',
+    '...DMLLDHHHHHDLLMD...',
+    '...DMLLDDDDDDDLLMD...',
+    '...DMLLLLLLLLLLLMD...',
+    '....DMLLLLLLLLLMD....',
+    '.....DMMMMMMMMMD.....',
+    '......DDDDDDDDD......',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // Bone Fragment — tall and narrow where the rest of the pool is wide. The
+  // legendary has to be tellable from across a table before anyone reads a word
+  // of it, and an upright silhouette in a row of round ones does that.
+  const FLESH_BONE_ART = [
+    '.....................',
+    '.....................',
+    '.........DDD.........',
+    '........DHHHD........',
+    '.......DHWWWHD.......',
+    '.......DHWWWHD.......',
+    '........DHHHD........',
+    '.........DLD.........',
+    '.........DLD.........',
+    '........DLLLD........',
+    '........DLLLD........',
+    '.........DLD.........',
+    '.........DLD.........',
+    '........DHHHD........',
+    '.......DHWWWHD.......',
+    '.......DHWWWHD.......',
+    '........DHHHD........',
+    '.........DDD.........',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // Scourge — toxic greens, the one pool whose colour is also its warning.
+  const SCOURGE_PAL = { D: '#14240c', M: '#3f6b20', L: '#6fa32e', H: '#a8d84a', W: '#eaffb0' };
+
+  // Ticks — a body with eight legs reaching past the edge of the grid. The legs
+  // leaving the frame is the point: it reads as something that does not fit in
+  // the space it has been put in.
+  const SCOURGE_TICK_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....D.........D.....',
+    '.....DD.......DD.....',
+    '......DD.....DD......',
+    '...D...DDDDDDD...D...',
+    '....DDDMMMMMMMDDD....',
+    '.....DMMLLLLLMMD.....',
+    '....DMMLLHHHLLMMD....',
+    '...DMMLLHHWHHLLMMD...',
+    '...DMMLLHHHHHLLMMD...',
+    '....DMMLLLLLLLMMD....',
+    '.....DDMMMMMMMDD.....',
+    '......DDDDDDDDD......',
+    '.....DD.......DD.....',
+    '....DD.........DD....',
+    '...D.............D...',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // Infested Mice — ears and a tail, the two features that survive being shrunk
+  // to a thumbnail. The body is deliberately plain so they stay the silhouette.
+  const SCOURGE_MICE_ART = [
+    '.....................',
+    '.....................',
+    '....DDD.......DDD....',
+    '...DHHHD.....DHHHD...',
+    '..DHWWWHD...DHWWWHD..',
+    '..DHHHHHDDDDDHHHHHD..',
+    '...DHHHDMMMMMDHHHD...',
+    '....DDDMMMMMMMDDD....',
+    '.....DMMLLLLLMMD.....',
+    '....DMMLLHHHLLMMD....',
+    '....DMLLHHHHHLLMD....',
+    '....DMLLLLLLLLLMD....',
+    '.....DMMLLLLLMMD.....',
+    '......DDMMMMMDD......',
+    '........DDDDD........',
+    '.........DDD.........',
+    '..........D..........',
+    '.........D...........',
+    '........D............',
+    '.....................',
+    '.....................',
+  ];
+
+  // Necrotic Mass — wider than it is tall, with the brightest values at the
+  // centre. It reads as something spreading outward from a source rather than as
+  // an object sitting still.
+  const SCOURGE_MASS_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '........DDDDD........',
+    '......DDMMMMMDD......',
+    '....DDMMLLLLLMMDD....',
+    '...DMMLLHHHHHLLMMD...',
+    '..DMLLHHHWWWHHHLLMD..',
+    '..DMLHHHWWWWWHHHLMD..',
+    '..DMLLHHHWWWHHHLLMD..',
+    '..DMMLLHHHHHHHLLMMD..',
+    '..DMMMLLLHHHLLLMMMD..',
+    '...DMMMLLLLLLLMMMD...',
+    '....DDMMMMMMMMMDD....',
+    '......DDDMMMDDD......',
+    '........DDDDD........',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // The Black Plague — the beaked mask. Borrowed rather than invented: it is one
+  // of the few disease silhouettes a room reads instantly with no caption, and
+  // the card has about a second to land.
+  const SCOURGE_PLAGUE_ART = [
+    '.....................',
+    '.....................',
+    '.......DDDDDDD.......',
+    '.....DDMMMMMMMDD.....',
+    '....DMMLLLLLLLMMD....',
+    '...DMLLHHHHHHHLLMD...',
+    '..DMLLHWWHHHWWHLLMD..',
+    '..DMLLHWWHHHWWHLLMD..',
+    '..DMLLHHHHHHHHHLLMD..',
+    '...DMLLHHHHHHHLLMD...',
+    '....DMLLHHHHHLLMD....',
+    '.....DMLLHHHLLMD.....',
+    '......DMLLHLLMD......',
+    '.......DMLLLMD.......',
+    '........DMLMD........',
+    '.........DMD.........',
+    '.........DMD.........',
+    '..........D..........',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // Ritual — violets. Kept away from both the greens and the reds so the third
+  // horror pool is never mistaken for either at a glance.
+  const RITUAL_PAL = { D: '#1a0f2a', M: '#4a2a6b', L: '#7a4aa8', H: '#b07ce0', W: '#f0dcff' };
+
+  // Sheep Sacrifice — a head seen front on, horns short. It is the pool's entry
+  // card and the one the rest of the ritual escalates from, so it is the plainest
+  // shape here on purpose.
+  const RITUAL_SHEEP_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....DD.......DD.....',
+    '....DMMD.....DMMD....',
+    '...DMLLMDDDDDMLLMD...',
+    '..DMLLLMMHHHMMLLLMD..',
+    '..DMLLMHHHHHHHMLLMD..',
+    '...DMMHHWHHHWHHMMD...',
+    '....DMHHHHHHHHHMD....',
+    '....DMHHHHHHHHHMD....',
+    '.....DMHHHHHHHMD.....',
+    '......DMHHHHHMD......',
+    '.......DMMMMMD.......',
+    '........DDDDD........',
+    '.........DDD.........',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // The Goat — the same head with the horns swept out past the frame and a beard
+  // added. Deliberately a variation on the sheep rather than a new subject: the
+  // pool is an escalating series, and the second card should read as the first
+  // one having become something.
+  const RITUAL_GOAT_ART = [
+    '.....................',
+    '.....................',
+    '..DD.............DD..',
+    '...DHD.........DHD...',
+    '....DHD.......DHD....',
+    '....DHHD.....DHHD....',
+    '.....DHHDDDDDHHD.....',
+    '......DMMMMMMMD......',
+    '.....DMMLLLLLMMD.....',
+    '....DMLLHHHHHLLMD....',
+    '....DMLHWHHHWHLMD....',
+    '....DMLLHHHHHLLMD....',
+    '.....DMLLHHHLLMD.....',
+    '......DMLLLLLMD......',
+    '.......DMLLLMD.......',
+    '........DMLMD........',
+    '.........DMD.........',
+    '.........DWD.........',
+    '..........D..........',
+    '.....................',
+    '.....................',
+  ];
+
+  // The Pyre — flame above, embers below. The brightest values sit at the TOP,
+  // the opposite of every other symbol here, which is what makes it read as
+  // light rather than as a shape.
+  const RITUAL_PYRE_ART = [
+    '.....................',
+    '.....................',
+    '.....................',
+    '..........D..........',
+    '.........DHD.........',
+    '........DHWHD........',
+    '.......DHWWWHD.......',
+    '......DHWWWWWHD......',
+    '.....DHHWWWWWHHD.....',
+    '....DMHHHWWWHHHMD....',
+    '....DMMHHHHHHHMMD....',
+    '...DMMLLHHHHHLLMMD...',
+    '...DMLLLLHHHLLLLMD...',
+    '..DMLLLLLLLLLLLLLMD..',
+    '..DMMLLLLLLLLLLLMMD..',
+    '...DDMMMMMMMMMMMDD...',
+    '.....DDDDDDDDDDD.....',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // The Offering — a vessel on a pedestal with something leaving it. The two
+  // sparks above the rim are the whole card: a chalice alone is an object, and a
+  // chalice giving something up is the transaction the pack is about.
+  const RITUAL_OFFER_ART = [
+    '.....................',
+    '.....................',
+    '....D...........D....',
+    '.....D.D.....D.D.....',
+    '......DWD...DWD......',
+    '.......D.....D.......',
+    '..DDDDDDDDDDDDDDDDD..',
+    '..DMLLLLLLLLLLLLLMD..',
+    '...DMLLHHHHHHHLLMD...',
+    '....DMMLLHHHLLMMD....',
+    '.....DDMMLLLMMDD.....',
+    '.......DMMMMMD.......',
+    '........DMMMD........',
+    '.........DMD.........',
+    '.........DMD.........',
+    '.......DDMMMDD.......',
+    '.....DDMMMMMMMDD.....',
+    '....DMMMMMMMMMMMD....',
+    '....DDDDDDDDDDDDD....',
+    '.....................',
+    '.....................',
+  ];
+
   function drawShape(ctx, rarity, t) {
     const packType = typeof window !== 'undefined' ? window.activePackType : 'garbage';
     const isHorror = parseInt(document.body?.dataset?.corruption || '0') >= (window.HORROR_THRESHOLD ?? 15);
@@ -164,6 +517,20 @@ const CardTextures = (() => {
     if (packType === 'adpack')              { drawShapeRitual(ctx, rarity, t);  return; }
     if (!isHorror)                          { drawShapeNature(ctx, rarity, t);  return; }
 
+    // ── Flesh pack pixel symbols ─────────────────────────────────────────────
+    // Same grid, same five-key palette and the same drawSprite path as Thornwire
+    // and the fungi. The horror packs were still on the old vector drawings,
+    // which is visible the moment a corrupted card sits next to a pristine one:
+    // one is hand-set pixels and the other is smooth strokes, and the deck stops
+    // reading as one object. Corruption is supposed to change what the card IS,
+    // not what medium it was drawn in.
+    if (rarity === 'common')    { drawSprite(ctx, getSprite('fleshMeat',  FLESH_MEAT_ART,  FLESH_PAL)); return; }
+    if (rarity === 'uncommon')  { drawSprite(ctx, getSprite('fleshKnot',  FLESH_KNOT_ART,  FLESH_PAL)); return; }
+    if (rarity === 'rare')      { drawSprite(ctx, getSprite('fleshBox',   FLESH_BOX_ART,   FLESH_PAL)); return; }
+    if (rarity === 'legendary') { drawSprite(ctx, getSprite('fleshBone',  FLESH_BONE_ART,  FLESH_BONE_PAL)); return; }
+
+    // Vector fallback below, still reached by mythical / luck-maxxing /
+    // legendary-alpha, which have no sprite yet.
     ctx.save();
     ctx.translate(128, 148);
     ctx.lineCap = 'round';
@@ -1005,6 +1372,14 @@ const CardTextures = (() => {
   // â”€â”€â”€ SCOURGE shape drawers (biological) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   function drawShapeScourge(ctx, rarity, t) {
+    // Pixel symbols first, each returning before the shared translate below, so
+    // they land on LAYOUT.symbolCenterY with every other pack's symbol.
+    if (rarity === 'common')    { drawSprite(ctx, getSprite('scourgeTick',   SCOURGE_TICK_ART,   SCOURGE_PAL)); return; }
+    if (rarity === 'uncommon')  { drawSprite(ctx, getSprite('scourgeMice',   SCOURGE_MICE_ART,   SCOURGE_PAL)); return; }
+    if (rarity === 'rare')      { drawSprite(ctx, getSprite('scourgeMass',   SCOURGE_MASS_ART,   SCOURGE_PAL)); return; }
+    if (rarity === 'legendary') { drawSprite(ctx, getSprite('scourgePlague', SCOURGE_PLAGUE_ART, SCOURGE_PAL)); return; }
+
+    // Vector fallback, still reached by the tiers above legendary.
     ctx.save();
     ctx.translate(128, 148);
 
@@ -1306,6 +1681,14 @@ const CardTextures = (() => {
   // ─── RITUAL shape drawers ──────────────────────────────────────────────────────
 
   function drawShapeRitual(ctx, rarity, t) {
+    // Pixel symbols first, each returning before the shared translate below, so
+    // they land on LAYOUT.symbolCenterY with every other pack's symbol.
+    if (rarity === 'common')    { drawSprite(ctx, getSprite('ritualSheep', RITUAL_SHEEP_ART, RITUAL_PAL)); return; }
+    if (rarity === 'uncommon')  { drawSprite(ctx, getSprite('ritualGoat',  RITUAL_GOAT_ART,  RITUAL_PAL)); return; }
+    if (rarity === 'rare')      { drawSprite(ctx, getSprite('ritualPyre',  RITUAL_PYRE_ART,  RITUAL_PAL)); return; }
+    if (rarity === 'legendary') { drawSprite(ctx, getSprite('ritualOffer', RITUAL_OFFER_ART, RITUAL_PAL)); return; }
+
+    // Vector fallback, still reached by the tiers above legendary.
     ctx.save();
     ctx.translate(128, 148);
     ctx.lineCap = 'round';

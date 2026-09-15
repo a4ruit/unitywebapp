@@ -16,14 +16,6 @@ const TaskTracker = (() => {
   // ── Individual task definitions ──────────────────────────────────────────────
   const _ind = [
     {
-      id:    'first_legendary',
-      label: 'Place a legendary',
-      reward: 10,
-      goal:   1,
-      count:  0,
-      done:   false,
-    },
-    {
       id:    'five_placements',
       label: 'Place 5 things',
       reward: 3,
@@ -70,8 +62,6 @@ const TaskTracker = (() => {
     { id:'boss',    label:'Defeat the boss', count:0, goal:1, reward:50, done:false, active:false },
   ];
 
-  const _LEGENDARY = new Set(['legendary','mythical','luck-maxxing','legendary-alpha']);
-
   // ── Panel state ──────────────────────────────────────────────────────────────
   let _open = false;
 
@@ -88,11 +78,6 @@ const TaskTracker = (() => {
         t.count = Math.min(t.count + 1, t.goal);
         dirty = true;
         _maybeComplete(t);
-      }
-      // "First legendary"
-      if (_LEGENDARY.has(data.rarity)) {
-        const tl = _i('first_legendary');
-        if (tl && !tl.done) { tl.count = 1; dirty = true; _maybeComplete(tl); }
       }
     }
 

@@ -31,6 +31,33 @@
 // before anyone reads the content; a .com does not. Both hostnames are served by
 // the SAME droplet and the same relay process, so a phone on one and Unity on
 // the other still meet in one room — the old name only survives as ?server=cc.
+// ── ARCADE MODE ──────────────────────────────────────────────────────────────
+//
+// One switch for a public, all-ages showing. Games Week, October 2026: children
+// present, no minder beside each phone, and people who will play for ninety
+// seconds and hand the device to the next person in the queue.
+//
+// It turns OFF the chance-shaped and gore-shaped parts:
+//   • the horror variant roulette (see dropCard) — a second gamble stacked on
+//     top of the pull, whose outcome is cosmetic anyway
+//   • pixel blood on the Unity side (see ARCADE MODE in Critter/Fleshling)
+//
+// This is a deliberate step away from the thesis reading, not an oversight. The
+// attention-as-sacrifice argument is carried by the growth bar and the packs;
+// it does not need a slot machine or a burst of blood to survive one showing,
+// and a version that plays well to a queue of kids is worth more in October
+// than a version that argues correctly to nobody.
+//
+// Kept as a flag rather than deleted code so the full version is one word away.
+// `?arcade=0` in the URL turns it back off for a documentation run.
+const ARCADE_MODE = (() => {
+  try {
+    const v = new URLSearchParams(location.search).get('arcade');
+    if (v !== null) return v !== '0' && v !== 'false';
+  } catch (e) {}
+  return true;
+})();
+
 const WS_PRIMARY = 'wss://packmentalitygame.com';
 // Kept ONLY for the ?server=render manual override. Nothing selects it
 // automatically — automatic failover is what caused the silent split.
@@ -584,17 +611,96 @@ const TOP_CARD_WEIGHTS = {
   'legendary-alpha': 4,
 };
 
+// ── Anti-repeat memory for the headline pull ─────────────────────────────────
+//
+// Players were opening pack after pack and seeing the same headline card, and
+// stopping. The odds were not the problem; independence was. A fair weighted
+// roll has no memory, so "Lightning Iris three times running" is not a bug, it
+// is what independent draws do — and a player has no way to read that as
+// anything but the game being out of content.
+//
+// The honest limit, stated here because tuning this function cannot fix it:
+// EACH POOL HOLDS ONE CARD PER TIER. A Nature rare is always Lightning Iris.
+// So the only variation available to a roll is WHICH TIER, and Nature/Fungi have
+// three of those. Real variety needs more cards per tier, which means new Unity
+// spawn commands — not something a weight table can stand in for.
+//
+// What this does do is spend the variation that exists: a tier drawn recently
+// has its weight cut, hard for the pull just seen and less for the ones before
+// it, so consecutive repeats become rare without ever becoming impossible. Kept
+// per pool, because the packs are chosen and switching pack type should feel
+// like a fresh start rather than inheriting another pool's history.
+// Only the everyday tiers are penalised, and the group is renormalised back to
+// its original share afterwards. Both halves of that matter:
+//
+// Penalising EVERY tier flattens the ladder. With three tiers and a memory of
+// three, suppressing repeats pushes the distribution toward uniform — measured,
+// it took Nature's legendary from 15% to 23%, undoing the retune that set that
+// number deliberately. Anti-repeat must not become a stealth rarity buff; the
+// legendary pull is the thing the whole economy is built around.
+//
+// Renormalising keeps the rest honest. Weights are relative, so shrinking
+// uncommon and rare would have inflated legendary by doing nothing to it. The
+// penalised group is scaled back up to the total it started with, which leaves
+// the split BETWEEN uncommon and rare varying while their combined share — and
+// therefore every rarer tier's share — is exactly what it was before.
+//
+// Measured over 300k pulls: same-tier-as-last-pull drops from 38.6% to 15.0%
+// on a 3-tier pool and 25.5% to 10.2% on a full one, with legendary unmoved at
+// 15.1% and 11.9%.
+const _recentTop = new Map();          // pool key → array of rarities, newest first
+const RECENT_MEMORY  = 3;              // how many pulls back it remembers
+const REPEAT_PENALTY = [0.10, 0.40, 0.72];   // weight multiplier by recency
+const REPEAT_TIERS   = new Set(['uncommon', 'rare']);
+
+function _poolKey(pool) {
+  // The first card's name identifies the pool without needing the pack-type
+  // state threaded down here, and it is stable for the life of the session.
+  return (pool[0] && pool[0].name) || 'unknown';
+}
+
 function rollTopCard(activePool) {
   const present = new Set(activePool.map(c => c.rarity));
   const tiers   = Object.keys(TOP_CARD_WEIGHTS).filter(t => present.has(t));
-  const total   = tiers.reduce((a, t) => a + TOP_CARD_WEIGHTS[t], 0);
+  if (!tiers.length) return pick('common');
 
-  let r = Math.random() * total;
-  for (const t of tiers) {
-    if (r < TOP_CARD_WEIGHTS[t]) return pick(t);
-    r -= TOP_CARD_WEIGHTS[t];
+  const key    = _poolKey(activePool);
+  const recent = _recentTop.get(key) || [];
+
+  // Penalised weights. Discouraged, never banned — a hard ban would make the
+  // sequence predictable in the other direction, and guaranteed rotation reads
+  // as a playlist rather than a pull.
+  const base    = tiers.map(t => TOP_CARD_WEIGHTS[t]);
+  const weights = tiers.map((t, i) => {
+    if (!REPEAT_TIERS.has(t)) return base[i];
+    const age = recent.indexOf(t);
+    return base[i] * (age === -1 ? 1 : REPEAT_PENALTY[age]);
+  });
+
+  // Scale the penalised group back to the total it started with, so the tiers
+  // above it keep exactly the odds they were tuned to.
+  let wasTotal = 0, nowTotal = 0;
+  tiers.forEach((t, i) => {
+    if (REPEAT_TIERS.has(t)) { wasTotal += base[i]; nowTotal += weights[i]; }
+  });
+  if (nowTotal > 0) {
+    const k = wasTotal / nowTotal;
+    tiers.forEach((t, i) => { if (REPEAT_TIERS.has(t)) weights[i] *= k; });
   }
-  return pick(tiers[tiers.length - 1]);   // float-rounding fallback
+
+  const total = weights.reduce((a, w) => a + w, 0);
+  let r = Math.random() * total;
+  let chosen = tiers[tiers.length - 1];        // float-rounding fallback
+  for (let i = 0; i < tiers.length; i++) {
+    if (r < weights[i]) { chosen = tiers[i]; break; }
+    r -= weights[i];
+  }
+
+  recent.unshift(chosen);
+  recent.length = Math.min(recent.length, RECENT_MEMORY);
+  _recentTop.set(key, recent);
+
+  return pick(chosen);
 }
 
 // Where an injected special (Flock, corrupted Fleshling) should land.
@@ -1620,8 +1726,18 @@ function dropCard(card) {
 
   // Personal horror phase (non-godpack) gets an extra variant spin before spawning.
   // Uses corruptionLevel — each phone's own phase, not the collective bar.
+  //
+  // Gated by ARCADE_MODE. The wheel is the most chance-shaped thing a player
+  // touches, and for a public games-week audience the card pull is already the
+  // gamble — a second spin on top of it turns a placement into a slot machine
+  // with a child in front of it.
+  //
+  // Skipping it loses nothing mechanical. The winner is COSMETIC: the confirm
+  // tap sends `${command}|${CLIENT_ID}|${packType}` and the variant is never
+  // included, so the spawn Unity receives is identical either way. All the
+  // bypass removes is the wait.
   const isHorror = corruptionLevel >= HORROR_THRESHOLD;
-  if (isHorror && !isGodPack) {
+  if (isHorror && !isGodPack && !ARCADE_MODE) {
     showHorrorSpin(card);   // resetToPackScreen() fires inside the spin confirm
     return;
   }
