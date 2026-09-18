@@ -20,6 +20,11 @@ const KeepsakeUI = (() => {
     return true;
   }
 
+  function _myColor() {
+    const c = (typeof playerColor === 'string' && playerColor) ? playerColor : '#c89030';
+    return c.startsWith('#') ? c : '#' + c;
+  }
+
   function _myName() {
     return (typeof playerName === 'string' && playerName) ? playerName : 'YOU';
   }
@@ -119,8 +124,12 @@ const KeepsakeUI = (() => {
     g.fillStyle = '#ffe3a0';
     g.fillText(name, W / 2, y);
 
-    g.strokeStyle = '#c89030'; g.lineWidth = 6; g.strokeRect(9, 9, W - 18, H - 18);
-    g.strokeStyle = '#6a4a18'; g.lineWidth = 2; g.strokeRect(17, 17, W - 34, H - 34);
+    // Border in the colour the player picked when they joined.
+    const tint = _myColor();
+    g.strokeStyle = tint; g.lineWidth = 6; g.strokeRect(9, 9, W - 18, H - 18);
+    g.globalAlpha = 0.45;
+    g.lineWidth = 2; g.strokeRect(17, 17, W - 34, H - 34);
+    g.globalAlpha = 1;
     return c;
   }
 

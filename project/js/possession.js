@@ -1881,7 +1881,7 @@ function _buildUI() {
          All buttons/joystick rendered on top; background page blocked below. -->
     <div id="poss-block-overlay"></div>
     <button id="poss-box-btn">Inhabit the Blind Box</button>
-    <button id="poss-serpent-btn">Become the Serpent</button>
+    <button id="poss-serpent-btn">Ride COSMEOW</button>
     <button id="poss-pig-btn">Ride the LAZERPIG</button>
     <button id="poss-seagull-btn">Inhabit a seagull</button>
     <button id="poss-fox-btn">Inhabit a fox</button>
@@ -1949,7 +1949,7 @@ function _buildUI() {
     <button id="poss-fire">FIRE</button>
     <button id="poss-pounce">POUNCE</button>
     <button id="poss-dive">STEAL<br>CHIPS</button>
-    <button id="poss-bloom">BLOOM</button>
+    <button id="poss-bloom">BURST</button>
     <button id="poss-place">PLACE</button>
     <button id="poss-open-box">OPEN<br>BOX</button>
     <button id="poss-release">release</button>
@@ -2449,7 +2449,7 @@ function _onGranted(duration, creature) {
 
   // ── Game Boy Color in-card readouts ──
   if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'     ? 'FOX CAM'     :
-                                             creature === 'serpent' ? 'SERPENT CAM' :
+                                             creature === 'serpent' ? 'COSMEOW CAM' :
                                              creature === 'seagull' ? 'SEAGULL CAM' :
                                              creature === 'pig'     ? 'LAZERPIG CAM' :
                                              creature === 'duck'    ? 'DUCK CAM'    : 'SHEEP CAM';
@@ -2524,7 +2524,7 @@ function _onDenied(creature) {
                   creature === 'duck'    ? 'Inhabit a duck'    :
                   creature === 'pig'     ? 'Ride the LAZERPIG' :
                   creature === 'seagull' ? 'Inhabit a seagull' :
-                  creature === 'serpent' ? 'Inhabit a serpent' : 'Inhabit a sheep';
+                  creature === 'serpent' ? 'Ride COSMEOW' : 'Inhabit a sheep';
   if (!btn) return;
   btn.textContent   = 'Streams full — wait';
   btn.style.opacity = '0.6';
@@ -2565,7 +2565,7 @@ function _refreshCamPreview() {
 
   // Title reflects the highest-priority live offer.
   const title = live.box ? 'BOX CAM'
-              : live.serpent ? 'SERPENT CAM'
+              : live.serpent ? 'COSMEOW CAM'
               : live.fox     ? 'FOX CAM'
               : live.pig     ? 'LAZERPIG CAM'
               : live.seagull ? 'SEAGULL CAM'
@@ -2732,7 +2732,7 @@ function _onSeagullSpawned() {
 
 /**
  * Called when Unity broadcasts that the Emerald Serpent has spawned
- * (legendary-alpha critter pack). Unlocks the "Become the Serpent" button.
+ * (legendary-alpha critter pack). Unlocks the "Ride COSMEOW" button.
  */
 function _onSerpentSpawned() {
   _undismissCam('serpent');
@@ -3526,7 +3526,7 @@ function _onEnded() {
   } else if (wasSerpent) {
     // The serpent is one-and-done — it flies off and despawns after its reign.
     _serpentAvailable = false;
-    _ui.serpentBtn.textContent   = 'Become the Serpent';
+    _ui.serpentBtn.textContent   = 'Ride COSMEOW';
     _ui.serpentBtn.style.opacity = '1';
   } else {
     // Same one-per-pull model for sheep

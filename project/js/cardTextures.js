@@ -151,6 +151,7 @@ const CardTextures = (() => {
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
   _loadSkin('symbol-lazerpig',   'assets/lazerpig-symbol.png');
   _loadSkin('symbol-chomptrap',  'assets/chomptrap-symbol.png');
+  _loadSkin('symbol-cosmeow',    'assets/cosmeow-symbol.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -2152,6 +2153,48 @@ const CardTextures = (() => {
     S: '#d4737f', Y: '#b84aff',
   };
 
+  // COSMEOW placeholder until the hand-drawn symbol arrives.
+  const COSMEOW_ART = [
+    '.....................',
+    '...................Y.',
+    '.............F..F....',
+    '...Y........Fp..pF...',
+    '............FFFFFF...',
+    '............FYFFYF...',
+    '........Y...FFFFFF...',
+    '.......F....FFppFF...',
+    'RRRRRRRF.FFFFFFFFF...',
+    'OOOOOOO.FFFFbbF......',
+    'YYYYYYY..FFFbbF......',
+    'GGGGGGG..FFFbbF......',
+    'BBBBBBB..FFFFFF....Y.',
+    'VVVVVVV.w.wwww.w.....',
+    '.......wwwwwwwwww....',
+    '......wwwwwwwwwwww...',
+    '......wwwwwwwwwwww...',
+    '.......wwwwwwwwww....',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+  const COSMEOW_PAL = {
+    R: '#ff3b4a', O: '#ff9a26', Y: '#ffe44a', G: '#4cff5e', B: '#3f9bff', V: '#a64dff',
+    F: '#33305c', b: '#dcd6f5', p: '#ff8cbf', w: '#eae6ff',
+  };
+
+  function drawCosmeowSymbol(ctx) {
+    const sym = _cardSkins['symbol-cosmeow'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('cosmeow', COSMEOW_ART, COSMEOW_PAL));
+  }
+
   // Placeholder until the hand-drawn symbol arrives.
   const CHOMP_ART = [
     '.....................',
@@ -3856,8 +3899,8 @@ const CardTextures = (() => {
     // ouroboros, independent of which pack type the player is currently on (the
     // normal drawShape dispatch keys off activePackType, which would otherwise
     // draw the nature Tree of Life).
-    if (card.name === 'Emerald Serpent')
-      drawSprite(ctx, getSprite('serpent', SERPENT_ART, SERPENT_PAL));
+    if (card.name === 'COSMEOW')
+      drawCosmeowSymbol(ctx);
     else if (card.name === 'CHOMPTRAP')
       drawChomptrapSymbol(ctx);
     else if (card.name === 'LAZERPIG')

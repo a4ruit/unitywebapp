@@ -519,8 +519,7 @@ const SignalLost = (() => {
       }
       #signal-lost .sl-line  { font-size: 16px; margin-top: 14px; opacity: 0.9; }
       #signal-lost .sl-keep  { font-size: 14px; margin-top: 6px; color: #9fd8ff; }
-      #signal-lost .sl-count { font-size: 64px; margin-top: 28px; }
-      #signal-lost .sl-hint  { font-size: 12px; margin-top: 4px; opacity: 0.6; letter-spacing: 2px; }
+      #signal-lost .sl-count { font-family: 'pf-pixelscript', cursive; font-size: 64px; margin-top: 28px; }
       @keyframes sl-jitter {
         0%   { transform: translate(0,0); }
         50%  { transform: translate(-2px,1px); }
@@ -537,7 +536,6 @@ const SignalLost = (() => {
         <div class="sl-line"  data-k="line"></div>
         <div class="sl-keep"  data-k="keep"></div>
         <div class="sl-count" data-k="count"></div>
-        <div class="sl-hint">LOOK AT THE BIG SCREEN</div>
       </div>`;
     ['click','touchstart','touchend','pointerdown','pointerup'].forEach(ev =>
       _root.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, { passive: false }));

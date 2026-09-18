@@ -133,7 +133,7 @@ const CRITTER_CARDS = [
   { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'Red Fox',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
   { id:'sphere',     name:'LAZERPIG',       rarity:'rare',            rarityRank:2, command:'spawn_lazerpig',   desc:'FIRIN MA LASERRR' },
-  { id:'star',       name:'Emerald Serpent', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
+  { id:'star',       name:'COSMEOW',         rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Rides a cloud. Leaves a rainbow. Mind the rainbow.' },
 ];
 
 // ─── SCOURGE (ewaste / horror) ────────────────────────────────────────────────
@@ -759,6 +759,11 @@ function rollPack() {
   // the active pool actually has (see rollTopCard above).
   const activePool = getActiveCardPool();
   let topCard = rollTopCard(activePool);
+  if (_debugSeedCosmeow) {
+    _debugSeedCosmeow = false;
+    const cm = CRITTER_CARDS.find(c => c.name === 'COSMEOW');
+    if (cm) topCard = { ...cm };
+  }
 
 
   // Choice-driven corruption — decided BEFORE the pack is built, because the
@@ -1840,6 +1845,22 @@ function debugTogglePhase() {
 // Direct boss spawn — bypasses the legendary-pull gate so we can iterate on
 // the fight without grinding packs. Unity handles `debug_spawn_boss` by
 // calling FleshBoss.Spawn at a ground point regardless of phase.
+// Seeds the NEXT pack with COSMEOW as its top card. Switches to the critter
+// pack too, because Unity picks what to spawn from the active pack type.
+// Key: C (desktop — M is taken by Unity's mail boss), or the ⚙ menu.
+var _debugSeedCosmeow = false;   // var: rollPack can run before this line during init
+function debugSeedCosmeow() {
+  _debugSeedCosmeow = true;
+  if (typeof setPackType === 'function') setPackType('ewaste');
+  console.log('[debug] next pack seeded with COSMEOW');
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'c' && e.key !== 'C') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  debugSeedCosmeow();
+});
+
 function debugSpawnBoss() {
   send('debug_spawn_boss');
   console.log('[DEBUG] requested boss spawn');
