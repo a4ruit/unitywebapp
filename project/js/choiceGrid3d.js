@@ -455,6 +455,25 @@ const ChoiceGrid3D = (() => {
       }
     }
 
+    // Hazard plates hung off the card's corner, same overlay system.
+    if (typeof WarnFX !== 'undefined') {
+      const PLATES = { 'LAZERPIG': 'laser', 'Lightning Iris': 'voltage' };
+      const pigCell = cells.find(c => c && c.card && PLATES[c.card.name]);
+      if (pigCell) {
+        WarnFX.start(() => {
+          if (!pigCell.displayCanvas) return null;
+          if (pigCell.state !== 'idle' && pigCell.state !== 'pulse') return null;
+          const r = pigCell.displayCanvas.getBoundingClientRect();
+          if (r.width <= 2 || r.height <= 2) return null;
+          const locked = !!(pigCell.el &&
+            pigCell.el.classList.contains('choice-cell-3d--locked'));
+          return { left: r.left, top: r.top, width: r.width, height: r.height, locked };
+        }, PLATES[pigCell.card.name]);
+      } else {
+        WarnFX.stop();
+      }
+    }
+
     // Fleshling (corrupted) — subtle glitch particles anchored to the card,
     // same overlay system as the flock. Only draws while the card is face-up.
     if (typeof GlitchFX !== 'undefined') {
@@ -490,6 +509,7 @@ const ChoiceGrid3D = (() => {
   function destroy() {
     if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
     if (typeof FlockFX !== 'undefined') FlockFX.stop();
+    if (typeof WarnFX !== 'undefined') WarnFX.stop();
     if (typeof GlitchFX !== 'undefined') GlitchFX.stop();
 
     cells.forEach(cell => {

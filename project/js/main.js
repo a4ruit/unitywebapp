@@ -121,14 +121,16 @@ const FLESH_CARDS = [
 
 // ─── CRITTER (ewaste / pristine) ──────────────────────────────────────────────
 // TRIMMED to 5 tiers — Great Stag (mythical) and The Migration (luck-maxxing)
-// are cut, leaving a GAP at ranks 4-5. Emerald Serpent keeps legendary-alpha, so
-// it's still the guaranteed-legendary voucher's target (see _guaranteedLegendary
-// below) and still what a prismatic critter pull ultimately means.
+// are cut, leaving a GAP at ranks 4-5. Emerald Serpent keeps legendary-alpha and
+// is still what a prismatic critter pull ultimately means. It was also the
+// guaranteed-legendary voucher's only possible target, which is why that shop
+// item was removed rather than fixed — see counter.js.
 const CRITTER_CARDS = [
   { id:'small_cube', name:'RAM',             rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
   { id:'large_cube', name:'DDoS Duck',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
   { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'Red Fox',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
+  { id:'sphere',     name:'LAZERPIG',       rarity:'rare',            rarityRank:2, command:'spawn_lazerpig',   desc:'FIRIN MA LASERRR' },
   { id:'star',       name:'Emerald Serpent', rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It blooms where the rot was. The garden answers the wound.' },
 ];
 
@@ -496,8 +498,13 @@ function setPackType(type) {
   setTickerState('idle');
 }
 
+// Random among ALL cards of that tier, not the first one found. find() meant a
+// pool could only ever surface one card per rarity, so a second rare was dead
+// data — which is also why repeats felt structural.
 function pick(tier) {
-  return { ...getActiveCardPool().find(c => c.rarity === tier) };
+  const pool = getActiveCardPool().filter(c => c.rarity === tier);
+  if (!pool.length) return {};
+  return { ...pool[Math.floor(Math.random() * pool.length)] };
 }
 
 let isGodPack = false;
@@ -751,13 +758,6 @@ function rollPack() {
   const activePool = getActiveCardPool();
   let topCard = rollTopCard(activePool);
 
-  // Guaranteed Legendary voucher (bought in the pristine shop). Forces the top
-  // card to the Emerald Serpent (critter legendary-alpha) — the only legendary
-  // creature available right now. Update this once more legendaries exist.
-  if (window._guaranteedLegendary) {
-    topCard = { ...CRITTER_CARDS.find(c => c.rarity === 'legendary-alpha') };
-    window._guaranteedLegendary = false;
-  }
 
   // Choice-driven corruption — decided BEFORE the pack is built, because the
   // Fleshling now gets a slot of its own rather than overwriting one.
@@ -1048,6 +1048,7 @@ function connect() {
       if (handleSoulTreeGoal(e.data)) return;
       if (handleQuestMessage(e.data)) return;
       if (handleGrantTitle(e.data)) return;
+      if (handleGrantPrismatic(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
@@ -1131,6 +1132,32 @@ function handleSoulTreeGoal(data) {
 // re-broadcasts, which keeps set_name the single source of truth: every other
 // surface still learns titles exactly one way, and a reconnect replays it
 // without any special case.
+// grant_prismatic — the room-wide version of the shop's prismatic name tag.
+//
+// Sent alongside grant_title when Unity awards <THE PROTECTOR>. It is a separate
+// message rather than a field on grant_title because the two are not the same
+// thing: a title is words, prismatic is a treatment, and a later reward might
+// want one without the other.
+//
+// Handled here rather than by counter.js so the phone applies it to its OWN tag
+// the moment it lands. Unity already knows — it granted it — but the person who
+// earned it is looking at a phone, and a reward that only exists on a screen
+// across the room is a reward most people never find out they have.
+function handleGrantPrismatic(data) {
+  if (typeof data !== 'string') return false;
+  const msg = data.startsWith('web:') ? data.slice(4).trim() : data.trim();
+  if (msg !== 'grant_prismatic') return false;
+
+  // Idempotent. The grant fires on every protector award, and a player who
+  // already bought it should not be told they just won something they own.
+  if (typeof markPrismaticOwned === 'function' && markPrismaticOwned()) {
+    if (typeof applyPrismaticNametag === 'function') applyPrismaticNametag();
+    if (typeof reSendSetName === 'function') reSendSetName();
+    if (typeof showRewardToast === 'function') showRewardToast('\u2726 PRISMATIC', 0);
+  }
+  return true;
+}
+
 function handleGrantTitle(data) {
   if (typeof data !== 'string') return false;
   // Same normalisation every other handler does. The relay prefixes messages
@@ -1553,34 +1580,6 @@ function showChoiceGrid() {
   });
 }
 
-// ─── Legendary reveal (shop "guaranteed legendary") ─────────────────────────────
-// A dedicated single-card screen. Already paid for in the shop, so tapping the
-// card just claims + spawns it — no extra cost. Currently always the Emerald
-// Serpent (the only legendary creature); expand when more legendaries exist.
-function showLegendaryReveal() {
-  Cards3D.destroy();
-  const el = document.getElementById('revealCard');
-  if (el) { el.innerHTML = ''; el.style.opacity = ''; }
-
-  const card = { ...CRITTER_CARDS.find(c => c.rarity === 'legendary-alpha'), starCost: 0 };
-
-  showScreen('screen-legendary');
-
-  ChoiceGrid3D.show([card], 'legendaryGrid', (chosenCard) => {
-    setTimeout(() => {
-      // Count toward the "first legendary" / placement tasks.
-      if (typeof TaskTracker !== 'undefined') {
-        TaskTracker.recordEvent('placement', { rarity: chosenCard.rarity });
-      }
-      // Session collection — claim the legendary
-      if (typeof Collection !== 'undefined') Collection.record(chosenCard);
-      // Force the CRITTER pool so it always spawns the Emerald Serpent,
-      // regardless of which pack type / phase the player is currently in.
-      send(`${chosenCard.command}|${CLIENT_ID}|critter`);
-      resetToPackScreen();
-    }, 400);
-  });
-}
 
 // ─── God-pack claim grid ──────────────────────────────────────────────────────
 

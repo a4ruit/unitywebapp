@@ -74,7 +74,6 @@
       <button onclick="debugSpawnBlindBox(); debugMenuClose()">spawn blind box</button>
       <button onclick="debugAddStars(); debugMenuClose()">+25 stars</button>
       <button onclick="debugStatLevel()">+1 stat lv</button>
-      <button onclick="debugForceCloseSoul(); debugMenuClose()">unstick soul screen</button>
     </div>
   </div>
   <script>
@@ -270,15 +269,6 @@
         <div class="choice-grid" id="choiceGrid"></div>
       </div>
 
-      <!-- LEGENDARY REVEAL — single card from the shop's guaranteed legendary -->
-      <div class="screen hidden" id="screen-legendary">
-        <div class="legendary-header">
-          <span class="legendary-title">★ LEGENDARY ★</span>
-          <span class="legendary-sub">tap to claim</span>
-        </div>
-        <div class="legendary-grid" id="legendaryGrid"></div>
-      </div>
-
       <!-- SHOP SCREEN -->
       <div class="screen hidden" id="screen-shop">
         <div class="shop-wrapper">
@@ -356,15 +346,6 @@
                   <div class="shop-item-stars">★ 12</div>
                 </div>
                 <button class="shop-btn" id="shopBigBtn" onclick="shopBuyBigBuff(12, this)">BUY</button>
-              </div>
-
-              <div class="shop-item shop-item--legendary">
-                <span class="shop-item-icon">⭐</span>
-                <div class="shop-item-info">
-                  <div class="shop-item-name">GUARANTEED LEGENDARY</div>
-                  <div class="shop-item-stars">★ 25</div>
-                </div>
-                <button class="shop-btn" onclick="shopBuyLegendary(25, this)">BUY</button>
               </div>
 
             </div>
@@ -583,7 +564,8 @@
   <script src="js/counter.js"></script>
   <script src="js/adled.js"></script>
   <script src="js/ad.js"></script>
-  <script src="js/flockfx.js"></script><!-- must be before choiceGrid3d.js -->
+  <script src="js/flockfx.js"></script>
+  <script src="js/warnfx.js"></script><!-- must be before choiceGrid3d.js -->
   <script src="js/glitchfx.js"></script><!-- must be before choiceGrid3d.js -->
   <script src="js/choiceGrid3d.js"></script>
   <script src="js/bloodDrip.js"></script>

@@ -116,6 +116,7 @@ let _sheepAvailable   = false;
 let _duckAvailable    = false;
 let _foxAvailable     = false;
 let _seagullAvailable = false;
+let _pigAvailable     = false;
 let _serpentAvailable = false;
 // Which creature is currently possessed — drives which WS verbs to send for
 // joystick input + action button. Null when nothing is being possessed.
@@ -144,7 +145,7 @@ let _blindBoxAvailable = false;
 //
 // Cleared whenever a NEW creature becomes available, so dismissing it now does
 // not silently suppress the next pull.
-let _camDismissed = false;
+// Dismissal state lives in _camDismissedFor, one flag per creature.
 
 // ── Fungi spore-paint state ───────────────────────────────────────────────
 // Entirely independent of possession sessions — the mushroom keeps existing
@@ -315,6 +316,16 @@ function handlePossessionMessage(data) {
   }
 
   // ── Seagull possession lifecycle (flying critter) ──────────────────────────
+  if (msg.startsWith('pig_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'pig'); return true; }
+    return true;
+  }
+  if (msg.startsWith('pig_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('pig'); return true; }
+    return true;
+  }
   if (msg.startsWith('seagull_possess_granted|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'seagull'); return true; }
@@ -333,6 +344,12 @@ function handlePossessionMessage(data) {
   }
   if (msg.startsWith('seagull_dived|')) {
     return true;   // ack only — the dive feedback lives in the Unity stream
+  }
+  if (msg === 'lazerpig_spawned' || msg.startsWith('lazerpig_spawned|')) {
+    const parts     = msg.split('|');
+    const spawnerId = parts[1];
+    if (spawnerId === CLIENT_ID) _onPigSpawned();
+    return true;
   }
   if (msg === 'seagull_spawned' || msg.startsWith('seagull_spawned|') || msg.startsWith('seagull_spawned ')) {
     const parts     = msg.split('|');
@@ -663,6 +680,27 @@ function _buildUI() {
     #poss-fox-btn:active { background: rgba(255,100,10,0.3); }
     #poss-fox-btn.poss-hidden { display: none; }
 
+    /* ── LAZERPIG inhabit button — violet, matching the beam ── */
+    #poss-pig-btn {
+      pointer-events: all;
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 12px 28px;
+      background: rgba(158,74,255,0.14);
+      border: 2px solid rgba(158,74,255,0.65);
+      color: #b48aff;
+      font-size: 13px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: background 0.2s, opacity 0.2s;
+      white-space: nowrap;
+    }
+    #poss-pig-btn:active { background: rgba(158,74,255,0.32); }
+    #poss-pig-btn.poss-hidden { display: none; }
+
     /* ── Seagull inhabit button — sky blue, the flying critter ── */
     #poss-seagull-btn {
       pointer-events: all;
@@ -711,7 +749,7 @@ function _buildUI() {
        activates) so players can't miss them on the pack screen. They centre
        on the cam window; multiple stack vertically if several creatures are
        available at once. A gentle glow-pulse draws the eye. ── */
-    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn, #poss-serpent-btn, #poss-box-btn {
+    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn, #poss-serpent-btn, #poss-box-btn, #poss-pig-btn {
       bottom: auto;
       top: 50%;
       z-index: 12;                       /* above the cam window + card frame */
@@ -729,6 +767,7 @@ function _buildUI() {
     #poss-seagull-btn { transform: translate(-50%, calc(-50% - 60px)); }  /* seagull — upper  */
     #poss-serpent-btn { transform: translate(-50%, calc(-50% - 90px)); }  /* serpent — upper  */
     #poss-box-btn     { transform: translate(-50%, calc(-50% - 120px)); } /* box     — top    */
+    #poss-pig-btn     { transform: translate(-50%, calc(-50% - 150px)); } /* lazerpig — top   */
     @keyframes poss-inhabit-pulse {
       0%, 100% { box-shadow: 0 0 10px rgba(0,0,0,0.55); }
       50%      { box-shadow: 0 0 18px 2px rgba(255,255,255,0.22), 0 0 10px rgba(0,0,0,0.55); }
@@ -915,6 +954,37 @@ function _buildUI() {
     #poss-explode:active {
       background: rgba(255, 96, 84, 0.45);
       transform: scale(0.92);
+    }  #poss-fire {
+      pointer-events: all;
+      position: absolute;
+      bottom: 156px;
+      right: 32px;
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: rgba(255, 96, 84, 0.18);
+      border: 2px solid rgba(255, 96, 84, 0.85);
+      color: #ff6054;
+      font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 0;
+      text-shadow: 0 0 8px rgba(255, 96, 84, 0.7);
+      box-shadow: 0 0 12px rgba(255, 96, 84, 0.4);
+      transition: transform 0.08s ease-out, background 0.1s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    #poss-fire:active {
+      background: rgba(255, 96, 84, 0.45);
+      transform: scale(0.92);
     }
 
     /* Armed: the duck is frozen and the stick does nothing, so the joystick
@@ -935,7 +1005,7 @@ function _buildUI() {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -54%);   /* vertical center, slight upward bias for the joystick below */
+      transform: translate(-50%, -50%);
       width: min(55vw, 220px);
       aspect-ratio: 5 / 7;
       display: none;
@@ -1360,6 +1430,12 @@ function _buildUI() {
       display: none;
       background: transparent;
     }
+    /* No z-index here: it is the first child, so DOM order already puts it
+       under every control. Giving it one lifted it over the joystick, FIRE and
+       RELEASE, which is why an active session looked live but ignored input. */
+    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn,
+    #poss-serpent-btn, #poss-box-btn, #poss-pig-btn { z-index: 20; }
+    #poss-video-wrap { z-index: 10; }
 
     /* ── Placement controls row — Game Boy layout: joystick LEFT, PLACE RIGHT.
        Fills the bottom portion of the placement card, below the header text.  */
@@ -1806,6 +1882,7 @@ function _buildUI() {
     <div id="poss-block-overlay"></div>
     <button id="poss-box-btn">Inhabit the Blind Box</button>
     <button id="poss-serpent-btn">Become the Serpent</button>
+    <button id="poss-pig-btn">Ride the LAZERPIG</button>
     <button id="poss-seagull-btn">Inhabit a seagull</button>
     <button id="poss-fox-btn">Inhabit a fox</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
@@ -1869,6 +1946,7 @@ function _buildUI() {
     <button id="poss-eat">FIRE</button>
     <button id="poss-flap">FLAP</button>
     <button id="poss-explode">EXPLODE</button>
+    <button id="poss-fire">FIRE</button>
     <button id="poss-pounce">POUNCE</button>
     <button id="poss-dive">STEAL<br>CHIPS</button>
     <button id="poss-bloom">BLOOM</button>
@@ -1917,6 +1995,7 @@ function _buildUI() {
     duckBtn:          root.querySelector('#poss-duck-btn'),
     foxBtn:           root.querySelector('#poss-fox-btn'),
     seagullBtn:       root.querySelector('#poss-seagull-btn'),
+    pigBtn:           root.querySelector('#poss-pig-btn'),
     serpentBtn:       root.querySelector('#poss-serpent-btn'),
     boxBtn:           root.querySelector('#poss-box-btn'),
     camClose:         root.querySelector('#poss-cam-close'),
@@ -1941,6 +2020,7 @@ function _buildUI() {
     eat:              root.querySelector('#poss-eat'),
     flap:             root.querySelector('#poss-flap'),
     explode:          root.querySelector('#poss-explode'),
+    fire:             root.querySelector('#poss-fire'),
     pounce:           root.querySelector('#poss-pounce'),
     dive:             root.querySelector('#poss-dive'),
     bloom:            root.querySelector('#poss-bloom'),
@@ -1963,6 +2043,7 @@ function _buildUI() {
   _ui.duckBtn.addEventListener('click',    _requestDuckPossession);
   _ui.foxBtn.addEventListener('click',     _requestFoxPossession);
   _ui.seagullBtn.addEventListener('click', _requestSeagullPossession);
+  if (_ui.pigBtn) _ui.pigBtn.addEventListener('click', _requestPigPossession);
   _ui.serpentBtn.addEventListener('click', _requestSerpentPossession);
   _ui.boxBtn.addEventListener('click',     _requestBoxPossession);
   _ui.openBox.addEventListener('click',    _openBox);
@@ -1976,6 +2057,10 @@ function _buildUI() {
   _ui.eat.addEventListener('click',         _fire);
   _ui.flap.addEventListener('touchstart',   e => { e.preventDefault(); _flap();         }, { passive: false });
   _ui.flap.addEventListener('click',        _flap);
+  if (_ui.fire) {
+    _ui.fire.addEventListener('touchstart', e => { e.preventDefault(); _pigFire(); }, { passive: false });
+    _ui.fire.addEventListener('click',      _pigFire);
+  }
   if (_ui.explode) {
     _ui.explode.addEventListener('touchstart', e => { e.preventDefault(); _explode(); }, { passive: false });
     _ui.explode.addEventListener('click',      _explode);
@@ -2017,6 +2102,9 @@ function _buildUI() {
   if (!_foxAvailable) {
     _ui.foxBtn.classList.add('poss-hidden');
     console.log('[possession.js] Fox button locked — waiting for first fox_spawned');
+  }
+  if (!_pigAvailable && _ui.pigBtn) {
+    _ui.pigBtn.classList.add('poss-hidden');
   }
   if (!_seagullAvailable) {
     _ui.seagullBtn.classList.add('poss-hidden');
@@ -2113,6 +2201,14 @@ function _requestFoxPossession() {
   _ui.video.muted = true;
   _ui.video.play().catch(() => {});
   send(`fox_possess_request|${CLIENT_ID}`);
+}
+
+function _requestPigPossession() {
+  _ui.pigBtn.textContent   = 'Requesting…';
+  _ui.pigBtn.style.opacity = '0.5';
+  _ui.video.muted = true;
+  _ui.video.play().catch(() => {});
+  send(`pig_possess_request|${CLIENT_ID}`);
 }
 
 function _requestSeagullPossession() {
@@ -2236,6 +2332,19 @@ function _renderRam() {
 let _duckArmed   = false;
 let _fuseTicker  = null;
 
+let _pigFired = false;
+
+function _pigFire() {
+  if (!_possessed || _creatureType !== 'pig' || _pigFired) return;
+  _pigFired = true;
+  console.log('[possession.js] pig_fire sent');
+  send(`pig_fire|${CLIENT_ID}`);
+  if (_ui.fire) {
+    _ui.fire.disabled    = true;
+    _ui.fire.textContent = 'FIRING';
+  }
+}
+
 function _explode() {
   if (!_possessed || _creatureType !== 'duck' || _duckArmed) return;
   _duckArmed = true;
@@ -2325,6 +2434,7 @@ function _onGranted(duration, creature) {
   _ui.duckBtn.classList.add('poss-hidden');
   _ui.foxBtn.classList.add('poss-hidden');
   _ui.seagullBtn.classList.add('poss-hidden');
+  if (_ui.pigBtn) _ui.pigBtn.classList.add('poss-hidden');
   _ui.serpentBtn.classList.add('poss-hidden');
   _ui.boxBtn.classList.add('poss-hidden');
 
@@ -2341,6 +2451,7 @@ function _onGranted(duration, creature) {
   if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'     ? 'FOX CAM'     :
                                              creature === 'serpent' ? 'SERPENT CAM' :
                                              creature === 'seagull' ? 'SEAGULL CAM' :
+                                             creature === 'pig'     ? 'LAZERPIG CAM' :
                                              creature === 'duck'    ? 'DUCK CAM'    : 'SHEEP CAM';
   _setGbTimer(duration);
 
@@ -2357,6 +2468,13 @@ function _onGranted(duration, creature) {
     _resetDuckExplode();
   } else if (creature === 'fox') {
     _ui.pounce.style.display = 'flex';
+  } else if (creature === 'pig') {
+    if (_ui.fire) {
+      _ui.fire.style.display = 'flex';
+      _ui.fire.disabled      = false;
+      _ui.fire.textContent   = 'FIRE';
+    }
+    _pigFired = false;
   } else if (creature === 'seagull') {
     _ui.dive.style.display   = 'flex';
   } else if (creature === 'serpent') {
@@ -2379,7 +2497,8 @@ function _onGranted(duration, creature) {
   const inputVerb = creature === 'fox'     ? 'fox_input'     :
                     creature === 'duck'    ? 'duck_input'    :
                     creature === 'seagull' ? 'seagull_input' :
-                    creature === 'serpent' ? 'serpent_input' : 'sheep_input';
+                    creature === 'serpent' ? 'serpent_input' :
+                    creature === 'pig'     ? 'pig_input'     : 'sheep_input';
   _resetInputSendTracking();  // first tick always fires
   _inputInterval = setInterval(() => {
     if (_shouldSendInput()) {
@@ -2396,10 +2515,17 @@ function _onDenied(creature) {
   // Denial can mean (a) someone else grabbed this creature, (b) the manager
   // is at its concurrent-stream cap, or (c) no spawned creatures remain.
   // Flash a short "STREAMS FULL" label, then restore the normal button text.
-  const btn     = creature === 'fox'  ? _ui.foxBtn  :
-                  creature === 'duck' ? _ui.duckBtn : _ui.btn;
-  const restore = creature === 'fox'  ? 'Inhabit a fox'  :
-                  creature === 'duck' ? 'Inhabit a duck' : 'Inhabit a sheep';
+  const btn     = creature === 'fox'     ? _ui.foxBtn     :
+                  creature === 'duck'    ? _ui.duckBtn    :
+                  creature === 'pig'     ? _ui.pigBtn     :
+                  creature === 'seagull' ? _ui.seagullBtn :
+                  creature === 'serpent' ? _ui.serpentBtn : _ui.btn;
+  const restore = creature === 'fox'     ? 'Inhabit a fox'     :
+                  creature === 'duck'    ? 'Inhabit a duck'    :
+                  creature === 'pig'     ? 'Ride the LAZERPIG' :
+                  creature === 'seagull' ? 'Inhabit a seagull' :
+                  creature === 'serpent' ? 'Inhabit a serpent' : 'Inhabit a sheep';
+  if (!btn) return;
   btn.textContent   = 'Streams full — wait';
   btn.style.opacity = '0.6';
   setTimeout(() => {
@@ -2421,44 +2547,103 @@ function _onDenied(creature) {
 // nothing is available. Never runs during an active possession.
 function _refreshCamPreview() {
   if (!_ui || _possessed) return;
-  const box = _blindBoxAvailable;
-  const any = _sheepAvailable || _duckAvailable || _foxAvailable || _seagullAvailable || _serpentAvailable || box;
-  if (!any || _camDismissed) {
+
+  const live = _liveOffers();
+  const any  = Object.keys(live).some(k => live[k]);
+  if (!any) {
     _ui.vidWrap.classList.remove('cam-preview');
     _ui.vidWrap.style.display = 'none';
+    if (_ui.blockOverlay && !_possessed) _ui.blockOverlay.style.display = 'none';
     return;
   }
-  // Title reflects the highest-priority available creature.
-  const title = box ? 'BOX CAM'
-              : _serpentAvailable ? 'SERPENT CAM'
-              : _foxAvailable     ? 'FOX CAM'
-              : _seagullAvailable ? 'SEAGULL CAM'
-              : _duckAvailable    ? 'DUCK CAM'
-              :                     'SHEEP CAM';
+  // Every live offer shows its button; dismissed ones stay gone until that
+  // creature is pulled again.
+  Object.keys(_offerBtns).forEach(k => {
+    const b = _offerBtns[k]();
+    if (b) b.classList.toggle('poss-hidden', !live[k]);
+  });
+
+  // Title reflects the highest-priority live offer.
+  const title = live.box ? 'BOX CAM'
+              : live.serpent ? 'SERPENT CAM'
+              : live.fox     ? 'FOX CAM'
+              : live.pig     ? 'LAZERPIG CAM'
+              : live.seagull ? 'SEAGULL CAM'
+              : live.duck    ? 'DUCK CAM'
+              :                'SHEEP CAM';
   if (_ui.gbTitle) _ui.gbTitle.textContent = title;
   _ui.vidWrap.style.display = 'block';
   _ui.vidWrap.classList.add('cam-preview');
   if (_ui.camClose) _ui.camClose.style.display = 'block';
-  _showNametag(true);
+  // The offer is modal: without this the pack carousel underneath stays live
+  // and a tap meant for INHABIT opens a card instead.
+  if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
+  if (typeof _showNametag === 'function') _showNametag(true);
 }
 
 // Close the preview by hand. The creature stays available — this hides the
 // window, it does not give up the inhabit.
+//
+// Dismissal is PER CREATURE. It used to be one global flag that any later
+// spawn cleared, so pulling a fox brought back the sheep offer the player had
+// already closed — things reappearing out of nowhere.
 function _dismissCamPreview() {
-  _camDismissed = true;
+  const live = _liveOffers();
+  Object.keys(live).forEach(k => { if (live[k]) _camDismissedFor[k] = true; });
   if (!_ui) return;
   if (_ui.camClose) _ui.camClose.style.display = 'none';
+  _hideOfferButtons();
   _refreshCamPreview();
 }
 
-// Any newly available creature brings the window back, so a dismissal only
-// applies to the offer that was on screen when it was made.
-function _undismissCam() {
-  _camDismissed = false;
+const _camDismissedFor = {
+  sheep: false, duck: false, fox: false, seagull: false,
+  serpent: false, pig: false, box: false,
+};
+
+const _offerBtns = {
+  sheep:   () => _ui && _ui.btn,
+  duck:    () => _ui && _ui.duckBtn,
+  fox:     () => _ui && _ui.foxBtn,
+  seagull: () => _ui && _ui.seagullBtn,
+  serpent: () => _ui && _ui.serpentBtn,
+  pig:     () => _ui && _ui.pigBtn,
+  box:     () => _ui && _ui.boxBtn,
+};
+
+// Available AND not dismissed.
+function _liveOffers() {
+  return {
+    sheep:   _sheepAvailable    && !_camDismissedFor.sheep,
+    duck:    _duckAvailable     && !_camDismissedFor.duck,
+    fox:     _foxAvailable      && !_camDismissedFor.fox,
+    seagull: _seagullAvailable  && !_camDismissedFor.seagull,
+    serpent: _serpentAvailable  && !_camDismissedFor.serpent,
+    pig:     _pigAvailable      && !_camDismissedFor.pig,
+    box:     _blindBoxAvailable && !_camDismissedFor.box,
+  };
+}
+
+// The offer is the window AND the buttons. Hiding one without the other left a
+// stack of INHABIT buttons floating over the pack screen with nothing to
+// dismiss them.
+function _hideOfferButtons() {
+  if (!_ui) return;
+  [_ui.btn, _ui.duckBtn, _ui.foxBtn, _ui.seagullBtn,
+   _ui.serpentBtn, _ui.boxBtn, _ui.pigBtn].forEach(b => {
+    if (b) b.classList.add('poss-hidden');
+  });
+}
+
+
+// Pulling that creature again is a new offer, so its own dismissal is cleared.
+// Nobody else's is.
+function _undismissCam(kind) {
+  if (kind in _camDismissedFor) _camDismissedFor[kind] = false;
 }
 
 function _onSheepSpawned() {
-  _undismissCam();
+  _undismissCam('sheep');
   _sheepAvailable = true;
   if (_ui && !_possessed) {
     _ui.btn.classList.remove('poss-hidden');
@@ -2472,7 +2657,7 @@ function _onSheepSpawned() {
  * Unlocks the duck inhabit button. Each duck card grants one possession.
  */
 function _onDuckSpawned() {
-  _undismissCam();
+  _undismissCam('duck');
   _duckAvailable = true;
   if (_ui && !_possessed) {
     _ui.duckBtn.classList.remove('poss-hidden');
@@ -2511,7 +2696,7 @@ function _onDuckFlapped(total) {
  * Unlocks the fox inhabit button. Each fox card grants one possession.
  */
 function _onFoxSpawned() {
-  _undismissCam();
+  _undismissCam('fox');
   _foxAvailable = true;
   if (_ui && !_possessed) {
     _ui.foxBtn.classList.remove('poss-hidden');
@@ -2524,8 +2709,19 @@ function _onFoxSpawned() {
  * Called when Unity broadcasts that a seagull has spawned (rare critter pack).
  * Unlocks the seagull inhabit button. Each seagull card grants one flight.
  */
+function _onPigSpawned() {
+  _undismissCam('pig');
+  _pigAvailable = true;
+  if (_ui && !_possessed && _ui.pigBtn) {
+    _ui.pigBtn.textContent   = 'Ride the LAZERPIG';
+    _ui.pigBtn.style.opacity = '1';
+    _ui.pigBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
+  }
+}
+
 function _onSeagullSpawned() {
-  _undismissCam();
+  _undismissCam('seagull');
   _seagullAvailable = true;
   if (_ui && !_possessed) {
     _ui.seagullBtn.classList.remove('poss-hidden');
@@ -2539,7 +2735,7 @@ function _onSeagullSpawned() {
  * (legendary-alpha critter pack). Unlocks the "Become the Serpent" button.
  */
 function _onSerpentSpawned() {
-  _undismissCam();
+  _undismissCam('serpent');
   _serpentAvailable = true;
   if (_ui && !_possessed) {
     _ui.serpentBtn.classList.remove('poss-hidden');
@@ -3154,7 +3350,7 @@ function _requestBoxPossession() {
 }
 
 function _onBoxSpawned() {
-  _undismissCam();
+  _undismissCam('box');
   _blindBoxAvailable = true;
   if (_ui && !_possessed) {
     _ui.boxBtn.classList.remove('poss-hidden');
@@ -3269,6 +3465,7 @@ function _onEnded() {
   const wasSeagull = _creatureType === 'seagull';
   const wasSerpent = _creatureType === 'serpent';
   const wasBox     = _creatureType === 'box';
+  const wasPig     = _creatureType === 'pig';
   _possessed    = false;
   clearInterval(_inputInterval);
   _joystickActive = false;
@@ -3319,6 +3516,13 @@ function _onEnded() {
     _seagullAvailable = false;
     _ui.seagullBtn.textContent   = 'Inhabit a seagull';
     _ui.seagullBtn.style.opacity = '1';
+  } else if (wasPig) {
+    // One shot per pig, so the ride is spent whether or not they fired.
+    _pigAvailable = false;
+    if (_ui.pigBtn) {
+      _ui.pigBtn.textContent   = 'Ride the LAZERPIG';
+      _ui.pigBtn.style.opacity = '1';
+    }
   } else if (wasSerpent) {
     // The serpent is one-and-done — it flies off and despawns after its reign.
     _serpentAvailable = false;
@@ -3356,6 +3560,12 @@ function _onEnded() {
   // session and reappears on the next creature, which is the bug where LAUNCH
   // outlived its encounter.
   if (_ui.explode) _ui.explode.style.display = 'none';
+  if (_ui.fire) {
+    _ui.fire.style.display = 'none';
+    _ui.fire.disabled      = false;
+    _ui.fire.textContent   = 'FIRE';
+  }
+  _pigFired = false;
   _ui.pounce.style.display   = 'none';
   _ui.dive.style.display     = 'none';
   _ui.bloom.style.display    = 'none';

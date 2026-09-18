@@ -457,6 +457,20 @@ function shopBuyBigBuff(cost, btn) {
   _shopConfirm(btn, 'ACTIVE');
 }
 
+// Marks prismatic owned, returning true only if this CHANGED anything.
+//
+// The shop and the <THE PROTECTOR> grant both arrive here, so ownership lives in
+// one place rather than each path keeping its own idea of it. Without that, a
+// player who earned it and then opened the shop would be offered it again at 30
+// stars, which is worse than never having been given it.
+function markPrismaticOwned() {
+  if (_prismaticOwned) return false;
+  _prismaticOwned = true;
+  if (typeof _syncPrismaticButton === 'function') _syncPrismaticButton();
+  if (typeof updateShopButtons    === 'function') updateShopButtons();
+  return true;
+}
+
 function shopBuyPrismatic(cost, btn) {
   if (_prismaticOwned) { _shopConfirm(btn, 'ACTIVE'); return; }  // already owned
   if (!spendStars(cost)) { _shopDenied(); return; }
@@ -532,18 +546,19 @@ function _syncPrismaticButton() {
   }
 }
 
-// Guaranteed legendary — pierce the gacha. Next pack's top card is legendary+.
-function shopBuyLegendary(cost, btn) {
-  if (!spendStars(cost)) { _shopDenied(); return; }
-  syncShopBalance();
-  updateShopButtons();
-  // Take the player to the single-card legendary reveal (they tap to claim it).
-  if (typeof showLegendaryReveal === 'function') {
-    showLegendaryReveal();
-  } else {
-    window._guaranteedLegendary = true;   // fallback to next-pull voucher
-  }
-}
+// The GUARANTEED LEGENDARY voucher lived here.
+//
+// Removed rather than fixed. It could only ever hand out the Emerald Serpent —
+// the critter pool's legendary-alpha and the only legendary creature that
+// exists — so it forced the CRITTER pool regardless of which pack the player
+// had open. Twenty-five stars spent inside a nature pack returned a creature
+// from a different deck, which reads as the shop being broken rather than as a
+// deliberate crossover. Its two code paths also disagreed: the reveal screen
+// spawned immediately, while the fallback voucher deferred to the next pull.
+//
+// Fixing it properly needs a legendary per pool, which is content work, not a
+// patch. Until then an item that misbehaves is worse than an item that is not
+// in the shop.
 
 function updateShopButtons() {
   // Grey out items the player can't afford, highlight what they can

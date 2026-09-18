@@ -104,6 +104,18 @@ const Announce = (() => {
       return true;
     }
 
+    // signal_lost|seconds|fromStage|toStage|keptPlacements|source
+    if (msg.startsWith('signal_lost|')) {
+      const p = msg.split('|');
+      SignalLost.show(parseInt(p[1]) || 15, p[2] || '', p[3] || '', parseInt(p[4]) || 0,
+                      p.slice(5).join('|'));
+      return true;
+    }
+    if (msg === 'signal_restored') {
+      SignalLost.hide();
+      return true;
+    }
+
     // ── <WH4Ti5L0VE> ─────────────────────────────────────────────────────────
     // Same HUD, same handlers, different name and tint. Its messages are kept on
     // their own prefix so the two bosses can never overwrite each other's state
@@ -466,4 +478,125 @@ const Announce = (() => {
 
   return { handleMessage, godPack };
 
+})();
+
+// ── TREE DOWN ──────────────────────────────────────────────────────────────
+// Room-wide cover when the Soul Tree falls. Blocks every tap underneath for the
+// grace period, says what fell and what it fell back to, then lifts on its own
+// timer or on signal_restored, whichever comes first.
+const SignalLost = (() => {
+  let _root = null, _raf = 0, _timer = 0, _endsAt = 0;
+
+  function _build() {
+    if (_root) return _root;
+
+    const css = document.createElement('style');
+    css.textContent = `
+      #signal-lost {
+        position: fixed; inset: 0; z-index: 2147483000;
+        display: flex; align-items: center; justify-content: center;
+        visibility: hidden; opacity: 0; transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+        /* Dimmed, desaturated page underneath, closed in by a heavy vignette:
+           reads as "you are out for a moment", not as a dead connection. */
+        background: radial-gradient(ellipse at center,
+                    rgba(0,0,0,0.35) 0%, rgba(0,0,0,0.55) 45%, rgba(0,0,0,0.96) 100%);
+        -webkit-backdrop-filter: grayscale(0.85) brightness(0.55);
+        backdrop-filter: grayscale(0.85) brightness(0.55);
+        pointer-events: all; touch-action: none;
+        font-family: 'Pixelify Sans', 'lo-res', monospace; color: #e8f0ff;
+        text-align: center; overflow: hidden;
+      }
+      #signal-lost.open { visibility: visible; opacity: 1; transition: opacity 0.6s ease; }
+      #signal-lost canvas {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        image-rendering: pixelated; opacity: 0.18;
+      }
+      #signal-lost .sl-body { position: relative; padding: 0 24px; }
+      #signal-lost .sl-title {
+        font-size: 44px; letter-spacing: 3px; color: #ff4d6d;
+        text-shadow: 3px 0 #3cf, -3px 0 #f0f;
+        animation: sl-jitter 0.18s steps(2) infinite;
+      }
+      #signal-lost .sl-line  { font-size: 16px; margin-top: 14px; opacity: 0.9; }
+      #signal-lost .sl-keep  { font-size: 14px; margin-top: 6px; color: #9fd8ff; }
+      #signal-lost .sl-count { font-size: 64px; margin-top: 28px; }
+      #signal-lost .sl-hint  { font-size: 12px; margin-top: 4px; opacity: 0.6; letter-spacing: 2px; }
+      @keyframes sl-jitter {
+        0%   { transform: translate(0,0); }
+        50%  { transform: translate(-2px,1px); }
+        100% { transform: translate(2px,-1px); }
+      }`;
+    document.head.appendChild(css);
+
+    _root = document.createElement('div');
+    _root.id = 'signal-lost';
+    _root.innerHTML = `
+      <canvas width="72" height="128"></canvas>
+      <div class="sl-body">
+        <div class="sl-title">TREE DOWN</div>
+        <div class="sl-line"  data-k="line"></div>
+        <div class="sl-keep"  data-k="keep"></div>
+        <div class="sl-count" data-k="count"></div>
+        <div class="sl-hint">LOOK AT THE BIG SCREEN</div>
+      </div>`;
+    ['click','touchstart','touchend','pointerdown','pointerup'].forEach(ev =>
+      _root.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }, { passive: false }));
+    document.body.appendChild(_root);
+    return _root;
+  }
+
+  function _static(ctx, img) {
+    const d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const v = Math.random() * 255 | 0;
+      d[i] = d[i + 1] = d[i + 2] = v;
+      d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function show(seconds, fromStage, toStage, kept, source) {
+    const root = _build();
+    const q = k => root.querySelector(`[data-k="${k}"]`);
+    const esc = s => String(s).replace(/[&<>"]/g, c =>
+      ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
+
+    const who = source ? esc(source) : 'the glitch';
+    q('line').innerHTML = `${who} destroyed the ${esc(fromStage).toLowerCase()}`;
+    q('keep').textContent = fromStage === toStage
+      ? 'it grows back in'
+      : `it grows back as a ${toStage.toLowerCase()} in`;
+
+    root.classList.add('open');
+
+    const canvas = root.querySelector('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = ctx.createImageData(canvas.width, canvas.height);
+    cancelAnimationFrame(_raf);
+    let last = 0;
+    const tick = t => {
+      if (t - last > 60) { _static(ctx, img); last = t; }
+      _raf = requestAnimationFrame(tick);
+    };
+    _raf = requestAnimationFrame(tick);
+
+    _endsAt = Date.now() + seconds * 1000;
+    clearInterval(_timer);
+    const paint = () => {
+      const left = Math.max(0, Math.ceil((_endsAt - Date.now()) / 1000));
+      q('count').textContent = left;
+      if (left <= 0) hide();
+    };
+    paint();
+    _timer = setInterval(paint, 200);
+  }
+
+  function hide() {
+    if (!_root) return;
+    _root.classList.remove('open');
+    cancelAnimationFrame(_raf);
+    clearInterval(_timer);
+  }
+
+  return { show, hide };
 })();

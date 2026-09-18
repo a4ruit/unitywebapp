@@ -144,6 +144,7 @@ const CardTextures = (() => {
   _loadSkin('symbol-duck',       'assets/duck-card.png');
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
+  _loadSkin('symbol-lazerpig',   'assets/lazerpig-symbol.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -1996,7 +1997,226 @@ const CardTextures = (() => {
 
   // ─── CRITTER shape drawers ─────────────────────────────────────────────────────
 
+  // C:\GULL — the critter pool's rare.
+  //
+  // Side on, facing left, standing — the same presentation as the sheep and the
+  // duck it sits beside. The first pass drew it head-on in a glide, which was a
+  // better gull and a worse CARD: next to two chunky side-view animals it read
+  // as an abstract V, not as a member of the same set. The pool's shared framing
+  // matters more here than the best silhouette for the species.
+  //
+  // The grey mantle over a white body is what separates it from the duck at a
+  // glance, since both are white birds at the same size. The eye and the open
+  // beak are the character: the card's line is "eyeing your chips".
+  const GULL_ART = [
+    '.....................',
+    '.....................',
+    '....DDDD.............',
+    '...DHHHHD............',
+    '..DHHWWHHD...........',
+    '..DHWDWHHD...........',
+    'DYDHHHHHHD...........',
+    'DYYDHHHHHDDDDD.......',
+    '.DYDHHHHHHHHHHDDD....',
+    '..DDHHHHHHHHHHHHHDD..',
+    '...DHHHHMMMMMMHHHHHD.',
+    '...DHHHMMMMMMMMMHHHHD',
+    '...DHHHMMMMMMMMMMMHDD',
+    '...DHHHHMMMMMMMMMDD..',
+    '....DHHHHHHHHHHHD....',
+    '.....DHHHHHHHHHD.....',
+    '......DDHHHHHDD......',
+    '.......DYD.DYD.......',
+    '.......DYD.DYD.......',
+    '......DYYD..DYYD.....',
+    '.....................',
+  ];
+
+  // Y is an accent key on top of the usual five, for the beak. The rest of the
+  // deck gets by on D-M-L-H-W because each symbol is one material; a gull is
+  // white with one yellow part, and dropping that part costs the only colour
+  // anyone actually names when they describe a seagull.
+  const GULL_PAL = {
+    D: '#1d2a38', M: '#5a6b7d', L: '#9fb0c0', H: '#dfe8f0', W: '#ffffff',
+    Y: '#f0b028',
+  };
+
+  // Red Fox — the critter pool's legendary.
+  //
+  // Same side-on, facing-left framing as the sheep, the duck and the gull. The
+  // legendary does not get a different presentation; it earns its rank on
+  // silhouette instead, which is the only thing that still works once the card
+  // is small, tumbling, or across a room.
+  //
+  // Three-quarter, not profile: both ears, both eyes and the white chest turned
+  // toward the viewer, with the body receding to the tail. A pure side-on fox
+  // reads as passing through; angled, it reads as having noticed you.
+  const FOX_ART = [
+    '.....................',
+    '..DD.......DD...DDD..',
+    '..DHD.....DHD..DHWWD.',
+    '..DHHD...DHHD.DHHWWWD',
+    '..DHHHDDDHHHD.DHHHWWD',
+    '.DHHHHHHHHHHHDDHHHWWD',
+    '.DHWDHHHHHDWHDDHHHWWD',
+    '.DHHHHHHHHHHHDDHHHWWD',
+    '.DHHWWWWWWWHHHDHHHWWD',
+    '..DHWWDDDWWHHHDHHHWWD',
+    '..DDWWWWWWWDLLDHHWWD.',
+    '...DWWWWWWWDLLLDHWWD.',
+    '...DWWWWWWDLLLLLDDWD.',
+    '....DWWWWDLLLLLLLDDD.',
+    '....DDWWDLLLLLLLLLD..',
+    '.....DLLLLLLLLLLLLD..',
+    '.....DMLLLLLLLLLLMD..',
+    '.....DDMMDDDDDDMMDD..',
+    '......DMMD....DMMD...',
+    '......DDDD....DDDD...',
+    '.....................',
+  ];
+
+  // Fox reds. W does double duty as the throat and the tail tip — the two white
+  // marks a red fox is actually identified by, and the only places the palette
+  // goes bright.
+  const FOX_PAL = {
+    D: '#2a1408',   // outline, and the dark of the legs
+    M: '#8f3a10',   // shaded underside and legs
+    L: '#d2641c',   // the coat
+    H: '#f08a2e',   // lit along the back, ears and tail
+    W: '#fff0dc',   // throat, belly, tail tip
+  };
+
+  // Emerald Serpent — ouroboros. The open mouth and the thinned tail are the
+  // whole read: a closed ring on its own is a washer.
+  const SERPENT_ART = [
+    '........D............',
+    '........DDDD.........',
+    '....DD.DHHHHDDD......',
+    '...DDHDHWDHHHDDDD....',
+    '..DDHHDHHHHHHHDMDD...',
+    '.DDHHHHDHHHHHDMMMDD..',
+    '.DHHHHHDDDDDDDMMMMD..',
+    '.DHHHHD.......DMMMDD.',
+    'DDHHHDD.......DDMMMD.',
+    'DHHHHD.........DMMMD.',
+    'DHHHHD.........DMMMD.',
+    'DHHHHD.........DMMMD.',
+    'DDHHHDD.......DDMMMD.',
+    '.DHHHHD.......DHMMMD.',
+    '.DHHHHHDD...DDHHHMMD.',
+    '.DDHHHHHDDDDDHHHHHD..',
+    '..DDHHHHHHHHHHHHHDD..',
+    '...DDHHHHHHHHHHHDD...',
+    '....DDHHHHHHHHHDD....',
+    '.....DDDDHHHDDDD.....',
+    '........DDDDD........',
+  ];
+  const SERPENT_PAL = {
+    D: '#0a2a18', M: '#1c6b3c', L: '#2f9c55', H: '#4fd07a', W: '#eaffe8',
+  };
+
+  // LAZERPIG — side on, facing left, coil along its back. The barrel is the
+  // only straight line on an otherwise round animal, which is what says which
+  // way it fires.
+  const LAZERPIG_ART = [
+    '.....................',
+    '.....................',
+    '.........DDDDDDDD....',
+    '........DMMMMMMMMD...',
+    '........DMYYYYYYMD...',
+    '.........DDDDDDDD....',
+    '....DDDDDDDDDDDDDD...',
+    '..DDHHHHHHHHHHHHHHDD.',
+    '.DHHHHHHHHHHHHHHHHHHD',
+    'DHHWHHHHHHHHHHHHHHHHD',
+    'DHWDWHHHHHHHHHHHHHHHD',
+    'DSSDWHHHHHHHHHHHHHHHD',
+    'DSSDHHHHHHHHHHHHHHHHD',
+    '.DHHHHHHHHHHHHHHHHHD.',
+    '..DHHHHHHHHHHHHHHHD..',
+    '...DDHHDDDDDDDHHDD...',
+    '....DHHD.....DHHD....',
+    '....DMMD.....DMMD....',
+    '....DDDD.....DDDD....',
+    '.....................',
+    '.....................',
+  ];
+  const LAZERPIG_PAL = {
+    D: '#2a1420', M: '#4a4f5e', L: '#7c8496', H: '#f0a8b4', W: '#ffe4ea',
+    S: '#d4737f', Y: '#b84aff',
+  };
+
+  function drawLazerpigSymbol(ctx) {
+    const sym = _cardSkins['symbol-lazerpig'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('lazerpig', LAZERPIG_ART, LAZERPIG_PAL));
+  }
+
+  // ─── Laser warning plate ───────────────────────────────────────────────────
+  // Class-4 laser hazard sign, in the deck's pixel language. Corner flavour on
+  // the LAZERPIG card — the only card that fires something across the field.
+  const WARN_ART = [
+    'KKKKKKKKKKKKKKKKKKK',
+    'KYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYKYYYYYYYYK',
+    'KYYYYYYYKYKYYYYYYYK',
+    'KYYYYYYYKYKYYYYYYYK',
+    'KYYYYYYYKYKYYYYYYYK',
+    'KYYYYYYKYYYKYYYYYYK',
+    'KYYYYYKYYKYYKYYYYYK',
+    'KYYYYYKKYKYKKYYYYYK',
+    'KYYYYYKYKKKYKYYYYYK',
+    'KYYYYKKKKKKKKKYYYYK',
+    'KYYYKYYYKKKYYYKYYYK',
+    'KYYYKYYKYKYKYYKYYYK',
+    'KYYYKYYYYKYYYYKYYYK',
+    'KYYKKKKKKKKKKKKKYYK',
+    'KYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYYYYYK',
+    'KKKKKKKKKKKKKKKKKKK',
+  ];
+
+  const WARN_PAL = { K: '#120c04', Y: '#f2c21a' };
+
+  // Hung on the top-right corner: big enough to read at a glance, tilted, and
+  // pushed out far enough that it overhangs the frame edge.
+  function drawLaserWarning(ctx) {
+    const spr = getSprite('laserwarn', WARN_ART, WARN_PAL);
+    const size = 64;
+
+    const smoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    ctx.save();
+    ctx.translate(232, 30);
+    ctx.rotate(9 * Math.PI / 180);
+    // Drop shadow, so the overhang reads as sitting on top of the frame.
+    ctx.globalAlpha = 0.35;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(-size / 2 + 3, -size / 2 + 3, size, size);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(spr, -size / 2, -size / 2, size, size);
+    ctx.restore();
+    ctx.imageSmoothingEnabled = smoothing;
+  }
+
   function drawShapeCritter(ctx, rarity, t) {
+    if (rarity === 'rare') {
+      drawSprite(ctx, getSprite('gull', GULL_ART, GULL_PAL));
+      return;
+    }
+    if (rarity === 'legendary') {
+      drawSprite(ctx, getSprite('fox', FOX_ART, FOX_PAL));
+      return;
+    }
+
     // Image-first: use PNG symbol art when available, fall back to procedural.
     if (rarity === 'common') {
       const sym = _cardSkins['symbol-critter'];
@@ -3568,6 +3788,7 @@ const CardTextures = (() => {
     if (card.name === 'White Mushroom' || card.name === 'RAM')        skinKey = 'nature-common';
     if (card.name === 'DDoS Duck'      || card.name === 'Fairy Cap')  skinKey = 'nature-uncommon';
     if (card.name === 'C:\\GULL'        || card.name === 'Puffball')  skinKey = 'nature-rare';
+    if (card.name === 'LAZERPIG') skinKey = 'nature-rare';
     // Leaf Storm, Blue Angel, and every other legendary-rarity card share
     // legendary-card.png as the frame. Symbol + labels still draw on top.
     if (card.rarity === 'legendary') skinKey = 'legendary';
@@ -3587,8 +3808,12 @@ const CardTextures = (() => {
     // ouroboros, independent of which pack type the player is currently on (the
     // normal drawShape dispatch keys off activePackType, which would otherwise
     // draw the nature Tree of Life).
-    if (card.name === 'Emerald Serpent') drawOuroboros(ctx, t);
-    else                                 drawShape(ctx, card.rarity, t);
+    if (card.name === 'Emerald Serpent')
+      drawSprite(ctx, getSprite('serpent', SERPENT_ART, SERPENT_PAL));
+    else if (card.name === 'LAZERPIG')
+      drawLazerpigSymbol(ctx);   // hazard plate is an overlay — see warnfx.js
+    else
+      drawShape(ctx, card.rarity, t);
     drawLabels(ctx, card, card.rarity, t, opts);
     // Over the labels, under the holo sheen: the overlay should read as sitting
     // on the frame, but holo is a finish applied to the whole card face.
