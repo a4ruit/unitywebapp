@@ -18,6 +18,38 @@ const wss    = new WebSocket.Server({ server });
 
 app.use(express.static('project'));
 
+// ── Keepsakes ───────────────────────────────────────────────────────────────
+// Each player's best-moment frame, uploaded by Unity when the credits roll and
+// fetched once by that player's phone. Memory only: a few small PNGs that
+// expire on their own, so nothing touches disk and nothing grows.
+const KEEPSAKE_TTL_MS = 30 * 60 * 1000;
+const KEEPSAKE_MAX    = 64;
+const keepsakes = new Map();   // clientId → { buf, at }
+
+function pruneKeepsakes() {
+  const now = Date.now();
+  for (const [id, k] of keepsakes) if (now - k.at > KEEPSAKE_TTL_MS) keepsakes.delete(id);
+  while (keepsakes.size > KEEPSAKE_MAX) keepsakes.delete(keepsakes.keys().next().value);
+}
+
+app.post('/keepsake/:id', express.raw({ type: 'image/png', limit: '400kb' }), (req, res) => {
+  // Optional shared secret so only the installation can upload.
+  if (process.env.KEEPSAKE_KEY && req.get('X-Keepsake-Key') !== process.env.KEEPSAKE_KEY)
+    return res.sendStatus(403);
+  if (!Buffer.isBuffer(req.body) || req.body.length === 0) return res.sendStatus(400);
+  keepsakes.set(req.params.id, { buf: req.body, at: Date.now() });
+  pruneKeepsakes();
+  res.sendStatus(204);
+});
+
+app.get('/keepsake/:id', (req, res) => {
+  const k = keepsakes.get(req.params.id);
+  if (!k) return res.sendStatus(404);
+  res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'no-store');
+  res.send(k.buf);
+});
+
 // ── Verbose logging ─────────────────────────────────────────────────────────
 // Console writes are SYNCHRONOUS in Node and block the event loop. At
 // 4 players × 20 Hz × 4 input verbs that's ~320 log lines/sec — enough to

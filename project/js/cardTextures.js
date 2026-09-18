@@ -76,6 +76,10 @@ const CardTextures = (() => {
     fungi:      { hp: 12, atk: 3,  rule: 'Plant, then draw a spore path.' },
     blueangel:  { hp: 20, atk: 2,  rule: 'Bait. Drains from range.' },
     sporecap:   { hp: 12, atk: 1,  rule: 'Tap to drop. Bursts on hit.' },
+    // Keyed by name: Puffball shares the 'fungi' placement but raises a shield
+    // instead of painting spores. hp is the SHIELD's pool — see PuffShield.cs.
+    puffball:   { hp: 40, atk: 3,  rule: 'Plant. Raises a shield that holds foes out.' },
+    chomptrap:  { hp: 9,  atk: 25, rule: 'Lures foes in. Then SNAP.' },
   };
 
   /// Stats for a card, or null when it has none (critters, horror cards, the
@@ -84,6 +88,7 @@ const CardTextures = (() => {
   function cardStats(card) {
     if (!card) return null;
     if (card.ability === 'leafstorm') return CARD_STATS.leafstorm;
+    if (card.name === 'Puffball')    return CARD_STATS.puffball;
     return CARD_STATS[card.placement] || null;
   }
 
@@ -145,6 +150,7 @@ const CardTextures = (() => {
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
   _loadSkin('symbol-lazerpig',   'assets/lazerpig-symbol.png');
+  _loadSkin('symbol-chomptrap',  'assets/chomptrap-symbol.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -2146,6 +2152,48 @@ const CardTextures = (() => {
     S: '#d4737f', Y: '#b84aff',
   };
 
+  // Placeholder until the hand-drawn symbol arrives.
+  const CHOMP_ART = [
+    '.....................',
+    '.........YYY.........',
+    '.........WYY.........',
+    '.........YYY.........',
+    '.........YYY.........',
+    '..........G..........',
+    '...RDDD...G...DDDR...',
+    '...DDDD...G...DDDD...',
+    '..RR...G..G..G...RR..',
+    '...DDDD.GGGGG.DDDD...',
+    '....DDD...G...DDD....',
+    '..........G..........',
+    '..........G..........',
+    '......SSSSSSSSS......',
+    '...sSs.s.sGs.s.sSs...',
+    '..S...............S..',
+    '.SS......sss......SS.',
+    '..S...............s..',
+    '...sSs.s.s.s.s.sSs.s.',
+    '......SSSSSSSSS.....s',
+    '.....................',
+  ];
+  const CHOMP_PAL = {
+    Y: '#ffd84a', W: '#fff6c8', G: '#5fae3c', D: '#2f7a2a', R: '#d8453a',
+    S: '#9aa4b2', s: '#4c5564',
+  };
+
+  function drawChomptrapSymbol(ctx) {
+    const sym = _cardSkins['symbol-chomptrap'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('chomptrap', CHOMP_ART, CHOMP_PAL));
+  }
+
   function drawLazerpigSymbol(ctx) {
     const sym = _cardSkins['symbol-lazerpig'];
     if (sym && sym.complete && sym.naturalWidth > 0) {
@@ -3810,6 +3858,8 @@ const CardTextures = (() => {
     // draw the nature Tree of Life).
     if (card.name === 'Emerald Serpent')
       drawSprite(ctx, getSprite('serpent', SERPENT_ART, SERPENT_PAL));
+    else if (card.name === 'CHOMPTRAP')
+      drawChomptrapSymbol(ctx);
     else if (card.name === 'LAZERPIG')
       drawLazerpigSymbol(ctx);   // hazard plate is an overlay — see warnfx.js
     else

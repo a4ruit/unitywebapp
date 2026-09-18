@@ -457,7 +457,7 @@ const ChoiceGrid3D = (() => {
 
     // Hazard plates hung off the card's corner, same overlay system.
     if (typeof WarnFX !== 'undefined') {
-      const PLATES = { 'LAZERPIG': 'laser', 'Lightning Iris': 'voltage' };
+      const PLATES = { 'LAZERPIG': 'laser', 'Lightning Iris': 'voltage', 'Puffball': 'shield' };
       const pigCell = cells.find(c => c && c.card && PLATES[c.card.name]);
       if (pigCell) {
         WarnFX.start(() => {

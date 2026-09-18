@@ -1,12 +1,13 @@
 // warnfx.js — hazard plates that hang off a card's top-right corner.
 //   LAZERPIG      → laser radiation
 //   Lightning Iris → high voltage
+//   Puffball       → shield in a blue sign disc (defensive)
 //
 // Same overlay trick as FlockFX: drawn on a full-viewport canvas anchored to the
 // card's live screen rect, so it can sit OUTSIDE the card edges instead of being
 // clipped inside the card texture.
 //
-//   WarnFX.start(getRect, kind)   kind: 'laser' | 'voltage'
+//   WarnFX.start(getRect, kind)   kind: 'laser' | 'voltage' | 'shield'
 //                                 getRect() -> {left,top,width,height,locked} or null
 //   WarnFX.stop()
 
@@ -41,34 +42,85 @@ const WarnFX = (() => {
   ];
 
   ART.voltage = [
-    'KKKKKKKKKKKKKKKKKKKKKKK',
-    'KYYYYYYYYYYYYYYYYYYYYYK',
-    'KYYYYYYYYYYYYYYYYYYYYYK',
-    'KYYYYYYYYYYYYYYYYYYYYYK',
-    'KYYYYYYYYYYKYYYYYYYYYYK',
-    'KYYYYYYYYYKYKYYYYYYYYYK',
-    'KYYYYYYYYYKYKYYYYYYYYYK',
-    'KYYYYYYYYYKYKYYYYYYYYYK',
-    'KYYYYYYYYKYYYKYYYYYYYYK',
-    'KYYYYYYYKYYYKYKYYYYYYYK',
-    'KYYYYYYYKYYYKYKYYYYYYYK',
-    'KYYYYYYYKYYKYYKYYYYYYYK',
-    'KYYYYYYKYKKKKKYKYYYYYYK',
-    'KYYYYYKYYYYKYYYYKYYYYYK',
-    'KYYYYYKYYYKYYYYYKYYYYYK',
-    'KYYYYYKYYYKYYYYYKYYYYYK',
-    'KYYYYKYYYYKYYYYYYKYYYYK',
-    'KYYYKYYYYYYYYYYYYYKYYYK',
-    'KYYYKKKKKKKKKKKKKKKYYYK',
-    'KYYYYYYYYYYYYYYYYYYYYYK',
-    'KYYYYYYYYYYYYYYYYYYYYYK',
-    'KYYYYYYYYYYYYYYYYYYYYYK',
-    'KKKKKKKKKKKKKKKKKKKKKKK',
+    'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
+    'KYYYYYYYYYYYYYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYKKKYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYKKKYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYKKKYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYKKKYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYKKYKKYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYKKYYYKKYYYYYYYYYYYK',
+    'KYYYYYYYYYYYKKYYYKKYYYYYYYYYYYK',
+    'KYYYYYYYYYYYKKYYYKKYYYYYYYYYYYK',
+    'KYYYYYYYYYYKKYYKKKKKYYYYYYYYYYK',
+    'KYYYYYYYYYKKYYKKKKYKKYYYYYYYYYK',
+    'KYYYYYYYYYKKYKKKKYYKKYYYYYYYYYK',
+    'KYYYYYYYYYKKKKKKYYYKKYYYYYYYYYK',
+    'KYYYYYYYYKKKKKKKKKKYKKYYYYYYYYK',
+    'KYYYYYYYKKYKKKKKKKKYYKKYYYYYYYK',
+    'KYYYYYYYKKYYYYKKKKYYYKKYYYYYYYK',
+    'KYYYYYYYKKYYYKKKKYYYYKKYYYYYYYK',
+    'KYYYYYYKKYYYKKKKYYYYYYKKYYYYYYK',
+    'KYYYYYKKYYYKKKYYYYYYYYYKKYYYYYK',
+    'KYYYYYKKYYKKYYYYYYYYYYYKKYYYYYK',
+    'KYYYYYKKYKYYYYYYYYYYYYYKKYYYYYK',
+    'KYYYYKKYYYYYYYYYYYYYYYYYKKYYYYK',
+    'KYYYKKKKKKKKKKKKKKKKKKKKKKKYYYK',
+    'KYYYKKKKKKKKKKKKKKKKKKKKKKKYYYK',
+    'KYYYYYYYYYYYYYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYYYYYYYYYYYYYYYYYK',
+    'KYYYYYYYYYYYYYYYYYYYYYYYYYYYYYK',
+    'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
   ];
 
-  const PAL = { K: '#120c04', Y: '#f2c21a' };
+  ART.shield = [
+    '...............................',
+    '...........WWWWWWWWW...........',
+    '........WWWWBBBBBBBWWWW........',
+    '.......WWBBBBBBBBBBBBBWW.......',
+    '......WWBBBBBBBBBBBBBBBWW......',
+    '.....WBBBBBBBBBBBBBBBBBBBW.....',
+    '....WBBWWBBBBBBBBBBBBBWWBBW....',
+    '...WWBBWWWWWWWWWWWWWWWWWBBWW...',
+    '..WWBBBWWWWWWWWWWWWWWWWWBBBWW..',
+    '..WBBBBWWWBBBBBBBBBBBWWWBBBBW..',
+    '..WBBBBWWWBWWWWWWWWWBWWWBBBBW..',
+    '.WWBBBBWWWBWWWWWWWWWBWWWBBBBWW.',
+    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
+    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
+    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
+    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
+    '.WBBBBBBWWBWWWWWWWWWBWWBBBBBBW.',
+    '.WBBBBBBWWWBWWWWWWWBWWWBBBBBBW.',
+    '.WBBBBBBBWWBWWWWWWWBWWBBBBBBBW.',
+    '.WWBBBBBBWWWBWWWWWBWWWBBBBBBWW.',
+    '..WBBBBBBBWWWBWWWBWWWBBBBBBBW..',
+    '..WBBBBBBBBWWWBWBWWWBBBBBBBBW..',
+    '..WWBBBBBBBWWWWBWWWWBBBBBBBWW..',
+    '...WWBBBBBBBWWWWWWWBBBBBBBWW...',
+    '....WBBBBBBBBBWWWBBBBBBBBBW....',
+    '.....WBBBBBBBBBWBBBBBBBBBW.....',
+    '......WWBBBBBBBBBBBBBBBWW......',
+    '.......WWBBBBBBBBBBBBBWW.......',
+    '........WWWWBBBBBBBWWWW........',
+    '...........WWWWWWWWW...........',
+    '...............................',
+  ];
+
+  const PAL = { K: '#120c04', Y: '#f2c21a', B: '#1f5fa6', W: '#f4f6fa' };
+
+  // Hand-drawn plates override the procedural art once they have loaded.
+  const IMG = {};
+  [['voltage', 'assets/elec-symbol.png']].forEach(([k, src]) => {
+    const im = new Image();
+    im.onload = () => { IMG[k] = im; };
+    im.src = src;
+  });
 
   function _plate() {
+    if (IMG[kind]) return IMG[kind];
     if (plates[kind]) return plates[kind];
     const art = ART[kind] || ART.laser;
     const c = document.createElement('canvas');

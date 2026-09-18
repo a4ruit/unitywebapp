@@ -92,6 +92,8 @@ let WS_URL = _wsOverride || WS_PRIMARY;
 // the joystick placement modal.
 const NATURE_CARDS = [
   { id:'small_cube', name:'Thornwire',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'thornwire',  desc:'Barbed and coiled. It only defends.' },
+  // Alternate common to Thornwire. Lures small enemies onto its jaws, then snaps.
+  { id:'small_cube', name:'CHOMPTRAP',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'chomptrap',  desc:'Sweet nectar. Steel teeth.' },
   { id:'large_cube', name:'Wildflowers', rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
   // `placement` stays 'flowerbush' — it is the wire protocol Unity matches on,
   // and the halo, radius and prefab lookups are all keyed to that string. Only
@@ -162,7 +164,7 @@ const SCOURGE_CARDS = [
 const FUNGI_CARDS = [
   { id:'small_cube', name:'White Mushroom', rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'fungi',     desc:'Overnight. Unannounced.' },
   { id:'large_cube', name:'Fairy Cap',      rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'fungi',     desc:'Do not eat. Do not touch.' },
-  { id:'sphere',     name:'Puffball',       rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'Ten trillion spores. Patient.' },
+  { id:'sphere',     name:'Puffball',       rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'A wall of spores. It holds until it breaks.' },
   { id:'triangle',   name:'Blue Angel',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   placement:'blueangel', desc:'It sings. The glitch stops whatever it is doing and comes.' },
 ];
 
@@ -1049,6 +1051,7 @@ function connect() {
       if (handleQuestMessage(e.data)) return;
       if (handleGrantTitle(e.data)) return;
       if (handleGrantPrismatic(e.data)) return;
+      if (typeof KeepsakeUI !== 'undefined' && KeepsakeUI.handle(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
