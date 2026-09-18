@@ -316,10 +316,13 @@ body::after {
    other screens). Set + revealed in submitPlayerName(). */
 #playerNametag {
   position: fixed;
-  top: 193.5px;
+  /* Same fixed anchor as .task-panel / .coll-panel (148px), so the tag lines
+     up with the CARDS and TASKS labels on every device instead of drifting
+     with screen height. */
+  top: 154px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 4;
+  z-index: 21;                  /* above the pack stack and its 3D canvas */
   display: none;                /* shown once a name is entered */
   pointer-events: none;
   font-family: 'Pixelify Sans', 'lo-res', sans-serif;
@@ -343,10 +346,10 @@ body::after {
    the top of the screen instead of under it. */
 #playerTitleTag {
   position: fixed;
-  top: 226px;                   /* clear of #playerNametag's border and glow */
+  top: 184px;                   /* directly under #playerNametag */
   left: 50%;
   transform: translateX(-50%);
-  z-index: 4;
+  z-index: 21;
   pointer-events: none;
   font-family: 'Pixelify Sans', 'lo-res', sans-serif;
   font-size: 10px;

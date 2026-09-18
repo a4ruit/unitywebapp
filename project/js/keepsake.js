@@ -6,7 +6,7 @@
 
 const KeepsakeUI = (() => {
 
-  const W = 600, H = 900;   // 2:3 poster
+  const W = 540, H = 960;   // 9:16, the projection's own aspect
 
   function handle(msg) {
     if (typeof msg !== 'string' || !msg.startsWith('keepsake|')) return false;
