@@ -1,20 +1,22 @@
 // keepsake.js — the post-game plaque. Unity uploads this player's best-moment
 // frame when the credits roll and sends:
-//   keepsake|clientId|title|teammate,teammate,...
+//   keepsake|clientId|title|placed|damage|teammate,teammate,...
 // The phone fetches its own frame once and composes the plaque on a canvas, so
 // the server never renders anything.
 
 const KeepsakeUI = (() => {
 
-  const W = 600, H = 820;
+  const W = 600, H = 900;   // 2:3 poster
 
   function handle(msg) {
     if (typeof msg !== 'string' || !msg.startsWith('keepsake|')) return false;
     const p = msg.split('|');
     if (p[1] !== CLIENT_ID) return true;
-    const title = p[2] || '';
-    const team  = (p[3] || '').split(',').map(s => s.trim()).filter(Boolean);
-    _load(title, team);
+    const title  = p[2] || '';
+    const placed = parseInt(p[3]) || 0;
+    const damage = parseInt(p[4]) || 0;
+    const team   = (p[5] || '').split(',').map(s => s.trim()).filter(Boolean);
+    _load(title, team, placed, damage);
     return true;
   }
 
@@ -22,72 +24,103 @@ const KeepsakeUI = (() => {
     return (typeof playerName === 'string' && playerName) ? playerName : 'YOU';
   }
 
-  function _load(title, team) {
+  function _load(title, team, placed, damage) {
     const img = new Image();
-    img.onload  = () => _show(_compose(img, title, team));
+    img.onload  = () => _show(_compose(img, title, team, placed, damage));
     img.onerror = () => console.warn('[keepsake] frame not available');
     img.src = `/keepsake/${encodeURIComponent(CLIENT_ID)}?t=${Date.now()}`;
   }
 
-  function _compose(img, title, team) {
+  // Largest font size (down to min) at which the text fits the width.
+  function _fit(g, text, max, min, width, family) {
+    let size = max;
+    for (; size > min; size -= 2) {
+      g.font = `${size}px ${family}`;
+      if (g.measureText(text).width <= width) break;
+    }
+    g.font = `${size}px ${family}`;
+    return size;
+  }
+
+  function _wrap(g, words, width) {
+    const lines = [];
+    let line = '';
+    words.forEach(w => {
+      const next = line ? line + '  ·  ' + w : w;
+      if (g.measureText(next).width > width && line) { lines.push(line); line = w; }
+      else line = next;
+    });
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  // Poster composition: the moment fills the card, the names carry it, and a
+  // couple of numbers sit between them. Laid out bottom-up so nothing can run
+  // off the edge.
+  function _compose(img, title, team, placed, damage) {
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
+    const F = '"Pixelify Sans", monospace';
 
-    g.fillStyle = '#0b0a10';
-    g.fillRect(0, 0, W, H);
+    const s  = Math.max(W / img.width, H / img.height);
+    const dw = img.width * s, dh = img.height * s;
+    g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
 
-    // Frame: gold outer, dark inner, stepped corners.
-    g.fillStyle = '#c89030'; g.fillRect(12, 12, W - 24, H - 24);
-    g.fillStyle = '#0b0a10'; g.fillRect(20, 20, W - 40, H - 40);
-    g.fillStyle = '#6a4a18'; g.fillRect(28, 28, W - 56, 2); g.fillRect(28, H - 30, W - 56, 2);
+    let gr = g.createLinearGradient(0, 0, 0, H * 0.16);
+    gr.addColorStop(0, 'rgba(5,4,10,0.75)');
+    gr.addColorStop(1, 'rgba(5,4,10,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, W, H * 0.16);
 
-    // The moment, with a vignette closing in.
-    const ix = 44, iy = 64, iw = W - 88;
-    const ih = Math.round(iw * img.height / img.width);
-    g.drawImage(img, ix, iy, iw, ih);
-    const v = g.createRadialGradient(ix + iw / 2, iy + ih / 2, ih * 0.25, ix + iw / 2, iy + ih / 2, iw * 0.62);
-    v.addColorStop(0, 'rgba(0,0,0,0)');
-    v.addColorStop(1, 'rgba(0,0,0,0.75)');
-    g.fillStyle = v; g.fillRect(ix, iy, iw, ih);
-    g.strokeStyle = '#c89030'; g.lineWidth = 3; g.strokeRect(ix - 2, iy - 2, iw + 4, ih + 4);
+    gr = g.createLinearGradient(0, H * 0.42, 0, H);
+    gr.addColorStop(0,    'rgba(5,4,10,0)');
+    gr.addColorStop(0.45, 'rgba(5,4,10,0.82)');
+    gr.addColorStop(1,    'rgba(5,4,10,0.97)');
+    g.fillStyle = gr; g.fillRect(0, H * 0.42, W, H * 0.58);
 
     g.textAlign = 'center';
+    const inner = W - 80;
+
     g.fillStyle = '#e8c070';
-    g.font = '18px "Pixelify Sans", monospace';
-    g.fillText('PACK MENTALITY', W / 2, 48);
+    _fit(g, title, 18, 12, inner, F);
+    g.fillText(title, W / 2, 50);
 
-    let y = iy + ih + 50;
-    g.fillStyle = '#ffffff';
-    g.font = '26px "Pixelify Sans", monospace';
-    g.fillText(title, W / 2, y);
-
-    // Plaque plate.
-    y += 30;
-    const px = 70, pw = W - 140, ph = H - y - 70;
-    g.fillStyle = '#2a1e0c'; g.fillRect(px, y, pw, ph);
-    g.strokeStyle = '#c89030'; g.lineWidth = 3; g.strokeRect(px, y, pw, ph);
-
-    let ty = y + 50;
-    g.fillStyle = '#ffe3a0';
-    g.font = '34px "Pixelify Sans", monospace';
-    g.fillText(_myName().toUpperCase(), W / 2, ty);
+    let y = H - 34;
+    g.fillStyle = '#7a6c50';
+    g.font = `12px ${F}`;
+    g.fillText(`PACK MENTALITY  ·  ${new Date().toLocaleDateString()}`, W / 2, y);
 
     if (team.length) {
-      ty += 34;
-      g.fillStyle = '#b89060';
-      g.font = '14px "Pixelify Sans", monospace';
-      g.fillText('ALONGSIDE', W / 2, ty);
-      g.fillStyle = '#e8d8b0';
-      g.font = '18px "Pixelify Sans", monospace';
-      const rows = Math.max(1, Math.floor((y + ph - 24 - ty) / 24));
-      team.slice(0, rows).forEach((n, i) => g.fillText(n.toUpperCase(), W / 2, ty + 28 + i * 24));
+      g.font = `18px ${F}`;
+      const lines = _wrap(g, team.map(n => n.toUpperCase()), inner).slice(0, 4);
+      y -= 40;
+      g.fillStyle = '#d8ccb0';
+      for (let i = lines.length - 1; i >= 0; i--) { g.fillText(lines[i], W / 2, y); y -= 24; }
+      y -= 6;
     }
 
-    g.fillStyle = '#6a5a40';
-    g.font = '12px "Pixelify Sans", monospace';
-    g.fillText(new Date().toLocaleDateString(), W / 2, H - 42);
+    // Numbers, in the world's terms: what you sent into it, what you cleared.
+    const stats = [];
+    if (placed > 0) stats.push(`${placed} SEEDS SENT`);
+    if (damage > 0) stats.push(`${damage} GLITCH CLEARED`);
+    if (stats.length) {
+      y -= 22;
+      g.fillStyle = '#b89060';
+      g.font = `15px ${F}`;
+      g.fillText(stats.join('   ·   '), W / 2, y);
+    }
+
+    y -= 30;
+    const name = _myName().toUpperCase();
+    _fit(g, name, 88, 28, inner, F);
+    g.fillStyle = '#000';
+    g.fillText(name, W / 2 + 3, y + 3);
+    g.fillStyle = '#ffe3a0';
+    g.fillText(name, W / 2, y);
+
+    g.strokeStyle = '#c89030'; g.lineWidth = 6; g.strokeRect(9, 9, W - 18, H - 18);
+    g.strokeStyle = '#6a4a18'; g.lineWidth = 2; g.strokeRect(17, 17, W - 34, H - 34);
     return c;
   }
 
@@ -96,7 +129,7 @@ const KeepsakeUI = (() => {
     wrap.style.cssText =
       'position:fixed;inset:0;z-index:2147483100;background:rgba(0,0,0,0.85);' +
       'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:16px;';
-    canvas.style.cssText = 'max-width:100%;max-height:74vh;image-rendering:pixelated;';
+    canvas.style.cssText = 'width:auto;height:auto;max-width:100%;max-height:calc(100vh - 110px);image-rendering:pixelated;';
     wrap.appendChild(canvas);
 
     const row = document.createElement('div');
