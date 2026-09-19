@@ -1622,6 +1622,8 @@ function showGodPackComplete() {
 
 // ─── Normal drop ──────────────────────────────────────────────────────────────
 
+var cardUse = {};   // name → { count, card } — read by keepsake.js
+
 function dropCard(card) {
   // Star cost gate — deduct here (grid already pre-checked affordability visually,
   // but spendStars is the authoritative source of truth).
@@ -1636,6 +1638,13 @@ function dropCard(card) {
 
   // Card committed — soft placement "plop".
   if (typeof Sound !== 'undefined') Sound.play('place');
+
+  // Tally for the keepsake's "most used card". Memory only, one round.
+  if (!card.corrupted && card.name) {
+    const u = cardUse[card.name] || (cardUse[card.name] = { count: 0, card });
+    u.count++;
+    u.card = card;
+  }
 
   // Corrupted card — choice-driven corruption. Placing it advances THIS phone
   // toward the horror phase (HORROR_THRESHOLD → flip) and spawns a corrupted

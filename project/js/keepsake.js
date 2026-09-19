@@ -25,6 +25,13 @@ const KeepsakeUI = (() => {
     return c.startsWith('#') ? c : '#' + c;
   }
 
+  function _favourite() {
+    if (typeof cardUse !== 'object' || !cardUse) return null;
+    let best = null;
+    for (const k in cardUse) if (!best || cardUse[k].count > best.count) best = cardUse[k];
+    return best;
+  }
+
   function _myName() {
     return (typeof playerName === 'string' && playerName) ? playerName : 'YOU';
   }
@@ -102,6 +109,24 @@ const KeepsakeUI = (() => {
       y -= 40;
       g.fillStyle = '#d8ccb0';
       for (let i = lines.length - 1; i >= 0; i--) { g.fillText(lines[i], W / 2, y); y -= 24; }
+      y -= 6;
+    }
+
+    // Most used card: a small face of it, with how often it was played.
+    const fav = _favourite();
+    if (fav && typeof CardTextures !== 'undefined') {
+      const face = CardTextures.buildFace(fav.card);
+      const cw = 58, ch = 87;
+      y -= ch + 10;
+      g.font = `14px ${F}`;
+      const label = `MOST USED  ·  ×${fav.count}`;
+      const tw = g.measureText(label).width;
+      const x0 = W / 2 - (cw + 14 + tw) / 2;
+      g.drawImage(face, x0, y, cw, ch);
+      g.textAlign = 'left';
+      g.fillStyle = '#b89060';
+      g.fillText(label, x0 + cw + 14, y + ch / 2 + 5);
+      g.textAlign = 'center';
       y -= 6;
     }
 
