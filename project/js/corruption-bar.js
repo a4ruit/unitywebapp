@@ -287,8 +287,10 @@ function _renderBar() {
   _corrUI.frame.classList.toggle('corr-horror', isHorror);
   _corrUI.stats.classList.toggle('corr-horror', isHorror);
 
-  // Blood drips past the midpoint — frequency ramps with how high we are
-  if (_corrLevel > 0.5) {
+  // Blood drips past the midpoint — frequency ramps with how high we are.
+  // Off in arcade mode, like every other bit of gore on the phone.
+  const _arcade = typeof ARCADE_MODE !== 'undefined' && ARCADE_MODE;
+  if (_corrLevel > 0.5 && !_arcade) {
     const now      = performance.now();
     const interval = Math.max(120, 900 - _corrLevel * 1000);   // 900ms @ 0.5 → 120ms @ 1.0
     if (now - _lastDropTime > interval) {

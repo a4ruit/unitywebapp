@@ -1,6 +1,6 @@
 // warnfx.js — hazard plates that hang off a card's top-right corner.
 //   LAZERPIG      → laser radiation
-//   Lightning Iris → high voltage
+//   ULTRAVIOLET → high voltage
 //   Puffball       → shield in a blue sign disc (defensive)
 //
 // Same overlay trick as FlockFX: drawn on a full-viewport canvas anchored to the

@@ -67,7 +67,7 @@ const CardTextures = (() => {
   // that matters.
   const CARD_STATS = {
     thornwire:  { hp: 9,  atk: 6,  rule: 'Throw a charge. AOE on hit.' },
-    wildflower: { hp: 9,  atk: 3,  rule: 'Plant. Small AOE damage.' },
+    wildflower: { hp: 9,  atk: 3,  rule: 'Plant. Lobs fireballs at foes.' },
     // ATK is the TOTAL the chain carries, not what any one target takes. The rule
     // text has to say the split, because a player reading 12 next to a card that
     // deals 4 a hit will think it is broken.
@@ -79,7 +79,11 @@ const CardTextures = (() => {
     // Keyed by name: Puffball shares the 'fungi' placement but raises a shield
     // instead of painting spores. hp is the SHIELD's pool — see PuffShield.cs.
     puffball:   { hp: 40, atk: 3,  rule: 'Plant. Raises a shield that holds foes out.' },
-    chomptrap:  { hp: 9,  atk: 25, rule: 'Lures foes in. Then SNAP.' },
+    chomptrap:  { hp: 9,  atk: 5, rule: 'Lures foes in. Then SNAP.' },
+    lunarshroom:{ hp: 12, atk: 0, rule: 'Heals everything near it, tree included.' },
+    frostcap:   { hp: 12, atk: 7, rule: 'Freezes, then slows. Shatters.' },
+    frostbloom: { hp: 9,  atk: 1, rule: 'Plant. Frost orb chills what it hits.' },
+    venombloom: { hp: 9,  atk: 1, rule: 'Plant. Venom lingers after it dies.' },
   };
 
   /// Stats for a card, or null when it has none (critters, horror cards, the
@@ -88,7 +92,11 @@ const CardTextures = (() => {
   function cardStats(card) {
     if (!card) return null;
     if (card.ability === 'leafstorm') return CARD_STATS.leafstorm;
-    if (card.name === 'Puffball')    return CARD_STATS.puffball;
+    if (card.name === 'PUFFBALL')    return CARD_STATS.puffball;
+    if (card.name === 'FROSTCAP')    return CARD_STATS.frostcap;
+    if (card.name === 'BLOOMSHROOM') return CARD_STATS.lunarshroom;
+    if (card.name === 'FROSTBLOOM')  return CARD_STATS.frostbloom;
+    if (card.name === 'VENOMBLOOM')  return CARD_STATS.venombloom;
     return CARD_STATS[card.placement] || null;
   }
 
@@ -116,6 +124,14 @@ const CardTextures = (() => {
   const ACTIVATION = new Set(['legendary','mythical','luck-maxxing','legendary-alpha']);
 
   function isAnimated(rarity) { return ANIMATED.has(rarity); }
+
+  /// Whether a card's face has to be redrawn every frame. Rarity decides it for
+  /// most cards; the blooms are uncommon but their orb has to keep orbiting.
+  function isAnimatedCard(card) {
+    if (!card) return false;
+    if (BLOOM_ORB[card.name]) return true;
+    return ANIMATED.has(card.rarity) || card.variant === 'holo' || !!card.corrupted || !!card.flock;
+  }
   function getCfg(rarity)     { return RARITY_CFG[rarity] || RARITY_CFG.common; }
 
   function hexToRgb(hex) {
@@ -148,6 +164,10 @@ const CardTextures = (() => {
   _loadSkin('symbol-critter',    'assets/critter-symbol.png');
   _loadSkin('symbol-duck',       'assets/duck-card.png');
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
+  // Own art for the other two blooms. Missing files just fall through to the
+  // tinted wildflower placeholder — drop the PNGs in and they take over.
+  _loadSkin('symbol-frostbloom', 'assets/frostbloom-symbol.png');
+  _loadSkin('symbol-venombloom', 'assets/venombloom-symbol.png');
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
   _loadSkin('symbol-lazerpig',   'assets/lazerpig-symbol.png');
   _loadSkin('symbol-chomptrap',  'assets/chomptrap-symbol.png');
@@ -292,6 +312,123 @@ const CardTextures = (() => {
     '.....................',
     '.....................',
   ];
+
+
+  // ── FLESHWEAVING sprites ────────────────────────────────────────────────────
+  // The four tribute cards. Each one has to say what it grafts on in a
+  // silhouette: one small lump, one extra arm, three at once, and the card that
+  // adds nothing and swings what is already there.
+
+  // SPAMROT — an unread message going soft. The badge is the joke: the thing
+  // demanding attention is also the thing rotting, and it drips.
+  const FLESH_SPAM_ART = [
+    '.....................',
+    '.....................',
+    '................DDDD.',
+    '................DWWD.',
+    '...DDDDDDDDDDDDDWWD..',
+    '...DMMMMMMMMMMMMDDD..',
+    '...DMLLLLLLLLLLLMD...',
+    '...DMLHLLLLLLLHLMD...',
+    '...DMLLHLLLLLHLLMD...',
+    '...DMLLLHLLLHLLLMD...',
+    '...DMLLLLHLHLLLLMD...',
+    '...DMLLLLLHLLLLLMD...',
+    '...DMLLLLLLLLLLLMD...',
+    '...DMMMMMMMMMMMMMD...',
+    '...DDDDDDDDDDDDDDD...',
+    '....DD...DDD...DD....',
+    '....DMD..DMMD..DMD...',
+    '.....DD...DMD...DD...',
+    '..........DD.........',
+    '.....................',
+    '.....................',
+  ];
+
+  // DOOMELIA — a feed with four arms on it. Polymelia by way of doomscrolling:
+  // the extra limbs exist to keep scrolling, and the screen is the only part
+  // that is lit.
+  const FLESH_DOOM_ART = [
+    '.....................',
+    '.....................',
+    '......DDDDDDDDD......',
+    '......DMMMMMMMD......',
+    '..DDD.DMLLLLLMD.DDD..',
+    '.DMMMDDMLLLLLMDDMMMD.',
+    '.DMLMDDMLHHHLMDDMLMD.',
+    '.DMMMDDMLHWHLMDDMMMD.',
+    '..DDD.DMLHHHLMD.DDD..',
+    '......DMLLLLLMD......',
+    '..DDD.DMLHHHLMD.DDD..',
+    '.DMMMDDMLLLLLMDDMMMD.',
+    '.DMLMDDMLHHHLMDDMLMD.',
+    '.DMMMDDMLLLLLMDDMMMD.',
+    '..DDD.DMLLLLLMD.DDD..',
+    '......DMMMMMMMD......',
+    '......DDDDDDDDD......',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // TRIFLESH — three tributes in one rite. Arranged as a triangle rather than a
+  // row so the count reads instantly at thumbnail size, and each lump carries
+  // the same pale core so they are obviously the same thing three times.
+  const FLESH_TRI_ART = [
+    '.....................',
+    '.....................',
+    '........DDDD.........',
+    '.......DMMMMD........',
+    '......DMLLLLMD.......',
+    '......DMLHWLMD.......',
+    '......DMMLLMMD.......',
+    '.......DDMMDD........',
+    '.........DD..........',
+    '..DDDD.......DDDD....',
+    '.DMMMMD.....DMMMMD...',
+    'DMLLLLMD...DMLLLLMD..',
+    'DMLHWLMD...DMLHWLMD..',
+    'DMMLLMMD...DMMLLMMD..',
+    '.DDMMDD.....DDMMDD...',
+    '..DD.........DD......',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+    '.....................',
+  ];
+
+  // GLITCHLIMB(tm) — a mark rather than a picture. The other three flesh cards
+  // show the meat they graft on; this one grafts nothing, so it is drawn as the
+  // cult's sign for it: a lit core with three spires radiating off it, one up
+  // and two down, symmetrical enough to read as a stamped symbol at any size.
+  const FLESH_GLITCH_ART = [
+    '.....................',
+    '.........DWD.........',
+    '.........DWD.........',
+    '........DHWHD........',
+    '........DHWHD........',
+    '.........DHD.........',
+    '.........DDD.........',
+    '.......DDHHHDD.......',
+    '......DHHWWWHHD......',
+    '.....DHHWWWWWHHD.....',
+    '....DHHWWWLWWWHHD....',
+    '.....DHHWWWWWHHD.....',
+    '......DHHWWWHHD......',
+    '.......DDHHHDD.......',
+    '.........DDD.........',
+    '....DHD.......DHD....',
+    '...DHWHD.....DHWHD...',
+    '...DHWHD.....DHWHD...',
+    '....DWD.......DWD....',
+    '.....D.........D.....',
+    '.....................',
+  ];
+
+  // No flesh in it at all: corrupted magenta, black outline, white-hot centre.
+  const FLESH_GLITCH_PAL = { D: '#2a0630', M: '#7a1268', L: '#ffffff', H: '#b81fa4', W: '#ff6ae8' };
 
   // Scourge — toxic greens, the one pool whose colour is also its warning.
   const SCOURGE_PAL = { D: '#14240c', M: '#3f6b20', L: '#6fa32e', H: '#a8d84a', W: '#eaffb0' };
@@ -516,6 +653,80 @@ const CardTextures = (() => {
     '.....................',
   ];
 
+  // Placeholder tints for the bloom family, keyed by display name: one flower
+  // shared between FIREBLOOM, FROSTBLOOM and VENOMBLOOM until each gets a sprite.
+  const BLOOM_TINT   = { FROSTBLOOM: '#6fc6ff', VENOMBLOOM: '#7de24a' };
+  const BLOOM_SYMBOL = { FROSTBLOOM: 'symbol-frostbloom', VENOMBLOOM: 'symbol-venombloom' };
+  // The orb that circles the flower in-world, carried onto the card face so the
+  // three blooms read apart at a glance. Core, glow, and the trailing motes.
+  const BLOOM_ORB = {
+    FIREBLOOM:  { core: '#fff0c0', glow: '#ff5a1e' },
+    FROSTBLOOM: { core: '#eaf8ff', glow: '#4ab4ff' },
+    VENOMBLOOM: { core: '#eaffc0', glow: '#5ed42a' },
+  };
+
+  // One orbit pass of the bloom orb. `front` picks the half of the ellipse this
+  // call draws, so the flower can sit between the two halves.
+  function drawBloomOrb(ctx, name, t, front) {
+    const c = BLOOM_ORB[name];
+    if (!c) return;
+    const cx = 128, cy = LAYOUT.symbolCenterY + 6;
+    const rx = 46, ry = 15;
+    const a  = t * 1.6;
+    if ((Math.sin(a) > 0) !== front) return;
+
+    const x = cx + Math.cos(a) * rx;
+    const y = cy + Math.sin(a) * ry;
+    const depth = 0.8 + 0.25 * Math.sin(a);       // nearer half reads bigger
+    const puff  = 0.9 + 0.1 * Math.sin(t * 9);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // Motes trailing behind it, fading back along the orbit.
+    for (let i = 1; i <= 4; i++) {
+      const ta = a - i * 0.16;
+      const tx = cx + Math.cos(ta) * rx, ty = cy + Math.sin(ta) * ry;
+      ctx.globalAlpha = (0.22 - i * 0.04) * depth;
+      ctx.fillStyle = c.glow;
+      ctx.beginPath();
+      ctx.arc(tx, ty, (3.2 - i * 0.5) * depth, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const r = 4.6 * depth * puff;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.4);
+    g.addColorStop(0,    c.core);
+    g.addColorStop(0.35, c.glow);
+    g.addColorStop(1,    'rgba(0,0,0,0)');
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r * 3.4, 0, Math.PI * 2); ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = c.core;
+    ctx.beginPath(); ctx.arc(x, y, r * 0.55, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+  const _tintCache = {};
+  let   _drawingCardName = '';
+
+  function _tinted(img, colour) {
+    const key = (img.src || '') + colour;
+    if (_tintCache[key]) return _tintCache[key];
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, 0, 0);
+    g.globalCompositeOperation = 'source-atop';
+    g.globalAlpha = 0.62;
+    g.fillStyle = colour;
+    g.fillRect(0, 0, c.width, c.height);
+    _tintCache[key] = c;
+    return c;
+  }
+
   function drawShape(ctx, rarity, t) {
     const packType = typeof window !== 'undefined' ? window.activePackType : 'garbage';
     const isHorror = parseInt(document.body?.dataset?.corruption || '0') >= (window.HORROR_THRESHOLD ?? 15);
@@ -532,10 +743,13 @@ const CardTextures = (() => {
     // one is hand-set pixels and the other is smooth strokes, and the deck stops
     // reading as one object. Corruption is supposed to change what the card IS,
     // not what medium it was drawn in.
-    if (rarity === 'common')    { drawSprite(ctx, getSprite('fleshMeat',  FLESH_MEAT_ART,  FLESH_PAL)); return; }
-    if (rarity === 'uncommon')  { drawSprite(ctx, getSprite('fleshKnot',  FLESH_KNOT_ART,  FLESH_PAL)); return; }
-    if (rarity === 'rare')      { drawSprite(ctx, getSprite('fleshBox',   FLESH_BOX_ART,   FLESH_PAL)); return; }
-    if (rarity === 'legendary') { drawSprite(ctx, getSprite('fleshBone',  FLESH_BONE_ART,  FLESH_BONE_PAL)); return; }
+    // SPAMROT / DOOMELIA / TRIFLESH / GLITCHLIMB(tm). The Mystery Meat, Gristle
+    // Knot, Blind Box and Bone Fragment sprites above are kept: the objects they
+    // drew still exist in Unity, and the art is ready if a tier wants it back.
+    if (rarity === 'common')    { drawSprite(ctx, getSprite('fleshSpam',   FLESH_SPAM_ART,   FLESH_PAL)); return; }
+    if (rarity === 'uncommon')  { drawSprite(ctx, getSprite('fleshDoom',   FLESH_DOOM_ART,   FLESH_PAL)); return; }
+    if (rarity === 'rare')      { drawSprite(ctx, getSprite('fleshTri',    FLESH_TRI_ART,    FLESH_PAL)); return; }
+    if (rarity === 'legendary') { drawSprite(ctx, getSprite('fleshGlitch', FLESH_GLITCH_ART, FLESH_GLITCH_PAL)); return; }
 
     // Vector fallback below, still reached by mythical / luck-maxxing /
     // legendary-alpha, which have no sprite yet.
@@ -1033,12 +1247,20 @@ const CardTextures = (() => {
     // whichever common card wants them next.
 
     if (rarity === 'uncommon') {
-      const wf = _cardSkins['symbol-wildflower'];
+      const own = _cardSkins[BLOOM_SYMBOL[_drawingCardName]];
+      const wf  = (own && own.complete && own.naturalWidth > 0) ? own : _cardSkins['symbol-wildflower'];
       if (wf && wf.complete && wf.naturalWidth > 0) {
         ctx.imageSmoothingEnabled = false;
         const targetH = LAYOUT.symbolHeight;
         const targetW = targetH * (wf.naturalWidth / wf.naturalHeight);
-        ctx.drawImage(wf, 128 - targetW / 2, LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+        const x = 128 - targetW / 2, y = LAYOUT.symbolCenterY - targetH / 2;
+        // Placeholder art: the bloom family shares one flower, tinted to its
+        // element until each gets its own sprite.
+        const tint = wf === own ? null : BLOOM_TINT[_drawingCardName];
+        drawBloomOrb(ctx, _drawingCardName, t, false);
+        if (tint) ctx.drawImage(_tinted(wf, tint), x, y, targetW, targetH);
+        else      ctx.drawImage(wf, x, y, targetW, targetH);
+        drawBloomOrb(ctx, _drawingCardName, t, true);
         return;
       }
     }
@@ -3868,6 +4090,11 @@ const CardTextures = (() => {
                    : isNature && card.rarity === 'uncommon' ? 'nature-uncommon'
                    : isNature && card.rarity === 'rare'     ? 'nature-rare'
                    : isFlesh  && card.rarity === 'common'   ? 'flesh-common'
+                   // DOOMELIA and TRIFLESH: uncommon-card.png / epic-card.png are
+                   // the generic pixel frames, not nature-only ones - the keys
+                   // are named after the pack that got them first.
+                   : isFlesh  && card.rarity === 'uncommon' ? 'nature-uncommon'
+                   : isFlesh  && card.rarity === 'rare'     ? 'nature-rare'
                    : null;
     // White Mushroom (fungi common) and Sheep (critter common) reuse the
     // common-card.png background ('nature-common' skin); Duck (critter uncommon)
@@ -3876,9 +4103,9 @@ const CardTextures = (() => {
     // Matched on the card's DISPLAY name, so renaming a card silently drops its
     // artwork unless these move with it. Renamed together in the critter pass:
     // Sheep -> RAM, Duck -> DDoS Duck, Seagull -> C:\GULL.
-    if (card.name === 'White Mushroom' || card.name === 'RAM')        skinKey = 'nature-common';
-    if (card.name === 'DDoS Duck'      || card.name === 'Fairy Cap')  skinKey = 'nature-uncommon';
-    if (card.name === 'C:\\GULL'        || card.name === 'Puffball')  skinKey = 'nature-rare';
+    if (card.name === 'BLOOMSHROOM' || card.name === 'RAM')           skinKey = 'nature-common';
+    if (card.name === 'DD.DUCK'        || card.name === 'FROSTCAP')   skinKey = 'nature-uncommon';
+    if (card.name === 'C:\\GULL'        || card.name === 'PUFFBALL')  skinKey = 'nature-rare';
     if (card.name === 'LAZERPIG') skinKey = 'nature-rare';
     // Leaf Storm, Blue Angel, and every other legendary-rarity card share
     // legendary-card.png as the frame. Symbol + labels still draw on top.
@@ -3905,8 +4132,10 @@ const CardTextures = (() => {
       drawChomptrapSymbol(ctx);
     else if (card.name === 'LAZERPIG')
       drawLazerpigSymbol(ctx);   // hazard plate is an overlay — see warnfx.js
-    else
+    else {
+      _drawingCardName = card.name || '';
       drawShape(ctx, card.rarity, t);
+    }
     drawLabels(ctx, card, card.rarity, t, opts);
     // Over the labels, under the holo sheen: the overlay should read as sitting
     // on the frame, but holo is a finish applied to the whole card face.
@@ -3937,5 +4166,5 @@ const CardTextures = (() => {
     return c;
   }
 
-  return { buildFace, buildBack, isAnimated, getCfg };
+  return { buildFace, buildBack, isAnimated, isAnimatedCard, getCfg };
 })();

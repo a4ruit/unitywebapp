@@ -1286,6 +1286,8 @@ const Pack3D = (() => {
 
   function spawnPackBloodDrip() {
     if (!pbCtx) return;
+    // No drips down the pack in arcade mode — see ARCADE MODE in main.js.
+    if (typeof ARCADE_MODE !== 'undefined' && ARCADE_MODE) return;
     const sy = 2 + Math.floor(Math.random() * 18);
     pbDrips.push({
       bx:         3 + Math.floor(Math.random() * (PBW - 6)),

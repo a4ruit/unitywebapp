@@ -58,6 +58,10 @@ const ARCADE_MODE = (() => {
   return true;
 })();
 
+// Tag the document so the stylesheet can branch on it too — the horror page
+// background is CSS, not canvas.
+try { document.body.classList.toggle('arcade-mode', ARCADE_MODE); } catch (e) {}
+
 const WS_PRIMARY = 'wss://packmentalitygame.com';
 // Kept ONLY for the ?server=render manual override. Nothing selects it
 // automatically — automatic failover is what caused the silent split.
@@ -91,31 +95,40 @@ let WS_URL = _wsOverride || WS_PRIMARY;
 // (see combo.js beginAbilityTrace / dropCard's `card.ability` branch) instead of
 // the joystick placement modal.
 const NATURE_CARDS = [
-  { id:'small_cube', name:'Thornwire',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'thornwire',  desc:'Barbed and coiled. It only defends.' },
+  { id:'small_cube', name:'THORNSPIKE', rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'thornwire',  desc:'Barbed and coiled. It only defends.' },
   // Alternate common to Thornwire. Lures small enemies onto its jaws, then snaps.
   { id:'small_cube', name:'CHOMPTRAP',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'chomptrap',  desc:'Sweet nectar. Steel teeth.' },
-  { id:'large_cube', name:'Wildflowers', rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'Nobody planted them. That\'s the point.' },
+  // The bloom family: one flower, three elements. All ride 'wildflower' on the
+  // wire — Unity tells them apart by the card name.
+  { id:'large_cube', name:'FIREBLOOM',   rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'It keeps a small sun. It is not friendly.' },
+  { id:'large_cube', name:'FROSTBLOOM',  rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'A cold little moon. Whatever it touches walks slower.' },
+  { id:'large_cube', name:'VENOMBLOOM',  rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'It waits, dripping. The sting outlives the flower.' },
   // `placement` stays 'flowerbush' — it is the wire protocol Unity matches on,
   // and the halo, radius and prefab lookups are all keyed to that string. Only
   // the name the player reads has changed.
-  { id:'sphere',     name:'Lightning Iris', rarity:'rare',   rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'It blooms and the air goes tight. Whatever is near feels it first.' },
-  { id:'triangle',   name:'Leaf Storm',  rarity:'legendary', rarityRank:3, command:'spawn_triangle',   ability:'leafstorm',    desc:'Trace the storm. Let it hunt for you.' },
+  { id:'sphere',     name:'ULTRAVIOLET', rarity:'rare',   rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'It blooms and the air goes tight. Whatever is near feels it first.' },
+  { id:'triangle',   name:'CLOVERSTORM', rarity:'legendary', rarityRank:3, command:'spawn_triangle',   ability:'leafstorm',    desc:'Trace the storm. Let it hunt for you.' },
 ];
 
 // ─── FLESH (garbage / horror) ─────────────────────────────────────────────────
-// Every slot here is MEAT FOR THE BOSS: it flies across the map and grafts on as
-// a limb, raising the boss's max HP for good. With no boss alive it lies on the
-// ground and waits to be absorbed by the next one.
+// FLESHWEAVING, as the TEKULT names it. Every slot is a tribute: it flies across
+// the map and grafts on as a limb, raising the boss's max HP for good. With no
+// boss alive it lies on the ground and waits to be absorbed by the next one.
+//
+// The rarer the tribute, the bigger the limb it weaves — SPAMROT is the runt of
+// them and GLITCHLIMB(tm) spends the limbs already grafted rather than adding
+// another. The cult reads all of it as devotional: attention harvested, rendered
+// down, and handed back to the thing doing the harvesting.
 //
 // The creatures that used to come out of this pack (glitchling, glitchworm) now
 // belong to SCOURGE, whose job is attacking the nature players' plants. Card art
 // is keyed by pack + rarity rather than by name, so these renames keep their
 // existing illustrations.
 const FLESH_CARDS = [
-  { id:'small_cube', name:'Mystery Meat', rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Origin unclear. It knows where to crawl.' },
-  { id:'large_cube', name:'Gristle Knot',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Muscle with nothing left to move. It wants a body.' },
-  { id:'sphere',     name:'Blind Box',           rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It has eyes. They do not work. Get inside it.' },
-  { id:'triangle',   name:'Bone Fragment',       rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Dense. Old. It will find somewhere to fit.' },
+  { id:'small_cube', name:'SPAMROT',            rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Unsolicited. Unread. Still growing. The smallest limb there is.' },
+  { id:'large_cube', name:'DOOMELIA',           rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'One more arm than anything needs. It scrolls for the rest of them.' },
+  { id:'sphere',     name:'TRIFLESH',           rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Three tributes, one rite. Three sockets filled at once.' },
+  { id:'triangle',   name:'GLITCHLIMB\u2122',      rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It flails. Spires come up. Whatever they touch is pixels.' },
   { id:'octagon',    name:'Unnamed Organ',       rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'It has a function. You do not want to know what it is.' },
   { id:'triad',      name:'Tendril Cluster',     rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three. Always three. All reaching for the same host.' },
   { id:'star',       name:'The Flesh',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was here before you. It will be here after.' },
@@ -129,9 +142,9 @@ const FLESH_CARDS = [
 // item was removed rather than fixed — see counter.js.
 const CRITTER_CARDS = [
   { id:'small_cube', name:'RAM',             rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
-  { id:'large_cube', name:'DDoS Duck',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
+  { id:'large_cube', name:'DD.DUCK', rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
   { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
-  { id:'triangle',   name:'Red Fox',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was watching before you arrived.' },
+  { id:'triangle',   name:'COWNADO',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Cows in it. Cows under it. Steer, and hope.' },
   { id:'sphere',     name:'LAZERPIG',       rarity:'rare',            rarityRank:2, command:'spawn_lazerpig',   desc:'FIRIN MA LASERRR' },
   { id:'star',       name:'COSMEOW',         rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Rides a cloud. Leaves a rainbow. Mind the rainbow.' },
 ];
@@ -142,10 +155,10 @@ const CRITTER_CARDS = [
 //   • rot fields — a marked ring of ground that chews every plant inside it
 //   • biters — glitchlings and glitchworms that chase individual placements
 const SCOURGE_CARDS = [
-  { id:'small_cube', name:'Ticks',               rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Eight legs. No conscience. Everything inside the ring is food.' },
-  { id:'large_cube', name:'Infested Mice',       rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'It picks a flower and walks straight at it.' },
-  { id:'sphere',     name:'Necrotic Mass',       rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Growing. Always growing. Mostly below the soil.' },
-  { id:'triangle',   name:'The Black Plague',    rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Arrived by ship. Nothing grows where it settles.' },
+  { id:'small_cube', name:'GLITCHELISK',        rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'It transmits. The picture goes wrong. Something nearby is being eaten.' },
+  { id:'large_cube', name:'CIRCUITSPIRE',        rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Cable, board and meat. It grows out over the edges of the screen.' },
+  { id:'sphere',     name:'DATAPYLON',           rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'It pulls a feed out of the sky. The ground underneath pays for it.' },
+  { id:'triangle',   name:'THE ZIGGURAT',        rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'It was built, not grown. Something climbs out of it every ten seconds.' },
   { id:'octagon',    name:'Host Event',          rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'The distinction between parasite and host is administrative.' },
   { id:'triad',      name:'Propagation Cluster', rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'Three vectors. Three places nobody can plant.' },
   { id:'star',       name:'The Bloom',           rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It does not spread. It reveals.' },
@@ -162,9 +175,9 @@ const SCOURGE_CARDS = [
 // Unity treats it as a different card end to end — no spore paint, and three
 // tap-to-drop spore caps once it lands.
 const FUNGI_CARDS = [
-  { id:'small_cube', name:'White Mushroom', rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'fungi',     desc:'Overnight. Unannounced.' },
-  { id:'large_cube', name:'Fairy Cap',      rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'fungi',     desc:'Do not eat. Do not touch.' },
-  { id:'sphere',     name:'Puffball',       rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'A wall of spores. It holds until it breaks.' },
+  { id:'small_cube', name:'BLOOMSHROOM',    rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'fungi',     desc:'It breathes moonlight. Everything near it mends.' },
+  { id:'large_cube', name:'FROSTCAP',       rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'fungi',     desc:'A pocket blizzard. Everything slows down.' },
+  { id:'sphere',     name:'PUFFBALL',       rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'A wall of spores. It holds until it breaks.' },
   { id:'triangle',   name:'Blue Angel',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   placement:'blueangel', desc:'It sings. The glitch stops whatever it is doing and comes.' },
 ];
 
@@ -199,7 +212,7 @@ const RITUAL_CARDS = [
 // of the creature it's named after. The card face is still keyed by `id`, so the
 // art is unchanged.
 const CORRUPTED_FLESHLING = {
-  id:'large_cube', name:'Glitchling', rarity:'common', rarityRank:0,
+  id:'large_cube', name:'GLITCHLING', rarity:'common', rarityRank:0,
   command:'spawn_corrupted', corrupted:true,
   desc:'Small. Hungry. It found you first.',
 };
@@ -215,7 +228,7 @@ const CORRUPTED_CARD_CHANCE = 0.9;
 // by cardTextures.buildFace via the `flock` flag). Placing it releases a small
 // flock (multiple sheep) — see dropCard.
 const FLOCK_O_SHEEP = {
-  id:'sphere', name:"Flock o' Sheep", rarity:'rare', rarityRank:2,
+  id:'sphere', name:'FLOCKASHEEP', rarity:'rare', rarityRank:2,
   command:'spawn_small_cube', flock:true,
   desc:'A drifting constellation. It counts itself to sleep.',
 };
@@ -624,12 +637,12 @@ const TOP_CARD_WEIGHTS = {
 //
 // Players were opening pack after pack and seeing the same headline card, and
 // stopping. The odds were not the problem; independence was. A fair weighted
-// roll has no memory, so "Lightning Iris three times running" is not a bug, it
+// roll has no memory, so "ULTRAVIOLET three times running" is not a bug, it
 // is what independent draws do — and a player has no way to read that as
 // anything but the game being out of content.
 //
 // The honest limit, stated here because tuning this function cannot fix it:
-// EACH POOL HOLDS ONE CARD PER TIER. A Nature rare is always Lightning Iris.
+// EACH POOL HOLDS ONE CARD PER TIER. A Nature rare is always ULTRAVIOLET.
 // So the only variation available to a roll is WHICH TIER, and Nature/Fungi have
 // three of those. Real variety needs more cards per tier, which means new Unity
 // spawn commands — not something a weight table can stand in for.
@@ -657,6 +670,42 @@ const TOP_CARD_WEIGHTS = {
 // Measured over 300k pulls: same-tier-as-last-pull drops from 38.6% to 15.0%
 // on a 3-tier pool and 25.5% to 10.2% on a full one, with legendary unmoved at
 // 15.1% and 11.9%.
+// ── Horror pools pull rarer ──────────────────────────────────────────────────
+//
+// The horror pools have SEVEN tiers where nature and fungi have three, so the
+// same weight table spreads them much thinner: a legendary lands at 11/93 on a
+// horror pool against 11/73 on Nature, and that legendary is then split three
+// ways between FLESH, SCOURGE and RITUAL depending on which pack the player is
+// opening. Measured against a real session that is roughly a one-in-three chance
+// of seeing a given horror legendary at all across twenty packs — which is how
+// twenty packs went by without a ZIGGURAT.
+//
+// The horror side is also where the variation actually lives now: the top tiers
+// are structures and rites with their own behaviour, not a bigger version of the
+// common. Pulling rare there is the content, so these pools get their own
+// multipliers over the shared table.
+const HORROR_TOP_BOOST = {
+  'legendary':       2.4,
+  'mythical':        1.8,
+  'luck-maxxing':    1.7,
+  'legendary-alpha': 1.6,
+};
+
+function _isHorrorPool(pool) {
+  return pool === FLESH_CARDS || pool === SCOURGE_CARDS || pool === RITUAL_CARDS;
+}
+
+// ── Pity ─────────────────────────────────────────────────────────────────────
+//
+// Weights alone cannot promise anything, and a player who opens a dozen horror
+// packs without meeting a single structure has been told the pack has nothing in
+// it. Counted per pool: after this many pulls with nothing legendary or above,
+// the next one IS legendary or above, rolled among whatever top tiers that pool
+// has so it is still a surprise WHICH one.
+const PITY_AT   = 7;
+const TOP_TIERS = new Set(['legendary', 'mythical', 'luck-maxxing', 'legendary-alpha']);
+const _sinceTop = new Map();           // pool key → pulls since a top-tier card
+
 const _recentTop = new Map();          // pool key → array of rarities, newest first
 const RECENT_MEMORY  = 3;              // how many pulls back it remembers
 const REPEAT_PENALTY = [0.10, 0.40, 0.72];   // weight multiplier by recency
@@ -675,11 +724,34 @@ function rollTopCard(activePool) {
 
   const key    = _poolKey(activePool);
   const recent = _recentTop.get(key) || [];
+  const horror = _isHorrorPool(activePool);
+
+  // Pity: long enough without a structure, and the next pull is one.
+  const dry = _sinceTop.get(key) || 0;
+  if (dry >= PITY_AT) {
+    const tops = tiers.filter(t => TOP_TIERS.has(t));
+    if (tops.length) {
+      const tw    = tops.map(t => TOP_CARD_WEIGHTS[t] * (horror ? (HORROR_TOP_BOOST[t] || 1) : 1));
+      const tot   = tw.reduce((a, w) => a + w, 0);
+      let   roll  = Math.random() * tot;
+      let   forced = tops[tops.length - 1];
+      for (let i = 0; i < tops.length; i++) {
+        if (roll < tw[i]) { forced = tops[i]; break; }
+        roll -= tw[i];
+      }
+      _sinceTop.set(key, 0);
+      recent.unshift(forced);
+      recent.length = Math.min(recent.length, RECENT_MEMORY);
+      _recentTop.set(key, recent);
+      return pick(forced);
+    }
+  }
 
   // Penalised weights. Discouraged, never banned — a hard ban would make the
   // sequence predictable in the other direction, and guaranteed rotation reads
   // as a playlist rather than a pull.
-  const base    = tiers.map(t => TOP_CARD_WEIGHTS[t]);
+  const base    = tiers.map(t =>
+    TOP_CARD_WEIGHTS[t] * (horror ? (HORROR_TOP_BOOST[t] || 1) : 1));
   const weights = tiers.map((t, i) => {
     if (!REPEAT_TIERS.has(t)) return base[i];
     const age = recent.indexOf(t);
@@ -708,6 +780,7 @@ function rollTopCard(activePool) {
   recent.unshift(chosen);
   recent.length = Math.min(recent.length, RECENT_MEMORY);
   _recentTop.set(key, recent);
+  _sinceTop.set(key, TOP_TIERS.has(chosen) ? 0 : dry + 1);
 
   return pick(chosen);
 }
@@ -763,6 +836,11 @@ function rollPack() {
     _debugSeedCosmeow = false;
     const cm = CRITTER_CARDS.find(c => c.name === 'COSMEOW');
     if (cm) topCard = { ...cm };
+  }
+  if (_debugSeedCownado) {
+    _debugSeedCownado = false;
+    const cn = CRITTER_CARDS.find(c => c.name === 'COWNADO');
+    if (cn) topCard = { ...cn };
   }
 
 
@@ -903,12 +981,67 @@ let soundEnabled = true; // name-screen "sound" toggle — gates all phone audio
 // Must match the swatches in index.html (and ideally Unity's palette).
 const PLAYER_COLORS = ['#7BE3FF', '#FFD96B', '#FF9BC9', '#6FE886', '#C28BFF', '#FFB070'];
 
+// ── Role ─────────────────────────────────────────────────────────────────────
+// Declared on the username screen and sent with the name. It gates NOTHING —
+// every card and every possession stays open to everyone. What it buys is
+// legibility: Unity draws the matching pixel symbol over this player's name tag
+// for a few seconds whenever they act, so the room can see who just did that.
+let playerRole = 'wildcard';
+
+function selectPlayerRole(btn) {
+  playerRole = btn.dataset.role || 'wildcard';
+  document.querySelectorAll('.name-role-pick').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  _paintNametagRole();
+}
+
+// The symbol under the player's own name tag on the pack screen. It is the same
+// art Unity flashes over their tag on the projection, so a player can connect
+// "that's mine" without anyone explaining it.
+function _paintNametagRole() {
+  const host = document.getElementById('playerRoleMark');
+  if (!host || typeof Roles === 'undefined') return;
+  host.innerHTML = '';
+  host.appendChild(Roles.canvas(playerRole, 2, playerColor || '#cfeefb'));
+  // Revealed with the tag itself, not before: on the username screen the picker
+  // is already showing the symbol.
+  if (playerName) host.style.display = 'block';
+}
+
+// Built rather than authored in the HTML, because the symbols are drawn from
+// the same grids Unity uses — there is no image file to point at.
+function _buildRolePicker() {
+  const host = document.getElementById('nameRolePicks');
+  if (!host || typeof Roles === 'undefined') return;
+  host.innerHTML = '';
+
+  Roles.list().forEach(id => {
+    const meta = Roles.meta(id);
+    const btn  = document.createElement('button');
+    btn.type         = 'button';
+    btn.className    = 'name-role-pick' + (id === playerRole ? ' selected' : '');
+    btn.dataset.role = id;
+    btn.style.color  = playerColor || '#cfeefb';
+    btn.setAttribute('aria-label', meta.label.toLowerCase());
+    btn.onclick = () => selectPlayerRole(btn);
+
+    btn.appendChild(Roles.canvas(id, 3, playerColor || '#cfeefb'));
+    host.appendChild(btn);
+  });
+}
+document.addEventListener('DOMContentLoaded', _buildRolePicker);
+
 function selectPlayerColor(el) {
   const hex = el && el.dataset ? el.dataset.color : '';
   if (!hex) return;
   document.querySelectorAll('.name-color-swatch').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
   playerColor = hex;
+  // The role symbols wear the chosen colour too, so the two settings read as
+  // one identity rather than as two unrelated pickers.
+  document.querySelectorAll('.name-role-pick').forEach(b => { b.style.color = hex; });
+  _buildRolePicker();
+  _paintNametagRole();
 }
 
 // Name-screen sound toggle. Records the preference only — the AudioContext is
@@ -933,7 +1066,9 @@ function _updateSoundToggle() {
 // cosmetic until it bought another one.
 function _setNamePayload() {
   const prismatic = (typeof _prismaticOwned !== 'undefined' && _prismaticOwned) ? '1' : '';
-  return `set_name|${CLIENT_ID}|${playerName}|${playerColor}|${prismatic}|${playerTitle}`;
+  // Role is appended LAST, so a Unity build that splits on | and reads the first
+  // five fields keeps working unchanged.
+  return `set_name|${CLIENT_ID}|${playerName}|${playerColor}|${prismatic}|${playerTitle}|${playerRole}`;
 }
 
 function sendSetName() {
@@ -958,6 +1093,7 @@ function submitPlayerName() {
   if (typeof Sound !== 'undefined') { Sound.setEnabled(soundEnabled); Sound.unlock(); }
   sendSetName();
   // Show the player's persistent name tag on the pack screen, in their colour.
+  _paintNametagRole();
   const tag = document.getElementById('playerNametag');
   if (tag) {
     tag.textContent     = `<${playerName}>`;
@@ -1868,6 +2004,20 @@ document.addEventListener('keydown', e => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   debugSeedCosmeow();
+});
+
+// Same, for COWNADO. Key: V, matching Unity's own COWNADO debug key.
+var _debugSeedCownado = false;
+function debugSeedCownado() {
+  _debugSeedCownado = true;
+  if (typeof setPackType === 'function') setPackType('ewaste');
+  console.log('[debug] next pack seeded with COWNADO');
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'v' && e.key !== 'V') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  debugSeedCownado();
 });
 
 function debugSpawnBoss() {

@@ -106,6 +106,29 @@ body.ritual-active .bg-grid {
   filter: hue-rotate(280deg) saturate(1.6) brightness(0.9);
 }
 
+/* ── ARCADE MODE ───────────────────────────────────────────────────────────
+   flesh-bg.png is the gnarled red pixel art that creeps in behind everything
+   once a phone leaves the pristine phase. For a public, all-ages showing it is
+   the loudest thing on the screen, so arcade mode swaps it for horror-web-bg.png
+   — the plain pixel frame — and carries the pack identity in colour alone.
+
+   The asset is drawn RED, so flesh needs no correction at all; scourge and
+   ritual rotate off it. That also replaces the mix-blend-mode tint this block
+   used before, which had to fight a green base image to reach red. */
+body.arcade-mode .bg-grid::before {
+  background-color: #080408;
+  background-image: url('../assets/horror-web-bg.png');
+}
+
+body.arcade-mode.scourge-active .bg-grid::before { filter: hue-rotate(100deg) saturate(1.1); }
+body.arcade-mode.ritual-active  .bg-grid::before { filter: hue-rotate(275deg) saturate(1.25); }
+
+/* The per-pack rotations below are tuned for the old overlay; the frame carries
+   the colour now, so the plate underneath it stays neutral. */
+body.arcade-mode.flesh-active   .bg-grid,
+body.arcade-mode.scourge-active .bg-grid,
+body.arcade-mode.ritual-active  .bg-grid { filter: none; }
+
 body::after {
   content:'';
   position:fixed; inset:0;
@@ -2687,7 +2710,9 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   display: flex;
   flex-direction: row-reverse; /* trigger(first in DOM) → rightmost → right edge */
   align-items: flex-start;     /* trigger stays compact; body can be taller */
-  z-index: 20;
+  /* Above #playerNametag (21): the tag is anchored to the same 148px line, so
+     an open panel body was being crossed by it. */
+  z-index: 22;
   pointer-events: none;        /* re-enabled individually on trigger + open body */
 }
 
@@ -3083,7 +3108,7 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   display: flex;
   flex-direction: row; /* trigger(first in DOM) → leftmost → left edge */
   align-items: flex-start;
-  z-index: 20;
+  z-index: 22;         /* above #playerNametag — see .task-panel */
   pointer-events: none;
 }
 
@@ -3468,9 +3493,16 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5), 0 0 12px rgba(200, 40, 80, 0.3);
   font-family: 'Pixelify Sans', 'lo-res', sans-serif;
   pointer-events: none;
+  /* Hidden, not just slid off: parked above the viewport its glow still
+     reached a few pixels down and showed as a red line along the top. */
+  visibility: hidden;
+  transition: transform 0.3s steps(6), visibility 0s linear 0.3s;
+}
+.boss-hud--open {
+  transform: translate(-50%, 0);
+  visibility: visible;
   transition: transform 0.3s steps(6);
 }
-.boss-hud--open { transform: translate(-50%, 0); }
 .boss-hud-name {
   font-size: 12px;
   letter-spacing: 0.06em;
@@ -4203,3 +4235,50 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   0%, 100% { opacity: 1;    transform: translateY(-50%) scale(1); }
   50%      { opacity: 0.35; transform: translateY(-50%) scale(1.25); }
 }
+
+/* ── Role picker (username screen) ─────────────────────────────────────────
+   Four pixel symbols beside the colour swatches. A role is a claim, not a
+   constraint — nothing about the game reads it as a restriction — so the
+   picker is styled like the swatches rather than like a class-select screen. */
+.name-role-picks {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.name-role-pick {
+  width: 46px; height: 46px;
+  padding: 0;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: 2px;
+  background: rgba(8, 14, 20, 0.6);
+  border: 1px solid rgba(140, 200, 230, 0.28);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.name-role-pick canvas {
+  image-rendering: pixelated;
+  opacity: 0.55;
+}
+.name-role-pick.selected {
+  border-color: currentColor;
+  box-shadow: 0 0 8px -2px currentColor;
+  background: rgba(20, 40, 52, 0.75);
+}
+.name-role-pick.selected canvas { opacity: 1; }
+.name-role-pick:active { transform: translateY(1px); }
+
+/* The role symbol under the player's own name tag on the pack screen. Anchored
+   to the same fixed line as the tag so it never drifts with screen height. */
+#playerRoleMark {
+  display: none;               /* shown with the tag, in submitPlayerName */
+  position: fixed;
+  top: 178px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 21;
+  pointer-events: none;
+  line-height: 0;
+  opacity: 0.85;
+}
+#playerRoleMark canvas { image-rendering: pixelated; }

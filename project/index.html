@@ -74,6 +74,7 @@
       <button onclick="debugSpawnBlindBox(); debugMenuClose()">spawn blind box</button>
       <button onclick="debugAddStars(); debugMenuClose()">+25 stars</button>
       <button onclick="debugSeedCosmeow(); debugMenuClose()">seed COSMEOW</button>
+      <button onclick="debugSeedCownado(); debugMenuClose()">seed COWNADO</button>
       <button onclick="debugStatLevel()">+1 stat lv</button>
     </div>
   </div>
@@ -168,6 +169,10 @@
               <button type="button" class="name-color-swatch" style="--c:#FFB070" data-color="#FFB070" onclick="selectPlayerColor(this)" aria-label="orange"></button>
             </div>
           </div>
+          <div class="name-term-field">
+            <span class="name-term-label">role:</span>
+            <div class="name-role-picks" id="nameRolePicks"></div>
+          </div>
           <button type="button" class="name-sound-toggle name-sound-toggle--on" id="nameSoundToggle" onclick="toggleSound()" aria-pressed="true"><span class="name-sound-box">[✓]</span><span class="name-sound-label">sound on</span></button>
           <button class="name-term-btn" onclick="submitPlayerName()">[ enter world ]</button>
         </div>
@@ -177,6 +182,9 @@
       <div class="screen hidden" id="screen-pack">
         <!-- player's persistent name tag (set on the username screen) -->
         <div id="playerNametag"></div>
+        <!-- The role symbol, directly under the tag. Same art the projection
+             flashes over this player's objects when they act. -->
+        <div id="playerRoleMark"></div>
         <div id="packStack" class="pack-stack-behind"></div>
 
         <!-- Cross-player combo strip — sits just below the card. Empty until a
@@ -252,7 +260,7 @@
           </div>
           <button class="star-shop-btn" onclick="openShop()">
             <span class="star-shop-btn-icon">★</span>
-            <span class="star-shop-btn-label">SHOP</span>
+            <span class="star-shop-btn-label">GIFTS</span>
           </button>
         </div>
 
@@ -578,6 +586,7 @@
   <script src="js/announce.js"></script><!-- must be before main.js -->
   <script src="js/combo.js"></script><!-- must be before main.js -->
   <script src="js/player.js"></script><!-- must be before main.js -->
+  <script src="js/roles.js"></script><!-- must be before main.js -->
   <!-- corruption-bar.js shelved — bar removed for now
   <script src="js/corruption-bar.js"></script> -->
   <script src="js/main.js"></script>

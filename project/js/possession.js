@@ -180,7 +180,7 @@ function updatePossessionWS() {
     _ui.btn.style.opacity     = '1';
     _ui.duckBtn.textContent   = 'Inhabit a duck';
     _ui.duckBtn.style.opacity = '1';
-    _ui.foxBtn.textContent    = 'Inhabit a fox';
+    _ui.foxBtn.textContent    = 'Ride the COWNADO';
     _ui.foxBtn.style.opacity  = '1';
     _ui.boxBtn.textContent    = 'Inhabit the Blind Box';
     _ui.boxBtn.style.opacity  = '1';
@@ -1884,7 +1884,7 @@ function _buildUI() {
     <button id="poss-serpent-btn">Ride COSMEOW</button>
     <button id="poss-pig-btn">Ride the LAZERPIG</button>
     <button id="poss-seagull-btn">Inhabit a seagull</button>
-    <button id="poss-fox-btn">Inhabit a fox</button>
+    <button id="poss-fox-btn">Ride the COWNADO</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
     <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
@@ -2448,7 +2448,7 @@ function _onGranted(duration, creature) {
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'block';
 
   // ── Game Boy Color in-card readouts ──
-  if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'     ? 'FOX CAM'     :
+  if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'     ? 'COWNADO CAM'     :
                                              creature === 'serpent' ? 'COSMEOW CAM' :
                                              creature === 'seagull' ? 'SEAGULL CAM' :
                                              creature === 'pig'     ? 'LAZERPIG CAM' :
@@ -2467,7 +2467,7 @@ function _onGranted(duration, creature) {
     if (_ui.explode) _ui.explode.style.display = 'flex';
     _resetDuckExplode();
   } else if (creature === 'fox') {
-    _ui.pounce.style.display = 'flex';
+    // COWNADO: no action button — it drives itself and the stick only steers.
   } else if (creature === 'pig') {
     if (_ui.fire) {
       _ui.fire.style.display = 'flex';
@@ -2520,7 +2520,7 @@ function _onDenied(creature) {
                   creature === 'pig'     ? _ui.pigBtn     :
                   creature === 'seagull' ? _ui.seagullBtn :
                   creature === 'serpent' ? _ui.serpentBtn : _ui.btn;
-  const restore = creature === 'fox'     ? 'Inhabit a fox'     :
+  const restore = creature === 'fox'     ? 'Ride the COWNADO'     :
                   creature === 'duck'    ? 'Inhabit a duck'    :
                   creature === 'pig'     ? 'Ride the LAZERPIG' :
                   creature === 'seagull' ? 'Inhabit a seagull' :
@@ -2566,7 +2566,7 @@ function _refreshCamPreview() {
   // Title reflects the highest-priority live offer.
   const title = live.box ? 'BOX CAM'
               : live.serpent ? 'COSMEOW CAM'
-              : live.fox     ? 'FOX CAM'
+              : live.fox     ? 'COWNADO CAM'
               : live.pig     ? 'LAZERPIG CAM'
               : live.seagull ? 'SEAGULL CAM'
               : live.duck    ? 'DUCK CAM'
@@ -3504,7 +3504,7 @@ function _onEnded() {
   } else if (wasFox) {
     // Each fox card pull = one possession. Lock the button until next fox card.
     _foxAvailable = false;
-    _ui.foxBtn.textContent   = 'Inhabit a fox';
+    _ui.foxBtn.textContent   = 'Ride the COWNADO';
     _ui.foxBtn.style.opacity = '1';
   } else if (wasDuck) {
     // Each duck card pull = one possession. Lock the button until next duck card.

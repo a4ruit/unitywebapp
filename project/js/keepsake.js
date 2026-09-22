@@ -6,7 +6,7 @@
 
 const KeepsakeUI = (() => {
 
-  const W = 540, H = 960;   // 9:16, the projection's own aspect
+  const KW = 540, KH = 960;   // 9:16, the projection's own aspect
 
   function handle(msg) {
     if (typeof msg !== 'string' || !msg.startsWith('keepsake|')) return false;
@@ -70,6 +70,11 @@ const KeepsakeUI = (() => {
   // couple of numbers sit between them. Laid out bottom-up so nothing can run
   // off the edge.
   function _compose(img, title, team, placed, damage) {
+    // The poster is composed at its own size, then set inside a mat so the
+    // player's border never sits hard against the picture.
+    const PAD = 22;
+    const W = KW - PAD * 2, H = KH - PAD * 2;
+
     const c = document.createElement('canvas');
     c.width = W; c.height = H;
     const g = c.getContext('2d');
@@ -141,6 +146,8 @@ const KeepsakeUI = (() => {
       g.fillText(stats.join('   ·   '), W / 2, y);
     }
 
+    // The role they claimed, stamped beside the name — the same symbol that
+    // flashed over their tag all session.
     y -= 30;
     const name = _myName().toUpperCase();
     _fit(g, name, 88, 28, inner, F);
@@ -149,13 +156,27 @@ const KeepsakeUI = (() => {
     g.fillStyle = '#ffe3a0';
     g.fillText(name, W / 2, y);
 
-    // Border in the colour the player picked when they joined.
+    if (typeof Roles !== 'undefined' && typeof playerRole !== 'undefined') {
+      const sym = Roles.canvas(playerRole, 3, _myColor());
+      g.drawImage(sym, W / 2 - sym.width / 2, y - 92);
+    }
+
+    // Mat it: the poster sits on a dark card, with the player's colour as the
+    // frame around the outside.
+    const out = document.createElement('canvas');
+    out.width = KW; out.height = KH;
+    const o = out.getContext('2d');
+    o.imageSmoothingEnabled = false;
+    o.fillStyle = '#0a0812';
+    o.fillRect(0, 0, KW, KH);
+    o.drawImage(c, PAD, PAD);
+
     const tint = _myColor();
-    g.strokeStyle = tint; g.lineWidth = 6; g.strokeRect(9, 9, W - 18, H - 18);
-    g.globalAlpha = 0.45;
-    g.lineWidth = 2; g.strokeRect(17, 17, W - 34, H - 34);
-    g.globalAlpha = 1;
-    return c;
+    o.strokeStyle = tint; o.lineWidth = 6; o.strokeRect(3, 3, KW - 6, KH - 6);
+    o.globalAlpha = 0.45;
+    o.lineWidth = 2; o.strokeRect(PAD - 4, PAD - 4, W + 8, H + 8);
+    o.globalAlpha = 1;
+    return out;
   }
 
   function _show(canvas) {

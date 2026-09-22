@@ -112,7 +112,7 @@ const ChoiceGrid3D = (() => {
     mesh.rotation.y = Math.PI;
     scene.add(mesh);
 
-    const animated  = CardTextures.isAnimated(card.rarity) || card.variant === 'holo' || card.corrupted || card.flock;
+    const animated  = CardTextures.isAnimatedCard(card);
     const startTime = performance.now() / 1000;
 
     const cell = {
@@ -457,7 +457,7 @@ const ChoiceGrid3D = (() => {
 
     // Hazard plates hung off the card's corner, same overlay system.
     if (typeof WarnFX !== 'undefined') {
-      const PLATES = { 'LAZERPIG': 'laser', 'Lightning Iris': 'voltage', 'Puffball': 'shield' };
+      const PLATES = { 'LAZERPIG': 'laser', 'ULTRAVIOLET': 'voltage', 'PUFFBALL': 'shield' };
       const pigCell = cells.find(c => c && c.card && PLATES[c.card.name]);
       if (pigCell) {
         WarnFX.start(() => {

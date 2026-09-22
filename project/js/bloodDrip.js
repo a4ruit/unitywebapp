@@ -484,5 +484,17 @@ const BloodDrip = (() => {
     schedulePackDrips();
   }
 
-  return { onPackOpened, startPackDrips, setCorruptionLevel, setPersonalLevel };
+  // ARCADE MODE covers the web app's blood too, not only Unity's pixel blood:
+  // the drip overlay is the loudest gore on the phone. Read at call time
+  // because main.js (which owns the flag) loads after this file.
+  function _arcade() {
+    return typeof ARCADE_MODE !== 'undefined' && ARCADE_MODE;
+  }
+
+  return {
+    onPackOpened:       (...a) => { if (!_arcade()) onPackOpened(...a); },
+    startPackDrips:     (...a) => { if (!_arcade()) startPackDrips(...a); },
+    setCorruptionLevel: (...a) => { if (!_arcade()) setCorruptionLevel(...a); },
+    setPersonalLevel:   (...a) => { if (!_arcade()) setPersonalLevel(...a); },
+  };
 })();
