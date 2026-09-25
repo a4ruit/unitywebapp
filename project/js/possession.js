@@ -117,6 +117,8 @@ let _duckAvailable    = false;
 let _foxAvailable     = false;
 let _seagullAvailable = false;
 let _pigAvailable     = false;
+let _swarmAvailable   = false;
+let _turtleAvailable  = false;
 let _serpentAvailable = false;
 // Which creature is currently possessed — drives which WS verbs to send for
 // joystick input + action button. Null when nothing is being possessed.
@@ -316,6 +318,56 @@ function handlePossessionMessage(data) {
   }
 
   // ── Seagull possession lifecycle (flying critter) ──────────────────────────
+  // ── BUGFIX swarm ──────────────────────────────────────────────────────────
+  if (msg.startsWith('swarm_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'swarm'); return true; }
+  }
+  if (msg.startsWith('swarm_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('swarm'); return true; }
+  }
+  if (msg.startsWith('swarm_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded('swarm'); return true; }
+  }
+  if (msg.startsWith('swarm_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onTick(Number(parts[2])); return true; }
+  }
+  if (msg.startsWith('swarm_nova_done|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _swarmNovaDone(); return true; }
+  }
+  // ── BUFFERING turtle ──────────────────────────────────────────────────────
+  if (msg.startsWith('turtle_possess_granted|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'turtle'); return true; }
+  }
+  if (msg.startsWith('turtle_possess_denied|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onDenied('turtle'); return true; }
+  }
+  if (msg.startsWith('turtle_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded('turtle'); return true; }
+  }
+  if (msg.startsWith('turtle_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _setGbTimer(Number(parts[2])); return true; }
+  }
+  if (msg === 'turtle_spawned' || msg.startsWith('turtle_spawned|')) {
+    const spawnerId = msg.includes('|') ? msg.split('|')[1].trim() : null;
+    if (!spawnerId || spawnerId === CLIENT_ID) _onTurtleSpawned();
+    return true;
+  }
+
+  if (msg === 'bugfix_spawned' || msg.startsWith('bugfix_spawned|')) {
+    const spawnerId = msg.includes('|') ? msg.split('|')[1].trim() : null;
+    if (!spawnerId || spawnerId === CLIENT_ID) _onSwarmSpawned();
+    return true;
+  }
+
   if (msg.startsWith('pig_possess_granted|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'pig'); return true; }
@@ -324,6 +376,23 @@ function handlePossessionMessage(data) {
   if (msg.startsWith('pig_possess_denied|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onDenied('pig'); return true; }
+    return true;
+  }
+  // The pig was the ONE creature with a _granted handler and no _tick or
+  // _ended. It worked by accident: its MsgPrefix was missing from Unity's
+  // message ternaries, so it fell through to the plain sheep possess_tick /
+  // possess_ended, which the handlers above do catch. Adding "pig" to those
+  // ternaries — while fixing the BUGFIX swarm, which was silently doing the
+  // same thing — made Unity start speaking the pig's own prefix to a web app
+  // that had never listened for it. The timer froze and the cam never closed.
+  if (msg.startsWith('pig_possess_ended|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _onEnded('pig'); return true; }
+    return true;
+  }
+  if (msg.startsWith('pig_possess_tick|')) {
+    const parts = msg.split('|');
+    if (parts[1] === CLIENT_ID) { _setGbTimer(Number(parts[2])); return true; }
     return true;
   }
   if (msg.startsWith('seagull_possess_granted|')) {
@@ -701,6 +770,49 @@ function _buildUI() {
     #poss-pig-btn:active { background: rgba(158,74,255,0.32); }
     #poss-pig-btn.poss-hidden { display: none; }
 
+    /* BUGFIX — firefly green, so the healer is not confusable with the pig at a
+       glance on a crowded button stack. */
+    #poss-swarm-btn {
+      /* #poss-root is pointer-events:none so the page behind it stays usable;
+         every button turns its own back on. Missing this is why the button
+         rendered fine and swallowed nothing - the taps went straight past it. */
+      pointer-events: all;
+      cursor: pointer;
+      white-space: nowrap;   /* one line, like its neighbours */
+      position: absolute; left: 50%; top: 50%;
+      padding: 12px 22px;
+      font-family: 'Pixelify Sans', monospace;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      color: #d8ffa8;
+      background: rgba(60, 110, 30, 0.22);
+      border: 2px solid rgba(150, 230, 90, 0.75);
+      border-radius: 10px;
+      box-shadow: 0 0 12px -3px rgba(150, 230, 90, 0.8);
+    }
+    #poss-swarm-btn:active { background: rgba(150, 230, 90, 0.32); }
+    #poss-swarm-btn.poss-hidden { display: none; }
+
+    /* BUFFERING — banner blue, matching the flag and the rally markers, so the
+       tank is not confusable with the green healer on the stack. */
+    #poss-turtle-btn {
+      pointer-events: all;
+      cursor: pointer;
+      white-space: nowrap;
+      position: absolute; left: 50%; top: 50%;
+      padding: 12px 22px;
+      font-family: 'Pixelify Sans', monospace;
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      color: #d6f0ff;
+      background: rgba(30, 80, 130, 0.24);
+      border: 2px solid rgba(110, 190, 245, 0.78);
+      border-radius: 10px;
+      box-shadow: 0 0 12px -3px rgba(110, 190, 245, 0.85);
+    }
+    #poss-turtle-btn:active { background: rgba(110, 190, 245, 0.34); }
+    #poss-turtle-btn.poss-hidden { display: none; }
+
     /* ── Seagull inhabit button — sky blue, the flying critter ── */
     #poss-seagull-btn {
       pointer-events: all;
@@ -749,7 +861,7 @@ function _buildUI() {
        activates) so players can't miss them on the pack screen. They centre
        on the cam window; multiple stack vertically if several creatures are
        available at once. A gentle glow-pulse draws the eye. ── */
-    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn, #poss-serpent-btn, #poss-box-btn, #poss-pig-btn {
+    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn, #poss-serpent-btn, #poss-box-btn, #poss-pig-btn, #poss-swarm-btn, #poss-turtle-btn {
       bottom: auto;
       top: 50%;
       z-index: 12;                       /* above the cam window + card frame */
@@ -768,6 +880,8 @@ function _buildUI() {
     #poss-serpent-btn { transform: translate(-50%, calc(-50% - 90px)); }  /* serpent — upper  */
     #poss-box-btn     { transform: translate(-50%, calc(-50% - 120px)); } /* box     — top    */
     #poss-pig-btn     { transform: translate(-50%, calc(-50% - 150px)); } /* lazerpig — top   */
+    #poss-swarm-btn   { transform: translate(-50%, calc(-50% - 180px)); } /* bugfix   — top    */
+    #poss-turtle-btn  { transform: translate(-50%, calc(-50% - 210px)); } /* buffering — top  */
     @keyframes poss-inhabit-pulse {
       0%, 100% { box-shadow: 0 0 10px rgba(0,0,0,0.55); }
       50%      { box-shadow: 0 0 18px 2px rgba(255,255,255,0.22), 0 0 10px rgba(0,0,0,0.55); }
@@ -1434,7 +1548,8 @@ function _buildUI() {
        under every control. Giving it one lifted it over the joystick, FIRE and
        RELEASE, which is why an active session looked live but ignored input. */
     #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn,
-    #poss-serpent-btn, #poss-box-btn, #poss-pig-btn { z-index: 20; }
+    #poss-serpent-btn, #poss-box-btn, #poss-pig-btn, #poss-swarm-btn,
+    #poss-turtle-btn { z-index: 20; }
     #poss-video-wrap { z-index: 10; }
 
     /* ── Placement controls row — Game Boy layout: joystick LEFT, PLACE RIGHT.
@@ -1883,6 +1998,8 @@ function _buildUI() {
     <button id="poss-box-btn">Inhabit the Blind Box</button>
     <button id="poss-serpent-btn">Ride COSMEOW</button>
     <button id="poss-pig-btn">Ride the LAZERPIG</button>
+    <button id="poss-swarm-btn">Conjure the BUGFIX</button>
+    <button id="poss-turtle-btn">RALLY</button>
     <button id="poss-seagull-btn">Inhabit a seagull</button>
     <button id="poss-fox-btn">Ride the COWNADO</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
@@ -1996,6 +2113,8 @@ function _buildUI() {
     foxBtn:           root.querySelector('#poss-fox-btn'),
     seagullBtn:       root.querySelector('#poss-seagull-btn'),
     pigBtn:           root.querySelector('#poss-pig-btn'),
+    swarmBtn:         root.querySelector('#poss-swarm-btn'),
+    turtleBtn:        root.querySelector('#poss-turtle-btn'),
     serpentBtn:       root.querySelector('#poss-serpent-btn'),
     boxBtn:           root.querySelector('#poss-box-btn'),
     camClose:         root.querySelector('#poss-cam-close'),
@@ -2044,6 +2163,8 @@ function _buildUI() {
   _ui.foxBtn.addEventListener('click',     _requestFoxPossession);
   _ui.seagullBtn.addEventListener('click', _requestSeagullPossession);
   if (_ui.pigBtn) _ui.pigBtn.addEventListener('click', _requestPigPossession);
+  if (_ui.swarmBtn) _ui.swarmBtn.addEventListener('click', _requestSwarmPossession);
+  if (_ui.turtleBtn) _ui.turtleBtn.addEventListener('click', _requestTurtlePossession);
   _ui.serpentBtn.addEventListener('click', _requestSerpentPossession);
   _ui.boxBtn.addEventListener('click',     _requestBoxPossession);
   _ui.openBox.addEventListener('click',    _openBox);
@@ -2058,8 +2179,14 @@ function _buildUI() {
   _ui.flap.addEventListener('touchstart',   e => { e.preventDefault(); _flap();         }, { passive: false });
   _ui.flap.addEventListener('click',        _flap);
   if (_ui.fire) {
-    _ui.fire.addEventListener('touchstart', e => { e.preventDefault(); _pigFire(); }, { passive: false });
-    _ui.fire.addEventListener('click',      _pigFire);
+    // One control, two creatures: the pig fires, the swarm bursts.
+    const _fireTap = () => {
+      if (_creatureType === 'swarm')  return _swarmNova();
+      if (_creatureType === 'turtle') return _turtleDash();
+      return _pigFire();
+    };
+    _ui.fire.addEventListener('touchstart', e => { e.preventDefault(); _fireTap(); }, { passive: false });
+    _ui.fire.addEventListener('click',      _fireTap);
   }
   if (_ui.explode) {
     _ui.explode.addEventListener('touchstart', e => { e.preventDefault(); _explode(); }, { passive: false });
@@ -2103,6 +2230,8 @@ function _buildUI() {
     _ui.foxBtn.classList.add('poss-hidden');
     console.log('[possession.js] Fox button locked — waiting for first fox_spawned');
   }
+  if (!_swarmAvailable && _ui.swarmBtn) _ui.swarmBtn.classList.add('poss-hidden');
+  if (!_turtleAvailable && _ui.turtleBtn) _ui.turtleBtn.classList.add('poss-hidden');
   if (!_pigAvailable && _ui.pigBtn) {
     _ui.pigBtn.classList.add('poss-hidden');
   }
@@ -2332,6 +2461,70 @@ function _renderRam() {
 let _duckArmed   = false;
 let _fuseTicker  = null;
 
+function _requestSwarmPossession() {
+  if (!_ui.swarmBtn) return;
+  _ui.swarmBtn.textContent   = 'Requesting…';
+  _ui.swarmBtn.style.opacity = '0.5';
+  send(`swarm_possess_request|${CLIENT_ID}`);
+}
+
+// One swarm, one nova. The button spends itself, like the pig's FIRE, because
+// the card is one decision rather than a rhythm.
+let _novaSpent = false;
+
+function _swarmNova() {
+  if (!_possessed || _creatureType !== 'swarm' || _novaSpent) return;
+  _novaSpent = true;
+  send(`swarm_nova|${CLIENT_ID}`);
+  if (_ui.fire) {
+    _ui.fire.disabled    = true;
+    _ui.fire.textContent = 'NOVA';
+  }
+}
+
+function _swarmNovaDone() {
+  if (_ui.fire) _ui.fire.style.display = 'none';
+}
+
+// RALLY: a short burst of speed. Fire-and-forget — Unity owns the cooldown, so
+// the phone does not track one. A tap during cooldown is simply ignored there,
+// which is cheaper than keeping two timers in step across the network.
+function _turtleDash() {
+  if (!_possessed || _creatureType !== 'turtle') return;
+  send(`turtle_dash|${CLIENT_ID}`);
+}
+
+function _requestTurtlePossession() {
+  if (!_ui.turtleBtn) return;
+  _ui.turtleBtn.textContent   = 'Requesting…';
+  _ui.turtleBtn.style.opacity = '0.5';
+  send(`turtle_possess_request|${CLIENT_ID}`);
+}
+
+function _onTurtleSpawned() {
+  _undismissCam('turtle');
+  _turtleAvailable = true;
+  if (_ui && !_possessed && _ui.turtleBtn) {
+    _ui.turtleBtn.textContent   = 'RALLY';
+    _ui.turtleBtn.style.opacity = '1';
+    _ui.turtleBtn.classList.remove('poss-hidden');
+    _refreshCamPreview();
+  }
+}
+
+function _onSwarmSpawned() {
+  _undismissCam('swarm');
+  _swarmAvailable = true;
+  if (_ui && !_possessed && _ui.swarmBtn) {
+    _ui.swarmBtn.textContent   = 'Conjure the BUGFIX';
+    _ui.swarmBtn.style.opacity = '1';
+    _ui.swarmBtn.classList.remove('poss-hidden');
+    // Opens the empty cam frame the button sits over, the same as every other
+    // creature. Missing this is why the button was floating on its own.
+    _refreshCamPreview();
+  }
+}
+
 let _pigFired = false;
 
 function _pigFire() {
@@ -2435,6 +2628,8 @@ function _onGranted(duration, creature) {
   _ui.foxBtn.classList.add('poss-hidden');
   _ui.seagullBtn.classList.add('poss-hidden');
   if (_ui.pigBtn) _ui.pigBtn.classList.add('poss-hidden');
+  if (_ui.swarmBtn) _ui.swarmBtn.classList.add('poss-hidden');
+  if (_ui.turtleBtn) _ui.turtleBtn.classList.add('poss-hidden');
   _ui.serpentBtn.classList.add('poss-hidden');
   _ui.boxBtn.classList.add('poss-hidden');
 
@@ -2451,6 +2646,8 @@ function _onGranted(duration, creature) {
   if (_ui.gbTitle) _ui.gbTitle.textContent = creature === 'fox'     ? 'COWNADO CAM'     :
                                              creature === 'serpent' ? 'COSMEOW CAM' :
                                              creature === 'seagull' ? 'SEAGULL CAM' :
+                                             creature === 'swarm'   ? 'BUGFIX CAM'   :
+                                             creature === 'turtle'  ? 'BUFFERING CAM' :
                                              creature === 'pig'     ? 'LAZERPIG CAM' :
                                              creature === 'duck'    ? 'DUCK CAM'    : 'SHEEP CAM';
   _setGbTimer(duration);
@@ -2462,6 +2659,9 @@ function _onGranted(duration, creature) {
   _ui.pounce.style.display = 'none';
   _ui.dive.style.display   = 'none';
   _ui.bloom.style.display  = 'none';
+  // FIRE was never in this reset list, so it survived from whichever session
+  // last showed it — which is why BUFFERING opened with a FIRE button.
+  if (_ui.fire) _ui.fire.style.display = 'none';
   if (creature === 'duck') {
     _ui.flap.style.display   = 'flex';
     if (_ui.explode) _ui.explode.style.display = 'flex';
@@ -2475,6 +2675,24 @@ function _onGranted(duration, creature) {
       _ui.fire.textContent   = 'FIRE';
     }
     _pigFired = false;
+  } else if (creature === 'swarm') {
+    // Same one-shot control the pig uses, relabelled. A second button would be
+    // a second thing to explain for an identical interaction.
+    if (_ui.fire) {
+      _ui.fire.style.display = 'flex';
+      _ui.fire.disabled      = false;
+      _ui.fire.textContent   = 'NOVA';
+    }
+    _novaSpent = false;
+  } else if (creature === 'turtle') {
+    // Same one control, relabelled again. Unlike the pig and the swarm this one
+    // is REPEATABLE — it is a movement burst on a cooldown, not a one-shot, so
+    // the button is never spent and never disables itself.
+    if (_ui.fire) {
+      _ui.fire.style.display = 'flex';
+      _ui.fire.disabled      = false;
+      _ui.fire.textContent   = 'RALLY';
+    }
   } else if (creature === 'seagull') {
     _ui.dive.style.display   = 'flex';
   } else if (creature === 'serpent') {
@@ -2498,6 +2716,8 @@ function _onGranted(duration, creature) {
                     creature === 'duck'    ? 'duck_input'    :
                     creature === 'seagull' ? 'seagull_input' :
                     creature === 'serpent' ? 'serpent_input' :
+                    creature === 'swarm'   ? 'swarm_input'   :
+                    creature === 'turtle'  ? 'turtle_input'  :
                     creature === 'pig'     ? 'pig_input'     : 'sheep_input';
   _resetInputSendTracking();  // first tick always fires
   _inputInterval = setInterval(() => {
@@ -2517,11 +2737,15 @@ function _onDenied(creature) {
   // Flash a short "STREAMS FULL" label, then restore the normal button text.
   const btn     = creature === 'fox'     ? _ui.foxBtn     :
                   creature === 'duck'    ? _ui.duckBtn    :
+                  creature === 'swarm'   ? _ui.swarmBtn   :
+                  creature === 'turtle'  ? _ui.turtleBtn  :
                   creature === 'pig'     ? _ui.pigBtn     :
                   creature === 'seagull' ? _ui.seagullBtn :
                   creature === 'serpent' ? _ui.serpentBtn : _ui.btn;
   const restore = creature === 'fox'     ? 'Ride the COWNADO'     :
                   creature === 'duck'    ? 'Inhabit a duck'    :
+                  creature === 'swarm'   ? 'Conjure the BUGFIX'  :
+                  creature === 'turtle'  ? 'RALLY'  :
                   creature === 'pig'     ? 'Ride the LAZERPIG' :
                   creature === 'seagull' ? 'Inhabit a seagull' :
                   creature === 'serpent' ? 'Ride COSMEOW' : 'Inhabit a sheep';
@@ -2567,6 +2791,7 @@ function _refreshCamPreview() {
   const title = live.box ? 'BOX CAM'
               : live.serpent ? 'COSMEOW CAM'
               : live.fox     ? 'COWNADO CAM'
+              : live.swarm   ? 'BUGFIX CAM'
               : live.pig     ? 'LAZERPIG CAM'
               : live.seagull ? 'SEAGULL CAM'
               : live.duck    ? 'DUCK CAM'
@@ -2598,7 +2823,7 @@ function _dismissCamPreview() {
 
 const _camDismissedFor = {
   sheep: false, duck: false, fox: false, seagull: false,
-  serpent: false, pig: false, box: false,
+  serpent: false, pig: false, box: false, swarm: false, turtle: false,
 };
 
 const _offerBtns = {
@@ -2608,6 +2833,7 @@ const _offerBtns = {
   seagull: () => _ui && _ui.seagullBtn,
   serpent: () => _ui && _ui.serpentBtn,
   pig:     () => _ui && _ui.pigBtn,
+  swarm:   () => _ui && _ui.swarmBtn,
   box:     () => _ui && _ui.boxBtn,
 };
 
@@ -2620,6 +2846,8 @@ function _liveOffers() {
     seagull: _seagullAvailable  && !_camDismissedFor.seagull,
     serpent: _serpentAvailable  && !_camDismissedFor.serpent,
     pig:     _pigAvailable      && !_camDismissedFor.pig,
+    swarm:   _swarmAvailable    && !_camDismissedFor.swarm,
+    turtle:  _turtleAvailable   && !_camDismissedFor.turtle,
     box:     _blindBoxAvailable && !_camDismissedFor.box,
   };
 }
@@ -2630,7 +2858,7 @@ function _liveOffers() {
 function _hideOfferButtons() {
   if (!_ui) return;
   [_ui.btn, _ui.duckBtn, _ui.foxBtn, _ui.seagullBtn,
-   _ui.serpentBtn, _ui.boxBtn, _ui.pigBtn].forEach(b => {
+   _ui.serpentBtn, _ui.boxBtn, _ui.pigBtn, _ui.swarmBtn].forEach(b => {
     if (b) b.classList.add('poss-hidden');
   });
 }
@@ -3466,6 +3694,8 @@ function _onEnded() {
   const wasSerpent = _creatureType === 'serpent';
   const wasBox     = _creatureType === 'box';
   const wasPig     = _creatureType === 'pig';
+  const wasSwarm   = _creatureType === 'swarm';
+  const wasTurtle  = _creatureType === 'turtle';
   _possessed    = false;
   clearInterval(_inputInterval);
   _joystickActive = false;
@@ -3523,6 +3753,21 @@ function _onEnded() {
       _ui.pigBtn.textContent   = 'Ride the LAZERPIG';
       _ui.pigBtn.style.opacity = '1';
     }
+  } else if (wasSwarm) {
+    // One nova per swarm, so the conjuring is spent whether or not they used it.
+    _swarmAvailable = false;
+    if (_ui.swarmBtn) {
+      _ui.swarmBtn.textContent   = 'Conjure the BUGFIX';
+      _ui.swarmBtn.style.opacity = '1';
+    }
+  } else if (wasTurtle) {
+    // One rally per card. The turtle itself STAYS on the field still buffing —
+    // what is spent is the right to steer it, not the thing it does.
+    _turtleAvailable = false;
+    if (_ui.turtleBtn) {
+      _ui.turtleBtn.textContent   = 'RALLY';
+      _ui.turtleBtn.style.opacity = '1';
+    }
   } else if (wasSerpent) {
     // The serpent is one-and-done — it flies off and despawns after its reign.
     _serpentAvailable = false;
@@ -3541,6 +3786,8 @@ function _onEnded() {
   if (_foxAvailable)     _ui.foxBtn.classList.remove('poss-hidden');
   if (_seagullAvailable) _ui.seagullBtn.classList.remove('poss-hidden');
   if (_serpentAvailable) _ui.serpentBtn.classList.remove('poss-hidden');
+  if (_swarmAvailable && _ui.swarmBtn) _ui.swarmBtn.classList.remove('poss-hidden');
+  if (_turtleAvailable && _ui.turtleBtn) _ui.turtleBtn.classList.remove('poss-hidden');
 
   // Lift the background block — pack carousel is interactive again
   if (_ui.blockOverlay) _ui.blockOverlay.style.display = 'none';

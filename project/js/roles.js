@@ -44,29 +44,29 @@ const Roles = (() => {
     ],
     damage: [
       '...........',
-      '..HH...HH..',
-      '...HH.HH...',
-      '....HHH....',
-      '....HFH....',
-      '...HH.HH...',
-      '..HH...HH..',
-      '.FFF...FFF.',
-      '..OF...FO..',
-      '..OF...FO..',
-      '..OO...OO..',
+      '..H.....H..',
+      '...H...H...',
+      '....H.H....',
+      '.....H.....',
+      '....H.H....',
+      '...H...H...',
+      '..H.....H..',
+      '.FF.....FF.',
+      '.F.......F.',
+      '...........',
     ],
-    wildcard: [
+    saboteur: [
       '.....O.....',
       '....OFO....',
-      '....OFO....',
-      'OOOOFFFOOOO',
-      '.OFFFFFFFO.',
-      '..FFFHFFF..',
-      '..OFFFFFO..',
-      '..OFO.OFO..',
-      '.OFO...OFO.',
-      '.O.......O.',
-      '...........',
+      '....OFFO.O.',
+      '...OFFFFO..',
+      '..OFFFFFFO.',
+      '..OFFHHFFO.',
+      '.OFFHHHHFO.',
+      '.OFHHHHHFO.',
+      '.OFHHHHHFO.',
+      '..OFHHHFO..',
+      '...OOOOO...',
     ],
   };
 
@@ -74,14 +74,14 @@ const Roles = (() => {
     tank:     { label: 'TANK',     hint: 'soak it'   },
     medic:    { label: 'MEDIC',    hint: 'mend it'   },
     damage:   { label: 'DAMAGE',   hint: 'break it'  },
-    wildcard: { label: 'WILDCARD', hint: 'whatever'  },
+    saboteur: { label: 'SABOTEUR', hint: 'burn it'   },
   };
 
-  const ORDER = ['tank', 'medic', 'damage', 'wildcard'];
+  const ORDER = ['tank', 'medic', 'damage', 'saboteur'];
 
   function list() { return ORDER.slice(); }
-  function meta(id) { return META[id] || META.wildcard; }
-  function art(id)  { return ART[id]  || ART.wildcard; }
+  function meta(id) { return META[id] || META.saboteur; }
+  function art(id)  { return ART[id]  || ART.saboteur; }
 
   // Draws one symbol into a canvas, in the player's own colour. The outline is
   // near-black and the highlight near-white, so the symbol survives being drawn

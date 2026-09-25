@@ -4268,12 +4268,15 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .name-role-pick.selected canvas { opacity: 1; }
 .name-role-pick:active { transform: translateY(1px); }
 
-/* The role symbol under the player's own name tag on the pack screen. Anchored
-   to the same fixed line as the tag so it never drifts with screen height. */
+/* The role symbol ABOVE the player's own name tag on the pack screen.
+   Above, not below: a purchased title takes the line directly under the tag
+   (#playerTitleTag at 184px), and the two would sit on top of each other.
+   Anchored to the same fixed line as the tag so it never drifts with screen
+   height - 22px of symbol plus a 6px gap above the tag's own 154px. */
 #playerRoleMark {
   display: none;               /* shown with the tag, in submitPlayerName */
   position: fixed;
-  top: 178px;
+  top: 126px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 21;
@@ -4282,3 +4285,51 @@ body:has(#screen-horror-spin:not(.hidden))::before {
   opacity: 0.85;
 }
 #playerRoleMark canvas { image-rendering: pixelated; }
+
+/* ── ROLE SPECIALISATION ───────────────────────────────────────────────────
+   The low-key tell that the game has noticed how you play. Once a player
+   passes the threshold in spec.js, body carries a spec-* class and the
+   background picks up a wash in that role's colour.
+
+   Deliberately a SEPARATE layer rather than another filter on .bg-grid — that
+   element already carries the per-pack hue rotation, and stacking a second
+   filter there would make specialisation fight the pack identity instead of
+   sitting under it. This is a tint over the top at low alpha, so the pack
+   colour still reads and the role is a mood rather than a repaint. */
+.bg-grid::after {
+  content: '';
+  position: absolute; inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 1.6s ease, background 1.6s ease;
+}
+body.specialised .bg-grid::after { opacity: 1; }
+
+/* Strongest at the edges, clear in the middle, so it never dirties the card
+   the player is actually looking at. */
+body.spec-tank .bg-grid::after {
+  background: radial-gradient(ellipse at center,
+              rgba(74,138,170,0) 35%, rgba(74,138,170,0.22) 100%);
+}
+body.spec-medic .bg-grid::after {
+  background: radial-gradient(ellipse at center,
+              rgba(120,220,130,0) 35%, rgba(120,220,130,0.20) 100%);
+}
+body.spec-damage .bg-grid::after {
+  background: radial-gradient(ellipse at center,
+              rgba(214,90,60,0) 35%, rgba(214,90,60,0.20) 100%);
+}
+body.spec-saboteur .bg-grid::after {
+  background: radial-gradient(ellipse at center,
+              rgba(190,110,220,0) 35%, rgba(190,110,220,0.22) 100%);
+}
+
+/* The moment it trips — one slow breath of the wash, then it settles to its
+   resting level. No banner: the player is mid-placement when this fires. */
+body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
+@keyframes specTrip {
+  0%   { opacity: 0; }
+  22%  { opacity: 1; }
+  55%  { opacity: 0.45; }
+  100% { opacity: 1; }
+}

@@ -457,18 +457,32 @@ const ChoiceGrid3D = (() => {
 
     // Hazard plates hung off the card's corner, same overlay system.
     if (typeof WarnFX !== 'undefined') {
-      const PLATES = { 'LAZERPIG': 'laser', 'ULTRAVIOLET': 'voltage', 'PUFFBALL': 'shield' };
-      const pigCell = cells.find(c => c && c.card && PLATES[c.card.name]);
-      if (pigCell) {
-        WarnFX.start(() => {
-          if (!pigCell.displayCanvas) return null;
-          if (pigCell.state !== 'idle' && pigCell.state !== 'pulse') return null;
-          const r = pigCell.displayCanvas.getBoundingClientRect();
-          if (r.width <= 2 || r.height <= 2) return null;
-          const locked = !!(pigCell.el &&
-            pigCell.el.classList.contains('choice-cell-3d--locked'));
-          return { left: r.left, top: r.top, width: r.width, height: r.height, locked };
-        }, PLATES[pigCell.card.name]);
+      // The blue disc marks a card that does not kill: shield for the ones that
+      // hold, cross for the ones that mend. Nature side only — RITUAL heals the
+      // boss, and a badge the players trust must never sit on that.
+      const PLATES = { 'LAZERPIG': 'laser', 'ULTRAVIOLET': 'voltage',
+                       'PUFFBALL': 'shield', 'SOLARGRIP': 'shield',
+                       'BUFFERING': 'shield',
+                       'INFRAMEND': 'medic', 'BLOOMSHROOM': 'medic',
+                       'BUGFIX': 'medic' };
+      // EVERY badged card in the grid gets its plate. This used to take the
+      // first match only, which was invisible while three cards had plates and
+      // none shared a pack — now BUGFIX and LAZERPIG can both be dealt, and
+      // whichever sat later in the grid lost its badge.
+      const plated = cells.filter(c => c && c.card && PLATES[c.card.name]);
+      if (plated.length) {
+        WarnFX.start(plated.map(cell => ({
+          kind: PLATES[cell.card.name],
+          getRect: () => {
+            if (!cell.displayCanvas) return null;
+            if (cell.state !== 'idle' && cell.state !== 'pulse') return null;
+            const r = cell.displayCanvas.getBoundingClientRect();
+            if (r.width <= 2 || r.height <= 2) return null;
+            const locked = !!(cell.el &&
+              cell.el.classList.contains('choice-cell-3d--locked'));
+            return { left: r.left, top: r.top, width: r.width, height: r.height, locked };
+          },
+        })));
       } else {
         WarnFX.stop();
       }

@@ -98,6 +98,11 @@ const NATURE_CARDS = [
   { id:'small_cube', name:'THORNSPIKE', rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'thornwire',  desc:'Barbed and coiled. It only defends.' },
   // Alternate common to Thornwire. Lures small enemies onto its jaws, then snaps.
   { id:'small_cube', name:'CHOMPTRAP',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'chomptrap',  desc:'Sweet nectar. Steel teeth.' },
+  // The pack's tank common. Holds rather than hits — it drags small enemies off
+  // whoever they were chasing and stacks them somewhere a CLOVERSTORM can reach.
+  // Never touches the boss: a common that could pull the boss around would make
+  // every other card in the deck optional.
+  { id:'small_cube', name:'SOLARGRIP',   rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'solargrip',  desc:'A sundew with a star in it. What it holds, it keeps.' },
   // The bloom family: one flower, three elements. All ride 'wildflower' on the
   // wire — Unity tells them apart by the card name.
   { id:'large_cube', name:'FIREBLOOM',   rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'wildflower', desc:'It keeps a small sun. It is not friendly.' },
@@ -107,6 +112,10 @@ const NATURE_CARDS = [
   // and the halo, radius and prefab lookups are all keyed to that string. Only
   // the name the player reads has changed.
   { id:'sphere',     name:'ULTRAVIOLET', rarity:'rare',   rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'It blooms and the air goes tight. Whatever is near feels it first.' },
+  // INFRAMEND is ULTRAVIOLET turned around: the same rod, the same chain, the
+  // same number - given back to its own side instead of taken from the other.
+  // Same placement string, told apart in Unity by name.
+  { id:'sphere',     name:'INFRAMEND',   rarity:'rare',   rarityRank:2, command:'spawn_sphere',     placement:'flowerbush', desc:'It leans toward whatever is hurt. The green goes where it is needed.' },
   { id:'triangle',   name:'CLOVERSTORM', rarity:'legendary', rarityRank:3, command:'spawn_triangle',   ability:'leafstorm',    desc:'Trace the storm. Let it hunt for you.' },
 ];
 
@@ -143,9 +152,18 @@ const FLESH_CARDS = [
 const CRITTER_CARDS = [
   { id:'small_cube', name:'RAM',             rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'Docile. Unaware. Already moving on.' },
   { id:'large_cube', name:'DD.DUCK', rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'Paddling. Persistent. Unbothered.' },
+  // The pack's only healer. Drive the swarm, pick a moment, spend it: the
+  // fireflies pull inward and let go one nova that mends friendlies and stings
+  // whatever hostile is standing in it.
+  { id:'large_cube', name:'BUGFIX',  rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'A few fireflies with a patch note. Spend them well.' },
   { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'COWNADO',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Cows in it. Cows under it. Steer, and hope.' },
   { id:'sphere',     name:'LAZERPIG',       rarity:'rare',            rarityRank:2, command:'spawn_lazerpig',   desc:'FIRIN MA LASERRR' },
+  // The critter side's only TANK. Slow to the point of comedy, and everything
+  // standing in its banner moves faster, places faster and mends — which is the
+  // joke and the balance at once. Banks a RALLY like the COWNADO banks a ride:
+  // nothing exists until somebody taps the button.
+  { id:'triangle',   name:'BUFFERING',       rarity:'legendary',       rarityRank:3, command:'spawn_buffering',  desc:'Slowest thing here. Everything near it hurries.' },
   { id:'star',       name:'COSMEOW',         rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Rides a cloud. Leaves a rainbow. Mind the rainbow.' },
 ];
 
@@ -519,7 +537,19 @@ function setPackType(type) {
 function pick(tier) {
   const pool = getActiveCardPool().filter(c => c.rarity === tier);
   if (!pool.length) return {};
-  return { ...pool[Math.floor(Math.random() * pool.length)] };
+
+  // Specialisation seeding. Only bites where a tier holds more than one card —
+  // NATURE rare (ULTRAVIOLET / INFRAMEND) and CRITTER uncommon (DD.DUCK /
+  // BUGFIX) are the real forks today. Everywhere else the tier has a single
+  // occupant and this collapses back to the uniform pick it replaced.
+  const w = pool.map(c => (typeof Spec !== 'undefined' ? Spec.weight(c) : 1));
+  const total = w.reduce((a, x) => a + x, 0);
+  let r = Math.random() * total;
+  for (let i = 0; i < pool.length; i++) {
+    if (r < w[i]) return { ...pool[i] };
+    r -= w[i];
+  }
+  return { ...pool[pool.length - 1] };
 }
 
 let isGodPack = false;
@@ -750,8 +780,12 @@ function rollTopCard(activePool) {
   // Penalised weights. Discouraged, never banned — a hard ban would make the
   // sequence predictable in the other direction, and guaranteed rotation reads
   // as a playlist rather than a pull.
+  // Specialisation nudges WHICH TIER as well as which card. With one card per
+  // tier in most pools, this is what actually carries the seeding — weighting
+  // inside a tier can do nothing when the tier has a single occupant.
   const base    = tiers.map(t =>
-    TOP_CARD_WEIGHTS[t] * (horror ? (HORROR_TOP_BOOST[t] || 1) : 1));
+    TOP_CARD_WEIGHTS[t] * (horror ? (HORROR_TOP_BOOST[t] || 1) : 1)
+                        * (typeof Spec !== 'undefined' ? Spec.tierWeight(activePool, t) : 1));
   const weights = tiers.map((t, i) => {
     if (!REPEAT_TIERS.has(t)) return base[i];
     const age = recent.indexOf(t);
@@ -986,10 +1020,10 @@ const PLAYER_COLORS = ['#7BE3FF', '#FFD96B', '#FF9BC9', '#6FE886', '#C28BFF', '#
 // every card and every possession stays open to everyone. What it buys is
 // legibility: Unity draws the matching pixel symbol over this player's name tag
 // for a few seconds whenever they act, so the room can see who just did that.
-let playerRole = 'wildcard';
+let playerRole = 'saboteur';
 
 function selectPlayerRole(btn) {
-  playerRole = btn.dataset.role || 'wildcard';
+  playerRole = btn.dataset.role || 'saboteur';
   document.querySelectorAll('.name-role-pick').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   _paintNametagRole();
@@ -1775,6 +1809,13 @@ function dropCard(card) {
   // Card committed — soft placement "plop".
   if (typeof Sound !== 'undefined') Sound.play('place');
 
+  // Count it toward a role specialisation. Placed, not offered — see spec.js.
+  // The second argument is the ALLEGIANCE axis: a corrupted card, or anything
+  // placed once this phone has flipped to the horror packs, is a defection.
+  if (typeof Spec !== 'undefined') {
+    Spec.record(card, !!card.corrupted || corruptionLevel >= HORROR_THRESHOLD);
+  }
+
   // Tally for the keepsake's "most used card". Memory only, one round.
   if (!card.corrupted && card.name) {
     const u = cardUse[card.name] || (cardUse[card.name] = { count: 0, card });
@@ -1898,8 +1939,14 @@ function dropCard(card) {
   // this spawn to the correct object set (nature vs flesh etc.) for THIS player,
   // independent of what other phones are currently sending. A holo finish rides
   // as an optional 4th field so Unity can spawn a holographic object.
-  const finish = card.variant === 'holo' ? '|holo' : '';
-  send(`${card.command}|${CLIENT_ID}|${getUnityPackType()}${finish}`);
+  // Five fields, always, in Unity's order: clientId | packType | finish |
+  // origin | cardName. The NAME is new and matters because several cards now
+  // share one command and one slot - DD.DUCK and BUGFIX, ULTRAVIOLET and
+  // INFRAMEND - so the command alone no longer says what was played. Every
+  // field is sent even when empty, because Unity reads them positionally and a
+  // collapsed gap would shift the name into the wrong slot.
+  const finish = card.variant === 'holo' ? 'holo' : '';
+  send(`${card.command}|${CLIENT_ID}|${getUnityPackType()}|${finish}||${card.name}`);
   resetToPackScreen();
 }
 

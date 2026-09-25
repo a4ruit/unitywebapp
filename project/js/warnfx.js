@@ -2,19 +2,36 @@
 //   LAZERPIG      → laser radiation
 //   ULTRAVIOLET → high voltage
 //   Puffball       → shield in a blue sign disc (defensive)
+//   SOLARGRIP      → the same shield: it holds rather than hits
+//   INFRAMEND / BLOOMSHROOM / BUGFIX → medic cross, same blue disc
+//
+// The blue disc is the NATURE side's badge for a card that is not trying to
+// kill anything. Horror healers (the RITUAL pack mends the boss) deliberately
+// do not wear it - the plate is a promise to the players reading the field,
+// and it should never appear on something working against them.
 //
 // Same overlay trick as FlockFX: drawn on a full-viewport canvas anchored to the
 // card's live screen rect, so it can sit OUTSIDE the card edges instead of being
 // clipped inside the card texture.
 //
-//   WarnFX.start(getRect, kind)   kind: 'laser' | 'voltage' | 'shield'
-//                                 getRect() -> {left,top,width,height,locked} or null
+//   WarnFX.start([{getRect, kind}, ...])   several plates at once
+//   WarnFX.start(getRect, kind)             one, the original form
+//       kind: 'laser' | 'voltage' | 'shield' | 'medic'
+//       getRect() -> {left,top,width,height,locked} or null
 //   WarnFX.stop()
+//
+// MULTIPLE plates, because one pack can hold more than one badged card. That
+// was safe when only three cards had plates and they sat in different packs;
+// with the shield and the cross added there are seven, and BUGFIX + LAZERPIG,
+// BLOOMSHROOM + PUFFBALL and SOLARGRIP + ULTRAVIOLET can each share a pack. A
+// single-plate overlay silently dropped whichever came second.
 
 const WarnFX = (() => {
 
-  let canvas = null, ctx = null, raf = null;
-  let getRect = null, t0 = 0, fade = 0, lastRect = null, kind = 'laser';
+  let canvas = null, ctx = null, raf = null, t0 = 0;
+  // One entry per plate on screen. Fade and last-known rect are PER ENTRY, so a
+  // card leaving the grid fades its own badge out without touching the others.
+  let entries = [];
   const plates = {};
 
   const ART = {};
@@ -75,38 +92,53 @@ const WarnFX = (() => {
     'KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK',
   ];
 
+  // 19x19, the same grid ART.laser uses. It was 31x31 before, which made it the
+  // only plate drawn at a different pixel density - beside the laser sign it
+  // read as a smooth logo next to pixel art rather than as a sibling.
   ART.shield = [
-    '...............................',
-    '...........WWWWWWWWW...........',
-    '........WWWWBBBBBBBWWWW........',
-    '.......WWBBBBBBBBBBBBBWW.......',
-    '......WWBBBBBBBBBBBBBBBWW......',
-    '.....WBBBBBBBBBBBBBBBBBBBW.....',
-    '....WBBWWBBBBBBBBBBBBBWWBBW....',
-    '...WWBBWWWWWWWWWWWWWWWWWBBWW...',
-    '..WWBBBWWWWWWWWWWWWWWWWWBBBWW..',
-    '..WBBBBWWWBBBBBBBBBBBWWWBBBBW..',
-    '..WBBBBWWWBWWWWWWWWWBWWWBBBBW..',
-    '.WWBBBBWWWBWWWWWWWWWBWWWBBBBWW.',
-    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
-    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
-    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
-    '.WBBBBBWWWBWWWWWWWWWBWWWBBBBBW.',
-    '.WBBBBBBWWBWWWWWWWWWBWWBBBBBBW.',
-    '.WBBBBBBWWWBWWWWWWWBWWWBBBBBBW.',
-    '.WBBBBBBBWWBWWWWWWWBWWBBBBBBBW.',
-    '.WWBBBBBBWWWBWWWWWBWWWBBBBBBWW.',
-    '..WBBBBBBBWWWBWWWBWWWBBBBBBBW..',
-    '..WBBBBBBBBWWWBWBWWWBBBBBBBBW..',
-    '..WWBBBBBBBWWWWBWWWWBBBBBBBWW..',
-    '...WWBBBBBBBWWWWWWWBBBBBBBWW...',
-    '....WBBBBBBBBBWWWBBBBBBBBBW....',
-    '.....WBBBBBBBBBWBBBBBBBBBW.....',
-    '......WWBBBBBBBBBBBBBBBWW......',
-    '.......WWBBBBBBBBBBBBBWW.......',
-    '........WWWWBBBBBBBWWWW........',
-    '...........WWWWWWWWW...........',
-    '...............................',
+    '.......KKKKK.......',
+    '.....KWWWWWWWK.....',
+    '...KKWWBBBBBWWKK...',
+    '..KWWBBBBBBBBBWWK..',
+    '..KWBBBBBBBBBBBWK..',
+    '.KWBBBBWWWWWBBBBWK.',
+    '.WWBBBWWWWWWWBBBWW.',
+    'KWBBBBWWWWWWWBBBBWK',
+    'KWBBBBWWWWWWWBBBBWK',
+    'KWBBBBWWWWWWWBBBBWK',
+    'KWBBBBBWWWWWBBBBBWK',
+    'KWBBBBBWWWWWBBBBBWK',
+    '.WWBBBBBWWWBBBBBWW.',
+    '.KWBBBBBBWBBBBBBWK.',
+    '..KWBBBBBBBBBBBWK..',
+    '..KWWBBBBBBBBBWWK..',
+    '...KKWWBBBBBWWKK...',
+    '.....KWWWWWWWK.....',
+    '.......KKKKK.......',
+  ];
+
+  // Same disc as ART.shield down to the pixel, so the two read as one family
+  // seen twice rather than as two separate badges. Only the glyph differs.
+  ART.medic = [
+    '.......KKKKK.......',
+    '.....KWWWWWWWK.....',
+    '...KKWWBBBBBWWKK...',
+    '..KWWBBBBBBBBBWWK..',
+    '..KWBBBBBBBBBBBWK..',
+    '.KWBBBBBWWWBBBBBWK.',
+    '.WWBBBBBWWWBBBBBWW.',
+    'KWBBBBBBWWWBBBBBBWK',
+    'KWBBBWWWWWWWWWBBBWK',
+    'KWBBBWWWWWWWWWBBBWK',
+    'KWBBBWWWWWWWWWBBBWK',
+    'KWBBBBBBWWWBBBBBBWK',
+    '.WWBBBBBWWWBBBBBWW.',
+    '.KWBBBBBWWWBBBBBWK.',
+    '..KWBBBBBBBBBBBWK..',
+    '..KWWBBBBBBBBBWWK..',
+    '...KKWWBBBBBWWKK...',
+    '.....KWWWWWWWK.....',
+    '.......KKKKK.......',
   ];
 
   const PAL = { K: '#120c04', Y: '#f2c21a', B: '#1f5fa6', W: '#f4f6fa' };
@@ -119,7 +151,7 @@ const WarnFX = (() => {
     im.src = src;
   });
 
-  function _plate() {
+  function _plate(kind) {
     if (IMG[kind]) return IMG[kind];
     if (plates[kind]) return plates[kind];
     const art = ART[kind] || ART.laser;
@@ -163,49 +195,67 @@ const WarnFX = (() => {
     const { w, h } = _resize();
     ctx.clearRect(0, 0, w, h);
 
-    const rect = getRect ? getRect() : null;
-    if (rect) lastRect = rect;
-    fade += ((rect ? 1 : 0) - fade) * 0.12;
-    if (fade < 0.02 || !lastRect) return;
+    const t = performance.now() / 1000 - t0;
 
-    const r      = lastRect;
-    const t      = performance.now() / 1000 - t0;
-    const locked = !!r.locked;
-    const size   = r.width * 0.22;
+    // The locked treatment used to be a CSS filter on the whole canvas, which
+    // only worked while there was exactly one plate. Greying is per-plate now,
+    // applied as alpha, so a locked card next to an affordable one dims alone.
+    canvas.style.filter  = 'none';
+    canvas.style.opacity = '1';
 
-    // Pinned at the top-right corner with only a small overhang past the frame.
-    const cx = r.left + r.width  * 0.82;
-    const cy = r.top  + r.height * 0.045 + Math.sin(t * 1.1) * size * 0.04;
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
 
-    const wantFilter  = locked ? 'grayscale(1) brightness(0.55)' : 'none';
-    const wantOpacity = locked ? '0.55' : '1';
-    if (canvas.style.filter  !== wantFilter)  canvas.style.filter  = wantFilter;
-    if (canvas.style.opacity !== wantOpacity) canvas.style.opacity = wantOpacity;
+      const rect = e.getRect ? e.getRect() : null;
+      if (rect) e.lastRect = rect;
+      e.fade += ((rect ? 1 : 0) - e.fade) * 0.12;
+      if (e.fade < 0.02 || !e.lastRect) continue;
 
-    ctx.save();
-    ctx.globalAlpha = fade;
-    ctx.imageSmoothingEnabled = false;
-    ctx.translate(cx, cy);
-    ctx.shadowColor   = 'rgba(0,0,0,0.45)';
-    ctx.shadowBlur    = 4;
-    ctx.shadowOffsetY = 3;
-    ctx.drawImage(_plate(), -size / 2, -size / 2, size, size);
-    ctx.restore();
+      const r      = e.lastRect;
+      const locked = !!r.locked;
+      const size   = r.width * 0.22;
+
+      // Pinned at the top-right corner with only a small overhang past the
+      // frame. The bob is phase-shifted per plate so two badges on screen do
+      // not rise and fall in lockstep.
+      const cx = r.left + r.width  * 0.82;
+      const cy = r.top  + r.height * 0.045
+               + Math.sin(t * 1.1 + i * 1.7) * size * 0.04;
+
+      ctx.save();
+      ctx.globalAlpha = e.fade * (locked ? 0.4 : 1);
+      ctx.imageSmoothingEnabled = false;
+      ctx.translate(cx, cy);
+      ctx.shadowColor   = 'rgba(0,0,0,0.45)';
+      ctx.shadowBlur    = 4;
+      ctx.shadowOffsetY = 3;
+      ctx.drawImage(_plate(e.kind), -size / 2, -size / 2, size, size);
+      ctx.restore();
+    }
   }
 
-  function start(getRectFn, plateKind) {
+  /// Accepts a list of {getRect, kind}, or the original single (fn, kind) pair.
+  function start(list, plateKind) {
     _ensure();
-    kind     = ART[plateKind] ? plateKind : 'laser';
-    getRect  = getRectFn;
-    lastRect = null;
-    t0       = performance.now() / 1000;
+
+    const raw = Array.isArray(list) ? list
+              : [{ getRect: list, kind: plateKind }];
+
+    entries = raw
+      .filter(e => e && typeof e.getRect === 'function')
+      .map(e => ({
+        getRect:  e.getRect,
+        kind:     ART[e.kind] ? e.kind : 'laser',
+        fade:     0,
+        lastRect: null,
+      }));
+
+    t0 = performance.now() / 1000;
     if (!raf) _loop();
   }
 
   function stop() {
-    getRect = null;
-    lastRect = null;
-    fade = 0;
+    entries = [];
     if (raf) { cancelAnimationFrame(raf); raf = null; }
     if (canvas) { ctx.clearRect(0, 0, canvas.width, canvas.height); canvas.style.display = 'none'; }
   }

@@ -72,6 +72,8 @@ const CardTextures = (() => {
     // text has to say the split, because a player reading 12 next to a card that
     // deals 4 a hit will think it is broken.
     flowerbush: { hp: 9,  atk: 12, rule: 'Plant. Chains to 3 foes, 4 each.' },
+    inframend:  { hp: 9,  atk: 0,  rule: 'Plant. Mends 3 friendly, 4 each.' },
+    bugfix:     { hp: 6,  atk: 2,  rule: 'Drive it. One nova: heal 6, sting 2.' },
     leafstorm:  { hp: 0,  atk: 8,  rule: 'Trace a path. Hits all enemies.' },
     fungi:      { hp: 12, atk: 3,  rule: 'Plant, then draw a spore path.' },
     blueangel:  { hp: 20, atk: 2,  rule: 'Bait. Drains from range.' },
@@ -84,6 +86,8 @@ const CardTextures = (() => {
     frostcap:   { hp: 12, atk: 7, rule: 'Freezes, then slows. Shatters.' },
     frostbloom: { hp: 9,  atk: 1, rule: 'Plant. Frost orb chills what it hits.' },
     venombloom: { hp: 9,  atk: 1, rule: 'Plant. Venom lingers after it dies.' },
+    solargrip:  { hp: 9,  atk: 0,
+                  rule: 'Plant. Drags one foe in. HOLO: all of them.' },
   };
 
   /// Stats for a card, or null when it has none (critters, horror cards, the
@@ -95,6 +99,9 @@ const CardTextures = (() => {
     if (card.name === 'PUFFBALL')    return CARD_STATS.puffball;
     if (card.name === 'FROSTCAP')    return CARD_STATS.frostcap;
     if (card.name === 'BLOOMSHROOM') return CARD_STATS.lunarshroom;
+    if (card.name === 'INFRAMEND')   return CARD_STATS.inframend;
+    if (card.name === 'BUGFIX')      return CARD_STATS.bugfix;
+    if (card.name === 'SOLARGRIP')   return CARD_STATS.solargrip;
     if (card.name === 'FROSTBLOOM')  return CARD_STATS.frostbloom;
     if (card.name === 'VENOMBLOOM')  return CARD_STATS.venombloom;
     return CARD_STATS[card.placement] || null;
@@ -1021,6 +1028,48 @@ const CardTextures = (() => {
 
   // â”€â”€â”€ NATURE shape drawers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+  const MEND_ART = [
+    '.........................',
+    '.........................',
+    '.......D.........D.......',
+    '......DHD.......DHD......',
+    '......DHD.......DHD......',
+    '.....DHMD.......DMHD.....',
+    '.....DMD..DHD....DMD.....',
+    '....DMD..DHMHD....DMD....',
+    '....DMD..DMWMD....DMD....',
+    '...DMD...DMMMD.....DMD...',
+    '...DMD....DMD......DMD...',
+    '..DBBD....DMD......DBBD..',
+    '..DBWBD...DMD.....DBWBD..',
+    '...DBBD...DMD......DBBD..',
+    '....DD....DMD.......DD...',
+    '..........DMD............',
+    '.........DDMDD...........',
+    '......DDLLLLLLLDD........',
+    '....DLLMMMMMMMMMLLD......',
+    '...DLMMHHHHHHHHHMMLD.....',
+    '...DLMHHWWWWWWWHHMLD.....',
+    '...DDLMMHHHHHHHMMLDD.....',
+    '.....DDLLMMMMMLLDD.......',
+    '.......DDDDDDDDD.........',
+    '.........................',
+  ];
+
+  // INFRAMEND — ULTRAVIOLET's counterpart, and drawn as its own plant rather
+  // than a recoloured iris. Where the iris is a mast reaching up to a point,
+  // this is a basin with arched stems leaning out and down: the gesture is
+  // giving rather than gathering, and the silhouette has to carry that at
+  // thumbnail size, because the two cards share a rarity and a slot.
+  const MEND_PAL = {
+    D: '#1d4536',   // outline, dark enough to hold against the gold frame
+    M: '#2f7a58',   // stem and the shaded side of a leaf
+    L: '#49a877',   // lit leaf
+    H: '#79d9a6',   // bell body — green, tinged blue
+    W: '#d8fff0',   // the lit mouth, and the pool in the basin
+    B: '#5ec4c0',   // the outer bells, pushed further toward blue
+  };
+
   // ─── Lightning Iris sprite ──────────────────────────────────────────────────
   // Hand-placed pixels rather than a downscaled render of the vector iris. Curves
   // resampled to a grid this small turn to mush, and the neighbouring cards use
@@ -1274,6 +1323,13 @@ const CardTextures = (() => {
     }
 
     if (rarity === 'rare') {
+      // Two rares share this slot now. INFRAMEND is its own plant and its own
+      // sprite — a recolour would have made the pair read as one card with a
+      // palette swap, which is exactly what the rework was avoiding.
+      if (_drawingCardName === 'INFRAMEND') {
+        drawSprite(ctx, getSprite('inframend', MEND_ART, MEND_PAL));
+        return;
+      }
       // Lightning Iris. Drawn here, before the shared translate below, for the
       // same reason the PNG symbols are — so it lands on LAYOUT.symbolCenterY
       // with the rest of the pack instead of the older procedural origin.
@@ -2237,6 +2293,45 @@ const CardTextures = (() => {
   // The grey mantle over a white body is what separates it from the duck at a
   // glance, since both are white birds at the same size. The eye and the open
   // beak are the character: the card's line is "eyeing your chips".
+  const BUGFIX_ART = [
+    '.........................',
+    '.........................',
+    '.........D...............',
+    '........DWD......DD......',
+    '.......DWHWD....DWWD.....',
+    '.......DWHWD...DWHHWD....',
+    '........DHD....DWHHWD....',
+    '.........D......DWWD.....',
+    '...LL...........DD.......',
+    '..L..L...........L.......',
+    '.L...............L.......',
+    '.................L...LL..',
+    '......DD............L....',
+    '.....DWWD..........L.....',
+    '....DWHHWD........L......',
+    '....DWHHWD.......L.......',
+    '.....DWWD................',
+    '......DD.....D...........',
+    '............DWD..........',
+    '...........DWHWD.........',
+    '...........DWHWD.........',
+    '............DHD..........',
+    '.............D...........',
+    '.........................',
+    '.........................',
+  ];
+
+  // BUGFIX — three fireflies and the light they leave behind. Drawn as a
+  // SWARM rather than one insect, because the card is the cluster: it is driven
+  // as one thing and spends itself as one burst.
+  const BUGFIX_PAL = {
+    D: '#223318',   // outline, dark enough to hold against the uncommon frame
+    H: '#8fdc3a',   // body glow
+    W: '#d9ff8a',   // the lit part of each fly
+    L: '#5f8a2e',   // the faint trail one leaves as it moves
+    M: '#8fdc3a',
+  };
+
   const GULL_ART = [
     '.....................',
     '.....................',
@@ -2446,6 +2541,95 @@ const CardTextures = (() => {
     S: '#9aa4b2', s: '#4c5564',
   };
 
+  // Placeholder until the hand-drawn symbol arrives. A sundew rosette seen
+  // from above: four long paddles, four short, a dew bead on the tip of each,
+  // and the little sun it grips with burning in the middle.
+  const SOLARGRIP_ART = [
+    '.....................',
+    '..........W..........',
+    '..........G..........',
+    '.........GGG.........',
+    '..........D..........',
+    '.....WG...D...GW.....',
+    '.....GG...D...GG.....',
+    '.......D..y..D.......',
+    '..........Y..........',
+    '...G.....yYy.....G...',
+    '.WGGDDDyYYSYYyDDDGGW.',
+    '...G.....yYy.....G...',
+    '..........Y..........',
+    '.......D..y..D.......',
+    '.....GG...D...GG.....',
+    '.....WG...D...GW.....',
+    '..........D..........',
+    '.........GGG.........',
+    '..........G..........',
+    '..........W..........',
+    '.....................',
+  ];
+  const SOLARGRIP_PAL = {
+    S: '#fffdf0', Y: '#ffe25a', y: '#f0a828',
+    G: '#5fae3c', D: '#2f7a2a',
+    W: '#fff4c0',
+  };
+
+  // Placeholder until the hand-drawn symbol arrives. The shell from above with
+  // the standard planted through it — the flag is what keeps a turtle from
+  // reading as a rock at this size.
+  const BUFFER_ART = [
+    '.....................',
+    '.........PFFFFF......',
+    '.........PFFFFFF.....',
+    '.........PFFFFF......',
+    '.........PFFF........',
+    '.........P...........',
+    '.........P...........',
+    '....sssssPsssss......',
+    '...sSSSSSPSSSSSs.....',
+    '..sSSGGSSPSSGGSSs....',
+    '..sSGGGGSPSGGGGSs....',
+    '..sSSGGSSSSSGGSSs....',
+    '..sSSSSSSSSSSSSSs....',
+    '...sSSGGSSSSGGSSs....',
+    '....sssssssssssss....',
+    '..hh.h.........h.hh..',
+    '.hhh.............hhh.',
+    '.....................',
+    '.........hhh.........',
+    '.........hhh.........',
+    '.....................',
+  ];
+  const BUFFER_PAL = {
+    S: '#4c7a3a', s: '#2d5226', G: '#6ea84a',
+    P: '#b89a62', F: '#6ec0f5', h: '#7fa85e',
+  };
+
+  function drawBufferingSymbol(ctx) {
+    const sym = _cardSkins['symbol-buffering'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('buffering', BUFFER_ART, BUFFER_PAL));
+  }
+
+  function drawSolargripSymbol(ctx) {
+    const sym = _cardSkins['symbol-solargrip'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('solargrip', SOLARGRIP_ART, SOLARGRIP_PAL));
+  }
+
   function drawChomptrapSymbol(ctx) {
     const sym = _cardSkins['symbol-chomptrap'];
     if (sym && sym.complete && sym.naturalWidth > 0) {
@@ -2521,6 +2705,12 @@ const CardTextures = (() => {
   }
 
   function drawShapeCritter(ctx, rarity, t) {
+    // BUGFIX shares the uncommon slot with DD.DUCK and has its own sprite —
+    // a duck symbol on the pack's only healer would be actively misleading.
+    if (_drawingCardName === 'BUGFIX') {
+      drawSprite(ctx, getSprite('bugfix', BUGFIX_ART, BUGFIX_PAL));
+      return;
+    }
     if (rarity === 'rare') {
       drawSprite(ctx, getSprite('gull', GULL_ART, GULL_PAL));
       return;
@@ -4105,6 +4295,7 @@ const CardTextures = (() => {
     // Sheep -> RAM, Duck -> DDoS Duck, Seagull -> C:\GULL.
     if (card.name === 'BLOOMSHROOM' || card.name === 'RAM')           skinKey = 'nature-common';
     if (card.name === 'DD.DUCK'        || card.name === 'FROSTCAP')   skinKey = 'nature-uncommon';
+    if (card.name === 'BUGFIX')                                       skinKey = 'nature-uncommon';
     if (card.name === 'C:\\GULL'        || card.name === 'PUFFBALL')  skinKey = 'nature-rare';
     if (card.name === 'LAZERPIG') skinKey = 'nature-rare';
     // Leaf Storm, Blue Angel, and every other legendary-rarity card share
@@ -4130,6 +4321,10 @@ const CardTextures = (() => {
       drawCosmeowSymbol(ctx);
     else if (card.name === 'CHOMPTRAP')
       drawChomptrapSymbol(ctx);
+    else if (card.name === 'SOLARGRIP')
+      drawSolargripSymbol(ctx);
+    else if (card.name === 'BUFFERING')
+      drawBufferingSymbol(ctx);
     else if (card.name === 'LAZERPIG')
       drawLazerpigSymbol(ctx);   // hazard plate is an overlay — see warnfx.js
     else {
