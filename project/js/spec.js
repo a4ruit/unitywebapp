@@ -62,7 +62,6 @@ const Spec = (() => {
     'RAM':         'damage',
     'DD.DUCK':     'damage',
     'BUGFIX':      'medic',
-    'C:\\GULL':    'damage',
     'LAZERPIG':    'damage',
     'COWNADO':     'damage',
     'COSMEOW':     'damage',

@@ -2604,6 +2604,54 @@ const CardTextures = (() => {
     P: '#b89a62', F: '#6ec0f5', h: '#7fa85e',
   };
 
+  // The critter legendary drew FOX_ART long after the red fox became the
+  // COWNADO — the card was reworked end to end in Unity and the face was never
+  // brought along. A leaning funnel with a cow tumbling in it: the lean is what
+  // says "travelling" rather than "standing", and the cow is the whole joke, so
+  // it gets the brightest pixels on the card.
+  const NADO_ART = [
+    '.....................',
+    'OLLLLLLLLLLLLLLLLLLLO',
+    'kODDDDDDDDDDDDDDDDDO.',
+    '..OLLLLLLLLLLLLLLLLO.',
+    '...ODDDDDDDDDDDDDDO.k',
+    '....OLLLLLLLLLLLLLO..',
+    '....ODDDDDDDDDDDDO...',
+    '.k...OLLLLLLLLLLLO...',
+    '......ODDWWDDWDDO....',
+    '......OLWWWWWWWLO....',
+    '.......OWKWWWKWDO..k.',
+    '........WWWWWWWO.....',
+    '........OKDDDKDO.....',
+    '..k......OLLLLO......',
+    '.........ODDDDO......',
+    '.........OLLLO.......',
+    '.........ODDDO..k....',
+    '..........OLLO.......',
+    '..........ODDO.......',
+    '.....................',
+    '.....................',
+  ];
+  // Dirt and torn grass, not storm grey — it is a funnel made of the field it
+  // is chewing through, which is why the darks carry green in them.
+  const NADO_PAL = {
+    D: '#5a6048', L: '#8a9070', O: '#2a2e22',
+    k: '#6e5a3c', W: '#f4f2e8', K: '#2b2822',
+  };
+
+  function drawCownadoSymbol(ctx) {
+    const sym = _cardSkins['symbol-cownado'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('cownado', NADO_ART, NADO_PAL));
+  }
+
   function drawBufferingSymbol(ctx) {
     const sym = _cardSkins['symbol-buffering'];
     if (sym && sym.complete && sym.naturalWidth > 0) {
@@ -4325,6 +4373,8 @@ const CardTextures = (() => {
       drawSolargripSymbol(ctx);
     else if (card.name === 'BUFFERING')
       drawBufferingSymbol(ctx);
+    else if (card.name === 'COWNADO')
+      drawCownadoSymbol(ctx);
     else if (card.name === 'LAZERPIG')
       drawLazerpigSymbol(ctx);   // hazard plate is an overlay — see warnfx.js
     else {

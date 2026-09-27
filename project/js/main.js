@@ -156,7 +156,11 @@ const CRITTER_CARDS = [
   // fireflies pull inward and let go one nova that mends friendlies and stings
   // whatever hostile is standing in it.
   { id:'large_cube', name:'BUGFIX',  rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'A few fireflies with a patch note. Spend them well.' },
-  { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
+  // BENCHED pending a rework — it never had a role beyond "a seagull is funny",
+  // and with LAZERPIG also sitting on rare it was the slot's weaker half. The
+  // seagull possession itself is untouched in Unity, so restoring the card is
+  // uncommenting this line.
+  // { id:'sphere',     name:'C:\\GULL',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Already airborne. Eyeing your chips.' },
   { id:'triangle',   name:'COWNADO',         rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Cows in it. Cows under it. Steer, and hope.' },
   { id:'sphere',     name:'LAZERPIG',       rarity:'rare',            rarityRank:2, command:'spawn_lazerpig',   desc:'FIRIN MA LASERRR' },
   // The critter side's only TANK. Slow to the point of comedy, and everything
@@ -1229,6 +1233,7 @@ function connect() {
       if (typeof KeepsakeUI !== 'undefined' && KeepsakeUI.handle(e.data)) return;
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
+      if (typeof ScreenBug !== 'undefined' && ScreenBug.handleMessage(e.data)) return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
       handlePossessionMessage(e.data);
     };
@@ -2065,6 +2070,21 @@ document.addEventListener('keydown', e => {
   const t = e.target;
   if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
   debugSeedCownado();
+});
+
+// Screen-bug test. Key: Y, matching Unity's own key. Asks Unity to send one to
+// THIS phone, so the effect can be checked without tabbing away from it — which
+// matters here more than for the other debug keys, because the thing being
+// tested only exists on the phone.
+function debugScreenBug() {
+  send(`debug_screen_bug|${CLIENT_ID}`);
+  console.log('[debug] requested a screen bug');
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'y' && e.key !== 'Y') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  debugScreenBug();
 });
 
 function debugSpawnBoss() {
