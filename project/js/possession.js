@@ -339,7 +339,7 @@ function handlePossessionMessage(data) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _swarmNovaDone(); return true; }
   }
-  // ── BUFFERING turtle ──────────────────────────────────────────────────────
+  // ── B.SHELLEY turret ──────────────────────────────────────────────────────
   if (msg.startsWith('turtle_possess_granted|')) {
     const parts = msg.split('|');
     if (parts[1] === CLIENT_ID) { _onGranted(Number(parts[2]), 'turtle'); return true; }
@@ -793,8 +793,8 @@ function _buildUI() {
     #poss-swarm-btn:active { background: rgba(150, 230, 90, 0.32); }
     #poss-swarm-btn.poss-hidden { display: none; }
 
-    /* BUFFERING — banner blue, matching the flag and the rally markers, so the
-       tank is not confusable with the green healer on the stack. */
+    /* B.SHELLEY — banner blue, so the tank is not confusable with the green
+       healer on the stack. */
     #poss-turtle-btn {
       pointer-events: all;
       cursor: pointer;
@@ -1999,7 +1999,7 @@ function _buildUI() {
     <button id="poss-serpent-btn">Ride COSMEOW</button>
     <button id="poss-pig-btn">Ride the LAZERPIG</button>
     <button id="poss-swarm-btn">Conjure the BUGFIX</button>
-    <button id="poss-turtle-btn">RALLY</button>
+    <button id="poss-turtle-btn">DEPLOY B.SHELLEY</button>
     <button id="poss-seagull-btn">Inhabit a seagull</button>
     <button id="poss-fox-btn">Ride the COWNADO</button>
     <button id="poss-duck-btn">Inhabit a duck</button>
@@ -2182,7 +2182,7 @@ function _buildUI() {
     // One control, two creatures: the pig fires, the swarm bursts.
     const _fireTap = () => {
       if (_creatureType === 'swarm')  return _swarmNova();
-      if (_creatureType === 'turtle') return _turtleDash();
+      if (_creatureType === 'turtle') return _turretFire();
       return _pigFire();
     };
     _ui.fire.addEventListener('touchstart', e => { e.preventDefault(); _fireTap(); }, { passive: false });
@@ -2486,12 +2486,12 @@ function _swarmNovaDone() {
   if (_ui.fire) _ui.fire.style.display = 'none';
 }
 
-// RALLY: a short burst of speed. Fire-and-forget — Unity owns the cooldown, so
-// the phone does not track one. A tap during cooldown is simply ignored there,
-// which is cheaper than keeping two timers in step across the network.
-function _turtleDash() {
+// FIRE: one burst of shells. Fire-and-forget — Unity owns the cooldown and the
+// round count, so the phone tracks neither. A tap with nothing left is ignored
+// there, which is cheaper than keeping two states in step over a socket.
+function _turretFire() {
   if (!_possessed || _creatureType !== 'turtle') return;
-  send(`turtle_dash|${CLIENT_ID}`);
+  send(`turtle_fire|${CLIENT_ID}`);
 }
 
 function _requestTurtlePossession() {
@@ -2505,7 +2505,7 @@ function _onTurtleSpawned() {
   _undismissCam('turtle');
   _turtleAvailable = true;
   if (_ui && !_possessed && _ui.turtleBtn) {
-    _ui.turtleBtn.textContent   = 'RALLY';
+    _ui.turtleBtn.textContent   = 'DEPLOY B.SHELLEY';
     _ui.turtleBtn.style.opacity = '1';
     _ui.turtleBtn.classList.remove('poss-hidden');
     _refreshCamPreview();
@@ -2647,7 +2647,7 @@ function _onGranted(duration, creature) {
                                              creature === 'serpent' ? 'COSMEOW CAM' :
                                              creature === 'seagull' ? 'SEAGULL CAM' :
                                              creature === 'swarm'   ? 'BUGFIX CAM'   :
-                                             creature === 'turtle'  ? 'BUFFERING CAM' :
+                                             creature === 'turtle'  ? 'B.SHELLEY CAM' :
                                              creature === 'pig'     ? 'LAZERPIG CAM' :
                                              creature === 'duck'    ? 'DUCK CAM'    : 'SHEEP CAM';
   _setGbTimer(duration);
@@ -2691,7 +2691,7 @@ function _onGranted(duration, creature) {
     if (_ui.fire) {
       _ui.fire.style.display = 'flex';
       _ui.fire.disabled      = false;
-      _ui.fire.textContent   = 'RALLY';
+      _ui.fire.textContent   = 'FIRE';
     }
   } else if (creature === 'seagull') {
     _ui.dive.style.display   = 'flex';
@@ -2745,7 +2745,7 @@ function _onDenied(creature) {
   const restore = creature === 'fox'     ? 'Ride the COWNADO'     :
                   creature === 'duck'    ? 'Inhabit a duck'    :
                   creature === 'swarm'   ? 'Conjure the BUGFIX'  :
-                  creature === 'turtle'  ? 'RALLY'  :
+                  creature === 'turtle'  ? 'DEPLOY B.SHELLEY'  :
                   creature === 'pig'     ? 'Ride the LAZERPIG' :
                   creature === 'seagull' ? 'Inhabit a seagull' :
                   creature === 'serpent' ? 'Ride COSMEOW' : 'Inhabit a sheep';
@@ -3765,7 +3765,7 @@ function _onEnded() {
     // what is spent is the right to steer it, not the thing it does.
     _turtleAvailable = false;
     if (_ui.turtleBtn) {
-      _ui.turtleBtn.textContent   = 'RALLY';
+      _ui.turtleBtn.textContent   = 'DEPLOY B.SHELLEY';
       _ui.turtleBtn.style.opacity = '1';
     }
   } else if (wasSerpent) {

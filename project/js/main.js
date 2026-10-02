@@ -167,7 +167,7 @@ const CRITTER_CARDS = [
   // standing in its banner moves faster, places faster and mends — which is the
   // joke and the balance at once. Banks a RALLY like the COWNADO banks a ride:
   // nothing exists until somebody taps the button.
-  { id:'triangle',   name:'BUFFERING',       rarity:'legendary',       rarityRank:3, command:'spawn_buffering',  desc:'Slowest thing here. Everything near it hurries.' },
+  { id:'triangle',   name:'B.SHELLEY',       rarity:'legendary',       rarityRank:3, command:'spawn_buffering',  desc:'Dug in. Turn the turret, pull the room onto yourself.' },
   { id:'star',       name:'COSMEOW',         rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'Rides a cloud. Leaves a rainbow. Mind the rainbow.' },
 ];
 
@@ -199,8 +199,23 @@ const SCOURGE_CARDS = [
 const FUNGI_CARDS = [
   { id:'small_cube', name:'BLOOMSHROOM',    rarity:'common',    rarityRank:0, command:'spawn_small_cube', placement:'fungi',     desc:'It breathes moonlight. Everything near it mends.' },
   { id:'large_cube', name:'FROSTCAP',       rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'fungi',     desc:'A pocket blizzard. Everything slows down.' },
+  // FROSTCAP's opposite number, sharing the uncommon slot. Frost stops things;
+  // fire costs them — and costs the ground, which nothing else on the nature
+  // side does.
+  { id:'large_cube', name:'LAVACAP',        rarity:'uncommon',  rarityRank:1, command:'spawn_large_cube', placement:'fungi',     desc:'It drips. The grass does not come back until it is gone.' },
   { id:'sphere',     name:'PUFFBALL',       rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'A wall of spores. It holds until it breaks.' },
-  { id:'triangle',   name:'Blue Angel',     rarity:'legendary', rarityRank:3, command:'spawn_triangle',   placement:'blueangel', desc:'It sings. The glitch stops whatever it is doing and comes.' },
+  // The pack's first card that reaches across the board. Shares the fungi
+  // placement and is told apart by name, like FROSTCAP and PUFFBALL.
+  { id:'sphere',     name:'SPORETILLERY',   rarity:'rare',      rarityRank:2, command:'spawn_sphere',     placement:'fungi',     desc:'Three shells. It cannot hit what stands at its feet.' },
+  // `placement` stays 'blueangel' — it is the wire protocol, and the preview,
+  // repaint, health preset and spore-cap follow-up are all keyed to that string.
+  // Only the name the player reads has changed.
+  { id:'triangle',   name:'AZURELURE',      rarity:'legendary', rarityRank:3, command:'spawn_triangle',   placement:'blueangel', desc:'It sings. The glitch stops whatever it is doing and comes.' },
+  // The pack's legendary HEAL, and the only card in the build that pays off
+  // what a player has already planted: it threads every mushroom on the board,
+  // pulses each one, blooms across the whole field including the tree, then
+  // withdraws and is gone. Shares the fungi placement and is told apart by name.
+  { id:'triangle',   name:'MYCELIATHREAD',  rarity:'legendary', rarityRank:3, command:'spawn_triangle',   placement:'fungi',     desc:'It was under all of them the whole time. It only has to be asked.' },
 ];
 
 // ─── RITUAL (adpack / horror) ─────────────────────────────────────────────────
@@ -212,10 +227,13 @@ const FUNGI_CARDS = [
 // With no boss alive the sacrifices bank toward SUMMONING one instead, which is
 // how the horror side gets back into a fight it has already lost.
 const RITUAL_CARDS = [
-  { id:'small_cube', name:'Sheep Sacrifice',  rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'The sheep is spent. The one who spent it walks on.' },
-  { id:'large_cube', name:'The Goat',         rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'The old compact. Blood for favour, paid at a run.' },
-  { id:'sphere',     name:'The Pyre',         rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Two walk out of the fire. Neither comes back.' },
-  { id:'triangle',   name:'The Offering',     rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Named. Then unnamed. Then given away.' },
+  // One weaver, one doorway, one thing through it.
+  { id:'small_cube', name:'GLITCHLING',   rarity:'common',          rarityRank:0, command:'spawn_small_cube', desc:'One weaver. One door. Something small already waiting behind it.' },
+  { id:'large_cube', name:'GLITCHWORM',   rarity:'uncommon',        rarityRank:1, command:'spawn_large_cube', desc:'A low, wide doorway. Whatever uses it does not stand up.' },
+  { id:'sphere',     name:'GLITCHGOYLE',  rarity:'rare',            rarityRank:2, command:'spawn_sphere',     desc:'Two weavers, and a frame cut taller than either of them.' },
+  // Three weavers on one door. The longest rite in the pack, and the one the
+  // nature side gets the best look at before it finishes.
+  { id:'triangle',   name:'GLITCHBEAST',  rarity:'legendary',       rarityRank:3, command:'spawn_triangle',   desc:'Three weavers. One enormous door. It walks out horns first.' },
   { id:'octagon',    name:'The Summoning',    rarity:'mythical',        rarityRank:4, command:'spawn_octagon',    desc:'Something answered. It wants feeding.' },
   { id:'triad',      name:'Mass Rite',        rarity:'luck-maxxing',    rarityRank:5, command:'spawn_triad',      desc:'They came at midnight. None returned alone.' },
   { id:'star',       name:'The Entity',       rarity:'legendary-alpha', rarityRank:6, command:'spawn_star',       desc:'It was the ritual all along.' },
@@ -252,17 +270,17 @@ const CORRUPTED_CARD_CHANCE = 0.9;
 const FLOCK_O_SHEEP = {
   id:'sphere', name:'FLOCKASHEEP', rarity:'rare', rarityRank:2,
   command:'spawn_small_cube', flock:true,
-  desc:'A drifting constellation. It counts itself to sleep.',
+  desc:'A drifting constellation, wound into a ball. Let go and it comes apart.',
 };
 const FLOCK_CHANCE = 0.25;   // chance a pristine critter pack offers the Flock o' Sheep
 
-// How many sheep one Flock o' Sheep card releases.
+// How many units one FLOCKASHEEP card releases.
 //
-// A plain constant, not a PlayerMods field. It used to scale with Presence and
-// with the SHEPHERD perk; Presence now pools into the room-wide movement bonus
-// and the perks are gone, so it could never vary — a knob that reads like it
-// does something while always returning 3 is worse than a number.
-const FLOCK_SIZE = 3;
+// One, since the card became a single ball of sheep rather than three loose
+// ones. The three existed so the splitting warhead had somewhere to live, and
+// the cost was that nobody could tell which of their sheep carried it — the
+// ball carries it visibly, so the crowd is no longer doing any work.
+const FLOCK_SIZE = 1;
 
 // ─── Placement star costs ──────────────────────────────────────────────────────
 // Common and uncommon are always free — lower rarities must remain accessible
@@ -875,6 +893,12 @@ function rollPack() {
     const cm = CRITTER_CARDS.find(c => c.name === 'COSMEOW');
     if (cm) topCard = { ...cm };
   }
+  if (_debugSeedShelley) {
+    _debugSeedShelley = false;
+    const bs = CRITTER_CARDS.find(c => c.name === 'B.SHELLEY');
+    if (bs) topCard = { ...bs };
+  }
+
   if (_debugSeedCownado) {
     _debugSeedCownado = false;
     const cn = CRITTER_CARDS.find(c => c.name === 'COWNADO');
@@ -916,7 +940,7 @@ function rollPack() {
     if (fi >= 0) cards[fi] = { ...FLOCK_O_SHEEP };
   }
 
-  // ── Holographic finish roll — critter + nature pools ────────────────────────
+  // ── Holographic finish roll — nature-side pools ─────────────────────────────
   // Runs LAST, after the Flock and corrupted injections. It used to run before
   // them, which silently destroyed prismatic pulls: both injections REPLACE a
   // common, and Thornwire is the only common in the nature pool, so a 50%
@@ -929,8 +953,16 @@ function rollPack() {
   // to show up often enough to be part of the game rather than a curiosity.
   // Injected specials (Flock, corrupted) are excluded: they already have their
   // own distinct treatment and shouldn't be double-skinned.
+  //
+  // FUNGI joins CRITTER and NATURE here. It was left out when it was the newest
+  // pool and the finish was still a pilot, which left a whole nature-side pack
+  // that could never produce a holo — a player pulling fungi all session would
+  // have concluded the finish did not exist. The horror pools stay out on
+  // purpose: a holo corrupted card would be rewarding the other allegiance with
+  // the nature side's own prestige treatment.
   const _holoPool = getActiveCardPool();
-  if ((_holoPool === CRITTER_CARDS || _holoPool === NATURE_CARDS) &&
+  if ((_holoPool === CRITTER_CARDS || _holoPool === NATURE_CARDS ||
+       _holoPool === FUNGI_CARDS) &&
       Math.random() < HOLO_PACK_CHANCE) {
     const eligible = cards.filter(c => !c.corrupted && !c.flock);
     const rarities = [...new Set(eligible.map(c => c.rarity))];
@@ -1882,8 +1914,9 @@ function dropCard(card) {
     } catch (e) { console.warn('[chain] step failed', e); }
   }
 
-  // Flock o' Sheep — releases a small flock instead of one sheep. Kept as a
-  // proof of concept for batch-release cards; FLOCK_SIZE is fixed.
+  // FLOCKASHEEP — one ball of sheep. The loop stays because the batch-release
+  // path is the only one that carries the "flock" origin field, and that field
+  // is what Unity reads to build the ball instead of a plain sheep.
   if (card.flock) {
     if (typeof CLIENT_ID !== 'undefined') {
       // 4th field carries the finish, 5th the origin. Both are trailing, so an
@@ -2076,6 +2109,22 @@ document.addEventListener('keydown', e => {
 // THIS phone, so the effect can be checked without tabbing away from it — which
 // matters here more than for the other debug keys, because the thing being
 // tested only exists on the phone.
+// Same, for B.SHELLEY. Key: B. Seeds the next critter pack with the card, so
+// the whole chain gets tested - pull, place, DEPLOY, man the turret - rather
+// than just the creature Unity's own key drops on the field.
+var _debugSeedShelley = false;
+function debugSeedShelley() {
+  _debugSeedShelley = true;
+  if (typeof setPackType === 'function') setPackType('ewaste');
+  console.log('[debug] next pack seeded with B.SHELLEY');
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== 'b' && e.key !== 'B') return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  debugSeedShelley();
+});
+
 function debugScreenBug() {
   send(`debug_screen_bug|${CLIENT_ID}`);
   console.log('[debug] requested a screen bug');

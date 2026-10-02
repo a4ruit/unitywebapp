@@ -84,8 +84,14 @@ const CardTextures = (() => {
     chomptrap:  { hp: 9,  atk: 5, rule: 'Lures foes in. Then SNAP.' },
     lunarshroom:{ hp: 12, atk: 0, rule: 'Heals everything near it, tree included.' },
     frostcap:   { hp: 12, atk: 7, rule: 'Freezes, then slows. Shatters.' },
+    lavacap:    { hp: 12, atk: 6, rule: 'Drips, burns, scorches. Bursts.' },
     frostbloom: { hp: 9,  atk: 1, rule: 'Plant. Frost orb chills what it hits.' },
     venombloom: { hp: 9,  atk: 1, rule: 'Plant. Venom lingers after it dies.' },
+    // ATK is one shell's impact. The rule text has to carry the count and the
+    // range rule, because a corner reading 6 beside a card that fires three
+    // times tells a player almost nothing about what it does.
+    tillery:    { hp: 12, atk: 6,
+                  rule: '3 shells. Long range only.' },
     solargrip:  { hp: 9,  atk: 0,
                   rule: 'Plant. Drags one foe in. HOLO: all of them.' },
   };
@@ -98,10 +104,12 @@ const CardTextures = (() => {
     if (card.ability === 'leafstorm') return CARD_STATS.leafstorm;
     if (card.name === 'PUFFBALL')    return CARD_STATS.puffball;
     if (card.name === 'FROSTCAP')    return CARD_STATS.frostcap;
+    if (card.name === 'LAVACAP')     return CARD_STATS.lavacap;
     if (card.name === 'BLOOMSHROOM') return CARD_STATS.lunarshroom;
     if (card.name === 'INFRAMEND')   return CARD_STATS.inframend;
     if (card.name === 'BUGFIX')      return CARD_STATS.bugfix;
     if (card.name === 'SOLARGRIP')   return CARD_STATS.solargrip;
+    if (card.name === 'SPORETILLERY') return CARD_STATS.tillery;
     if (card.name === 'FROSTBLOOM')  return CARD_STATS.frostbloom;
     if (card.name === 'VENOMBLOOM')  return CARD_STATS.venombloom;
     return CARD_STATS[card.placement] || null;
@@ -137,6 +145,9 @@ const CardTextures = (() => {
   function isAnimatedCard(card) {
     if (!card) return false;
     if (BLOOM_ORB[card.name]) return true;
+    // BUGFIX is uncommon, so rarity alone would have cached its face once and
+    // frozen the swarm on frame one — the same trap the blooms hit.
+    if (card.name === 'BUGFIX') return true;
     return ANIMATED.has(card.rarity) || card.variant === 'holo' || !!card.corrupted || !!card.flock;
   }
   function getCfg(rarity)     { return RARITY_CFG[rarity] || RARITY_CFG.common; }
@@ -173,12 +184,26 @@ const CardTextures = (() => {
   _loadSkin('symbol-wildflower', 'assets/wildflower-card.png');
   // Own art for the other two blooms. Missing files just fall through to the
   // tinted wildflower placeholder — drop the PNGs in and they take over.
-  _loadSkin('symbol-frostbloom', 'assets/frostbloom-symbol.png');
-  _loadSkin('symbol-venombloom', 'assets/venombloom-symbol.png');
+  _loadSkin('symbol-firebloom',  'assets/firebloom.png');
+  _loadSkin('symbol-frostbloom', 'assets/frostbloom.png');
+  _loadSkin('symbol-venombloom', 'assets/venombloom.png');
+  _loadSkin('symbol-cownado',    'assets/cownado.png');
   _loadSkin('symbol-flesh',      'assets/flesh-symbol.png');   // corrupted-card symbol
   _loadSkin('symbol-lazerpig',   'assets/lazerpig-symbol.png');
   _loadSkin('symbol-chomptrap',  'assets/chomptrap-symbol.png');
-  _loadSkin('symbol-cosmeow',    'assets/cosmeow-symbol.png');
+  // Was 'cosmeow-symbol.png', which has never existed — the card had been
+  // falling back to its placeholder pixel art the whole time. Same slip as the
+  // bloom family: the loader was written before the file was named.
+  _loadSkin('symbol-cosmeow',    'assets/cosmeow.png');
+  _loadSkin('symbol-puffball',   'assets/puffball.png');
+  _loadSkin('symbol-bloomshroom','assets/bloomshroom.png');
+  _loadSkin('symbol-frostcap',   'assets/frostcap.png');
+  _loadSkin('symbol-sporetillery','assets/sporetillery.png');
+  _loadSkin('symbol-inframend',  'assets/inframend.png');
+  _loadSkin('symbol-bugfix',     'assets/bugfix.png');
+  _loadSkin('symbol-lavacap',    'assets/lavacap.png');
+  _loadSkin('symbol-ultraviolet','assets/ultraviolet.png');
+  _loadSkin('symbol-cloverstorm','assets/cloverstorm.png');
 
   // ─── Phase helper ────────────────────────────────────────────────────────────
 
@@ -662,8 +687,15 @@ const CardTextures = (() => {
 
   // Placeholder tints for the bloom family, keyed by display name: one flower
   // shared between FIREBLOOM, FROSTBLOOM and VENOMBLOOM until each gets a sprite.
-  const BLOOM_TINT   = { FROSTBLOOM: '#6fc6ff', VENOMBLOOM: '#7de24a' };
-  const BLOOM_SYMBOL = { FROSTBLOOM: 'symbol-frostbloom', VENOMBLOOM: 'symbol-venombloom' };
+  // BLOOM_TINT is gone. It recoloured the shared wildflower art when a bloom
+  // had no symbol of its own; all three have one now, so every lookup returned
+  // undefined and the branch below was dead.
+
+  const BLOOM_SYMBOL = {
+    FIREBLOOM:  'symbol-firebloom',
+    FROSTBLOOM: 'symbol-frostbloom',
+    VENOMBLOOM: 'symbol-venombloom',
+  };
   // The orb that circles the flower in-world, carried onto the card face so the
   // three blooms read apart at a glance. Core, glow, and the trailing motes.
   const BLOOM_ORB = {
@@ -715,19 +747,203 @@ const CardTextures = (() => {
     ctx.beginPath(); ctx.arc(x, y, r * 0.55, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
+  // ── BUGFIX fireflies ───────────────────────────────────────────────────────
+  // Five flies wandering the card face, each dragging a fading trail.
+  //
+  // Not an orbit like the bloom orb. The blooms have ONE orb on a fixed ellipse
+  // because the card is a single flower with a single element; BUGFIX is a
+  // swarm, and a swarm on rails reads as a carousel. Each fly gets its own
+  // lissajous — two sine terms at incommensurate rates — so the paths drift
+  // against each other and never visibly repeat, which is what makes five dots
+  // read as insects rather than as an animation loop.
+  const BUGFIX_FLIES = [
+    { rx: 62, ry: 40, sx: 0.51, sy: 0.83, ph: 0.0,  sz: 1.00 },
+    { rx: 48, ry: 52, sx: 0.79, sy: 0.47, ph: 1.9,  sz: 0.82 },
+    { rx: 70, ry: 30, sx: 0.37, sy: 1.07, ph: 3.4,  sz: 0.90 },
+    { rx: 36, ry: 44, sx: 1.13, sy: 0.61, ph: 5.1,  sz: 0.70 },
+    { rx: 56, ry: 24, sx: 0.67, sy: 1.29, ph: 2.6,  sz: 0.76 },
+  ];
+  const BUGFIX_CORE = '#f2ffc8';
+  const BUGFIX_GLOW = '#9ae82c';
+  const BUGFIX_DIM  = '#4f7a18';   // the coldest step of the falloff
+
+  // The card's pixel grid.
+  //
+  // Same cell the generated symbols are drawn at — a 21-row sprite stretched to
+  // LAYOUT.symbolHeight — so a firefly's pixel is exactly the size of a pixel in
+  // the art it is flying around. Anything else reads as two different
+  // resolutions sharing a frame, which is what made the smooth version look
+  // pasted on.
+  // Forced EVEN, so a cell centred on a snapped point lands on whole canvas
+  // pixels. An odd cell size puts every square on a half-pixel boundary and the
+  // canvas antialiases the edges — which is exactly the softness this is
+  // trying to get rid of.
+  const BUGFIX_PIX = Math.max(2, Math.floor(LAYOUT.symbolHeight / 21) & ~1);
+
+  /// Snap a world position to the grid, so flies step between cells instead of
+  /// sliding through them. The snapping IS the effect: a square drawn at a
+  /// fractional offset is antialiased by the canvas and stops being a pixel.
+  function _snap(v) { return Math.round(v / BUGFIX_PIX) * BUGFIX_PIX; }
+
+  /// Alpha in fixed steps. A continuous fade puts a hundred shades of green on
+  /// a card whose art has four, and reads as a glow effect rather than as more
+  /// of the same drawing.
+  function _band(a) { return Math.max(0, Math.round(a * 6) / 6); }
+
+  function _flyAt(f, t) {
+    return {
+      x: _snap(128 + Math.sin(t * f.sx + f.ph) * f.rx),
+      y: _snap(LAYOUT.symbolCenterY + Math.sin(t * f.sy + f.ph * 1.7) * f.ry),
+    };
+  }
+
+  /// A filled square of grid cells, centred on a snapped point. `cells` is a
+  /// radius in cells, so 0 is one pixel, 1 is a 3x3 and so on.
+  function _pixBlock(ctx, x, y, cells, color, alpha) {
+    const a = _band(alpha);
+    if (a <= 0) return;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = color;
+    const s = BUGFIX_PIX;
+    ctx.fillRect(x - cells * s - s / 2, y - cells * s - s / 2,
+                 (cells * 2 + 1) * s, (cells * 2 + 1) * s);
+  }
+
+  /// A hollow ring of cells — the glow falloff, drawn as discrete shells rather
+  /// than a radial gradient. Corners are skipped so the shell reads as a rough
+  /// circle instead of a square outline.
+  function _pixRing(ctx, x, y, cells, color, alpha) {
+    const a = _band(alpha);
+    if (a <= 0) return;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = color;
+    const s = BUGFIX_PIX;
+    for (let dy = -cells; dy <= cells; dy++) {
+      for (let dx = -cells; dx <= cells; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== cells) continue;
+        if (Math.abs(dx) === cells && Math.abs(dy) === cells) continue;  // corner
+        ctx.fillRect(x + dx * s - s / 2, y + dy * s - s / 2, s, s);
+      }
+    }
+  }
+
+  /// One pass of the swarm. `front` picks which flies this call draws, so the
+  /// symbol can sit inside the swarm rather than under all of it.
+  function drawBugfixFlies(ctx, t, front) {
+    ctx.save();
+    // Additive, so overlapping trails brighten instead of flattening — that
+    // pile-up at a crossing is most of what sells these as light.
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (let i = 0; i < BUGFIX_FLIES.length; i++) {
+      // Alternating, not depth-sorted. A sort would make flies pop between
+      // layers as they cross the middle; a fixed split just means some are
+      // always behind, which is all the parallax this needs.
+      if ((i % 2 === 0) !== front) continue;
+
+      const f = BUGFIX_FLIES[i];
+      const p = _flyAt(f, t);
+
+      // The trail: past positions of this same fly, so it genuinely follows
+      // where the fly has been rather than trailing a straight line behind it.
+      //
+      // Sampled coarsely and snapped, which means consecutive samples often
+      // land on the SAME cell. That is wanted — it is what gives the trail the
+      // uneven, clotted spacing of hand-placed pixels rather than the even
+      // spacing of a computed streak.
+      for (let k = 1; k <= 7; k++) {
+        const q = _flyAt(f, t - k * 0.08);
+        _pixBlock(ctx, q.x, q.y, 0,
+                  k <= 3 ? BUGFIX_GLOW : BUGFIX_DIM,
+                  (0.34 - k * 0.042) * f.sz);
+      }
+
+      // Each fly pulses on its own clock, so the swarm flickers unevenly the
+      // way real fireflies do instead of breathing in unison. Quantised to
+      // whole cells, so the body grows in steps rather than swelling.
+      const puff = 0.78 + 0.32 * Math.sin(t * (5.3 + i * 1.7) + f.ph);
+      const big  = (f.sz * puff) > 0.85;
+
+      // Glow as three discrete shells, dimmest outward. Additive blending does
+      // the rest: where two flies' shells overlap the bands add up and brighten
+      // by a whole step, which is the pixel-art way of drawing light.
+      if (big) _pixRing(ctx, p.x, p.y, 3, BUGFIX_DIM,  0.16);
+      _pixRing(ctx, p.x, p.y, 2, BUGFIX_DIM,  0.30);
+      _pixRing(ctx, p.x, p.y, 1, BUGFIX_GLOW, 0.60);
+
+      // The body: one cell, or a plus of five at the top of the pulse.
+      _pixBlock(ctx, p.x, p.y, 0, BUGFIX_CORE, 1);
+      if (big) {
+        const s = BUGFIX_PIX;
+        ctx.globalAlpha = 0.85;
+        ctx.fillStyle = BUGFIX_CORE;
+        ctx.fillRect(p.x - s * 1.5, p.y - s / 2, s, s);
+        ctx.fillRect(p.x + s * 0.5, p.y - s / 2, s, s);
+        ctx.fillRect(p.x - s / 2, p.y - s * 1.5, s, s);
+        ctx.fillRect(p.x - s / 2, p.y + s * 0.5, s, s);
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Cards that recolour their shared frame PNG instead of having one of their
+  // own. Empty on purpose: LAVACAP was tried here and reverted. A hue rotation
+  // can only ever be the cyan frame in another colour, and that frame's
+  // highlights, checker and border contrast were all drawn against a cool
+  // palette — a card that wants its own palette wants its own frame PNG, which
+  // slots in beside uncommon-card.png like any other skin.
+  const CARD_FRAME_TINT = {};
+
   const _tintCache = {};
   let   _drawingCardName = '';
 
-  function _tinted(img, colour) {
-    const key = (img.src || '') + colour;
+  /// Recolour an image while keeping its LIGHTNESS.
+  ///
+  /// Not _tinted. That paints a flat fill over everything, which averages a
+  /// frame's border and its dark panel toward the same muddy value and reads as
+  /// a stain — pixel art carries its structure in value, so a fill that flattens
+  /// value destroys the drawing. The 'color' blend mode takes hue and saturation
+  /// from the fill and leaves lightness alone, so the border stays bright, the
+  /// panel stays dark, and only the temperature changes.
+  function _recoloured(img, colour, alpha = 1) {
+    const key = 'rc' + (img.src || '') + colour + alpha;
+    if (_tintCache[key]) return _tintCache[key];
+
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.drawImage(img, 0, 0);
+
+    g.globalCompositeOperation = 'color';
+    g.globalAlpha = alpha;
+    g.fillStyle = colour;
+    g.fillRect(0, 0, c.width, c.height);
+
+    // A blend mode composites against the whole canvas, including the
+    // transparent corners, so the alpha has to be stamped back on afterwards
+    // or the card gains square edges.
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'destination-in';
+    g.drawImage(img, 0, 0);
+
+    _tintCache[key] = c;
+    return c;
+  }
+
+  function _tinted(img, colour, alpha = 0.62) {
+    const key = (img.src || '') + colour + alpha;
     if (_tintCache[key]) return _tintCache[key];
     const c = document.createElement('canvas');
     c.width = img.naturalWidth; c.height = img.naturalHeight;
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
     g.drawImage(img, 0, 0);
+    // source-atop, so the fill lands only where the frame already has pixels —
+    // the card's transparent corners stay transparent.
     g.globalCompositeOperation = 'source-atop';
-    g.globalAlpha = 0.62;
+    g.globalAlpha = alpha;
     g.fillStyle = colour;
     g.fillRect(0, 0, c.width, c.height);
     _tintCache[key] = c;
@@ -1303,12 +1519,8 @@ const CardTextures = (() => {
         const targetH = LAYOUT.symbolHeight;
         const targetW = targetH * (wf.naturalWidth / wf.naturalHeight);
         const x = 128 - targetW / 2, y = LAYOUT.symbolCenterY - targetH / 2;
-        // Placeholder art: the bloom family shares one flower, tinted to its
-        // element until each gets its own sprite.
-        const tint = wf === own ? null : BLOOM_TINT[_drawingCardName];
         drawBloomOrb(ctx, _drawingCardName, t, false);
-        if (tint) ctx.drawImage(_tinted(wf, tint), x, y, targetW, targetH);
-        else      ctx.drawImage(wf, x, y, targetW, targetH);
+        ctx.drawImage(wf, x, y, targetW, targetH);
         drawBloomOrb(ctx, _drawingCardName, t, true);
         return;
       }
@@ -2499,6 +2711,41 @@ const CardTextures = (() => {
     F: '#33305c', b: '#dcd6f5', p: '#ff8cbf', w: '#eae6ff',
   };
 
+  // Cards whose symbol is a supplied PNG and nothing else — no placeholder
+  // pixel art was ever drawn for them, so there is nothing to fall back TO
+  // except the generic rarity shape they have been using all along.
+  const PNG_SYMBOL = {
+    'PUFFBALL':    'symbol-puffball',
+    'BLOOMSHROOM': 'symbol-bloomshroom',
+    'FROSTCAP':    'symbol-frostcap',
+    'LAVACAP':     'symbol-lavacap',
+    // Unlike the others here, INFRAMEND does have generated art — MEND_ART,
+    // drawn inside drawShape's rare branch. This entry sits earlier in the
+    // dispatch, so the PNG wins while the sprite stays as the fallback for a
+    // frame drawn before the image has loaded.
+    'INFRAMEND':   'symbol-inframend',
+    // Both have generated art in drawShapeNature — the iris at rare, the leaf
+    // storm at legendary. Same layering: the PNG wins, the sprite stays as the
+    // fallback for a frame drawn before the image loads.
+    'ULTRAVIOLET': 'symbol-ultraviolet',
+    'CLOVERSTORM': 'symbol-cloverstorm',
+  };
+  // BUGFIX is deliberately NOT in the map above: its symbol is drawn by its own
+  // branch in the dispatch, between the two halves of the firefly swarm.
+
+  /// Draw a loaded skin at the symbol slot. Returns false if the image is not
+  /// there yet, so the caller can fall back rather than draw nothing.
+  function drawPngSymbol(ctx, key) {
+    const sym = _cardSkins[key];
+    if (!sym || !sym.complete || !sym.naturalWidth) return false;
+    ctx.imageSmoothingEnabled = false;
+    const targetH = LAYOUT.symbolHeight;
+    const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+    ctx.drawImage(sym, 128 - targetW / 2,
+                  LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+    return true;
+  }
+
   function drawCosmeowSymbol(ctx) {
     const sym = _cardSkins['symbol-cosmeow'];
     if (sym && sym.complete && sym.naturalWidth > 0) {
@@ -2638,6 +2885,102 @@ const CardTextures = (() => {
     D: '#5a6048', L: '#8a9070', O: '#2a2e22',
     k: '#6e5a3c', W: '#f4f2e8', K: '#2b2822',
   };
+
+  // Placeholder until the hand-drawn symbol arrives. The cluster seen from the
+  // side: oyster shelves stepping up either side of a barrel pitched to lob,
+  // with a shell already in the air. The arc is the card - the range rules are
+  // the whole design - so it gets drawn rather than implied.
+  const TILLERY_ART = [
+    '.....................',
+    '................s....',
+    '..............s......',
+    '.............s.......',
+    '..........MMM........',
+    '.........MMMMM.......',
+    '.........MMMMM.......',
+    '..........MMM........',
+    '..........MMM........',
+    '..CCC.....MMM....CC..',
+    '.CCCCC...MMMMM..CCCC.',
+    '.cccc...MMMMMMM..ccc.',
+    '..ss...MMMMMMMMM..s..',
+    'CCCC..MMMMMMMMMMM.CCC',
+    'CCCCC.MMMMMMMMMMMCCCC',
+    'cccc..MMMMMMMMMMM.ccc',
+    '.ss....MMMMMMMMM...s.',
+    '........MMMMMMM......',
+    '.........MMMMM.......',
+    '..........sss........',
+    '.....................',
+  ];
+  const TILLERY_PAL = {
+    M: '#6e6a56', C: '#b8ad8e', c: '#e2dcc6', s: '#a8c64a',
+  };
+
+  // MYCELIATHREAD. Drawn as the NETWORK rather than as a mushroom: one pale cap
+  // at the centre with threads branching out to smaller caps at the edges. The
+  // card's whole subject is what it connects, and a single mushroom would have
+  // read as another BLOOMSHROOM — the fungi pack already has three cards whose
+  // symbol is "a mushroom", and this is the one that is about the space between
+  // them.
+  //
+  // The branches fork and thin as they go out, because an even radial burst
+  // reads as a sun or a spark; it is the uneven splitting that reads as growth.
+  const MYCELIA_ART = [
+    '.....................',
+    '..m...m.......m...m..',
+    '...t.t.........t.t...',
+    '....t.t.......t.t....',
+    '.m...t.t.....t.t...m.',
+    '..t...ttt...ttt...t..',
+    '...ttt..tt.tt..ttt...',
+    '......tt..t..tt......',
+    '........tt.tt........',
+    '.........CCC.........',
+    '........CCCCC........',
+    '........CCCCC........',
+    '.........SSS.........',
+    '........tt.tt........',
+    '......tt..t..tt......',
+    '...ttt..tt.tt..ttt...',
+    '..t...ttt...ttt...t..',
+    '.m...t.t.....t.t...m.',
+    '....t.t.......t.t....',
+    '..m..m.........m..m..',
+    '.....................',
+  ];
+  // Near-white threads on the pale cap — mycelium reads as light against soil,
+  // and the reference is almost colourless. The faint green is reserved for the
+  // small caps, so the only saturation on the card is at the things it links.
+  const MYCELIA_PAL = {
+    t: '#e8ece2', C: '#dcd6c2', S: '#b0a88e', m: '#9fc47a',
+  };
+
+  function drawMyceliaSymbol(ctx) {
+    const sym = _cardSkins['symbol-mycelia'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('mycelia', MYCELIA_ART, MYCELIA_PAL));
+  }
+
+  function drawSporetillerySymbol(ctx) {
+    const sym = _cardSkins['symbol-sporetillery'];
+    if (sym && sym.complete && sym.naturalWidth > 0) {
+      ctx.imageSmoothingEnabled = false;
+      const targetH = LAYOUT.symbolHeight;
+      const targetW = targetH * (sym.naturalWidth / sym.naturalHeight);
+      ctx.drawImage(sym, 128 - targetW / 2,
+                    LAYOUT.symbolCenterY - targetH / 2, targetW, targetH);
+      return;
+    }
+    drawSprite(ctx, getSprite('sporetillery', TILLERY_ART, TILLERY_PAL));
+  }
 
   function drawCownadoSymbol(ctx) {
     const sym = _cardSkins['symbol-cownado'];
@@ -4343,8 +4686,13 @@ const CardTextures = (() => {
     // Sheep -> RAM, Duck -> DDoS Duck, Seagull -> C:\GULL.
     if (card.name === 'BLOOMSHROOM' || card.name === 'RAM')           skinKey = 'nature-common';
     if (card.name === 'DD.DUCK'        || card.name === 'FROSTCAP')   skinKey = 'nature-uncommon';
+    if (card.name === 'LAVACAP')                                      skinKey = 'nature-uncommon';
     if (card.name === 'BUGFIX')                                       skinKey = 'nature-uncommon';
     if (card.name === 'C:\\GULL'        || card.name === 'PUFFBALL')  skinKey = 'nature-rare';
+    // The fungi pack's OTHER rare. It shares the slot with PUFFBALL above and
+    // was simply never added when it was written, so it fell through to the
+    // procedural frame while its slot-mate wore the pixel one.
+    if (card.name === 'SPORETILLERY')                                 skinKey = 'nature-rare';
     if (card.name === 'LAZERPIG') skinKey = 'nature-rare';
     // Leaf Storm, Blue Angel, and every other legendary-rarity card share
     // legendary-card.png as the frame. Symbol + labels still draw on top.
@@ -4352,8 +4700,16 @@ const CardTextures = (() => {
     const skinImg  = skinKey ? _cardSkins[skinKey] : null;
 
     if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
-      // PNG replaces the procedural background + border + corners
-      ctx.drawImage(skinImg, 0, 0, 256, 384);
+      // PNG replaces the procedural background + border + corners.
+      //
+      // A few cards recolour that shared frame rather than getting a PNG of
+      // their own. LAVACAP is the case this was added for: it shares the
+      // uncommon slot with FROSTCAP, and two cards that are explicitly each
+      // other's opposite reading in the same cyan defeats the pairing. Tinting
+      // keeps the pixel frame's shape and ironwork while changing its
+      // temperature, which is the only thing that has to differ.
+      const tint = CARD_FRAME_TINT[card.name];
+      ctx.drawImage(tint ? _recoloured(skinImg, tint, 0.85) : skinImg, 0, 0, 256, 384);
     } else {
       // Fallback: procedural frame
       drawBackground(ctx, card.rarity, t);
@@ -4371,12 +4727,33 @@ const CardTextures = (() => {
       drawChomptrapSymbol(ctx);
     else if (card.name === 'SOLARGRIP')
       drawSolargripSymbol(ctx);
-    else if (card.name === 'BUFFERING')
+    else if (card.name === 'B.SHELLEY')
       drawBufferingSymbol(ctx);
     else if (card.name === 'COWNADO')
       drawCownadoSymbol(ctx);
+    else if (card.name === 'SPORETILLERY')
+      drawSporetillerySymbol(ctx);
+    else if (card.name === 'MYCELIATHREAD')
+      drawMyceliaSymbol(ctx);
     else if (card.name === 'LAZERPIG')
       drawLazerpigSymbol(ctx);   // hazard plate is an overlay — see warnfx.js
+    // PNG-only symbols: no pixel-art placeholder was ever drawn for these, so
+    // they fall back to the generic rarity shape rather than to art of their
+    // own. Guarded on the image having actually loaded, or a missing file would
+    // leave the card blank instead of merely un-illustrated.
+    else if (card.name === 'BUGFIX') {
+      // The swarm is drawn AROUND the symbol: half the flies behind it, half in
+      // front, so the art sits inside the swarm rather than on top of it.
+      drawBugfixFlies(ctx, t, false);
+      if (!drawPngSymbol(ctx, 'symbol-bugfix')) {
+        _drawingCardName = card.name;
+        drawShape(ctx, card.rarity, t);
+      }
+      drawBugfixFlies(ctx, t, true);
+    }
+    else if (PNG_SYMBOL[card.name] && drawPngSymbol(ctx, PNG_SYMBOL[card.name])) {
+      // drawn
+    }
     else {
       _drawingCardName = card.name || '';
       drawShape(ctx, card.rarity, t);

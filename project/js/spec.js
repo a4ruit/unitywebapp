@@ -55,17 +55,23 @@ const Spec = (() => {
     // ── FUNGI ──
     'BLOOMSHROOM': 'medic',
     'FROSTCAP':    'damage',
+    'LAVACAP':     'damage',
+    'SPORETILLERY':'damage',
     'PUFFBALL':    'tank',
-    'Blue Angel':  'tank',      // taunt — soaks so others don't
+    'AZURELURE':   'tank',      // taunt — soaks so others don't
+    'MYCELIATHREAD':'medic',    // the only legendary heal on the nature side
 
     // ── CRITTER ──
     'RAM':         'damage',
+    // Was missing entirely: a rare that detonates for 9 read as neutral, so
+    // placing it advanced no stream at all.
+    'FLOCKASHEEP': 'damage',
     'DD.DUCK':     'damage',
     'BUGFIX':      'medic',
     'LAZERPIG':    'damage',
     'COWNADO':     'damage',
     'COSMEOW':     'damage',
-    'BUFFERING':   'tank',      // the rally field: the critter side's only tank
+    'B.SHELLEY':   'tank',      // taunts on hit and eats it: the critter tank
 
     // NOTE: the horror pools - FLESH, SCOURGE and RITUAL - are deliberately
     // ABSENT. Once a player has taken the glitchling route they are in the

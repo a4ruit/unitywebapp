@@ -462,9 +462,9 @@ const ChoiceGrid3D = (() => {
       // boss, and a badge the players trust must never sit on that.
       const PLATES = { 'LAZERPIG': 'laser', 'ULTRAVIOLET': 'voltage',
                        'PUFFBALL': 'shield', 'SOLARGRIP': 'shield',
-                       'BUFFERING': 'shield',
+                       'B.SHELLEY': 'shield',
                        'INFRAMEND': 'medic', 'BLOOMSHROOM': 'medic',
-                       'BUGFIX': 'medic' };
+                       'BUGFIX': 'medic', 'MYCELIATHREAD': 'medic' };
       // EVERY badged card in the grid gets its plate. This used to take the
       // first match only, which was invisible while three cards had plates and
       // none shared a pack — now BUGFIX and LAZERPIG can both be dealt, and
