@@ -4333,3 +4333,646 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
   55%  { opacity: 0.45; }
   100% { opacity: 1; }
 }
+
+/* ── Spec tally ─────────────────────────────────────────────────────────────
+   Tick marks beside the player's own role symbol, one per counted placement.
+   Small and low-contrast on purpose: this is a record, not a progress meter,
+   and anything that invites watching turns a slow commitment into a task. */
+.spec-tally {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 5px;
+  vertical-align: middle;
+  opacity: 0.55;
+}
+.spec-tally i {
+  display: block;
+  width: 2px;
+  height: 9px;
+  background: currentColor;
+}
+/* The finished set is a real tally: four uprights with the fifth struck
+   through them. Relative so the cross can be laid over the group. */
+.spec-tally { position: relative; }
+.spec-tally.is-complete { opacity: 1; }
+.spec-tally-cross {
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  width: calc(100% + 4px);
+  height: 2px;
+  background: currentColor;
+  /* Leaning the way a hand draws it, not a flat strike-through. */
+  transform: translateY(-50%) rotate(-24deg);
+  box-shadow: 0 0 5px currentColor;
+}
+
+/* ── Role avatar (BULLWARK) — see the block at the end of this file ── */
+
+
+/* ═══ Spec tally ═══════════════════════════════════════════════════════════
+   Tick marks beside the player's own role symbol, one per counted placement.
+   Small and low-contrast on purpose: this is a record, not a progress meter,
+   and anything that invites watching turns a slow commitment into a task. */
+.spec-tally {
+  position: relative;
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 5px;
+  vertical-align: middle;
+  opacity: 0.55;
+}
+.spec-tally i { display: block; width: 2px; height: 9px; background: currentColor; }
+.spec-tally.is-complete { opacity: 1; }
+/* The fifth mark struck through the other four, the way a hand draws a tally. */
+.spec-tally-cross {
+  position: absolute;
+  left: -2px; top: 50%;
+  width: calc(100% + 4px);
+  height: 2px;
+  background: currentColor;
+  transform: translateY(-50%) rotate(-24deg);
+  box-shadow: 0 0 5px currentColor;
+}
+
+/* ═══ Role avatar: BULLWARK ════════════════════════════════════════════════ */
+
+#avatar-root { position: fixed; inset: 0; z-index: 90; pointer-events: none; }
+#avatar-root > * { pointer-events: auto; }
+
+/* ── The role card ────────────────────────────────────────────────────────
+   Shown on the pack screen once the tally completes. A CARD, not a button:
+   everything else the player earns in this game arrives as a card, and a lone
+   green button made the one reward that costs the most to reach read as a
+   system prompt instead of a prize.
+
+   So it borrows the same chrome as the driving overlay and the pack faces —
+   outer rule, inner rule a few pixels in, a symbol on an inset plate, name
+   under it — and takes its colour from the avatar's own theme. The card they
+   tap and the card they then hold are the same object. */
+/* ── The deal ─────────────────────────────────────────────────────────────
+   A dim behind the hand, for one second, on the frame it is first dealt.
+
+   pointer-events: none is load-bearing. This looks like the driving overlay's
+   scrim and must behave like its opposite: that one exists to EAT touches so a
+   steering thumb cannot open a pack, and this one must never intercept
+   anything — the player can keep playing straight through the reveal, and the
+   dim is only telling them something, not asking. */
+.avatar-hand-dim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 70% at 50% 100%,
+              rgba(2,6,12,0.74) 0%, rgba(2,6,12,0.5) 55%, rgba(2,6,12,0.16) 100%);
+  opacity: 0;
+  transition: opacity 0.55s ease;
+
+  /* !important, and it is not optional.
+     
+     #avatar-root > * { pointer-events: auto } is an ID selector and beats a
+     plain class, so this element was taking every touch on the page — at
+     opacity 0, full-screen, from the login form onward. The entire app was
+     unclickable and nothing looked wrong, which is the worst shape a bug can
+     have: an invisible full-screen div is the single easiest way to break a
+     page and leave no evidence. */
+  pointer-events: none !important;
+}
+.avatar-hand-dim.is-on { opacity: 1; }
+
+/* The cards arrive from below the screen edge, fanning out as they rise —
+   dealt, rather than appearing. Staggered per card by --deal, with the earned
+   one landing LAST so the lift that singles it out is the final beat rather
+   than something already true when the others arrive. */
+@keyframes avatarDeal {
+  0%   { opacity: 0; transform: translateX(-50%) translateY(150px) rotate(0deg); }
+  100% { opacity: 1; }
+}
+.avatar-hand.is-dealing .avatar-hand-card {
+  animation: avatarDeal 0.55s cubic-bezier(0.18, 0.9, 0.25, 1) backwards;
+  animation-delay: var(--deal, 0s);
+}
+
+/* ── The hand ─────────────────────────────────────────────────────────────
+   Three cards fanned at the bottom, held the way a hand of cards is held.
+
+   Laid out ABSOLUTELY inside a fixed-size box rather than with flex.
+   Flex was positioning the cards AND the per-card --slide was moving them
+   again, so every card was offset twice and the set drifted off centre — the
+   two systems were each solving the same problem without knowing about the
+   other. One of them had to go, and the fan needs exact control of where each
+   card sits, so it is this one. */
+.avatar-hand {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  transform: translateX(-50%);
+  /* Sized explicitly, because absolutely-positioned children give a parent no
+     height of its own to take. */
+  width: 300px;
+  height: 196px;
+  pointer-events: none;
+}
+.avatar-hand[hidden] { display: none; }
+
+.avatar-hand-card {
+  /* Overrides the lone-button geometry the same rule still carries. */
+  position: absolute !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: 0 !important;
+  margin: 0 !important;
+
+  pointer-events: auto;
+
+  /* Centre first, THEN fan. Keeping the -50% inside the same transform is what
+     stops the card drifting as --slide changes.
+     
+     !important because .avatar-enter still carries `transform: translateX(-50%)`
+     from its lone-button days and sits LATER in this file. Same specificity,
+     later wins — so without this the fan was silently overwritten and all three
+     cards stacked dead centre. */
+  transform: translateX(calc(-50% + var(--slide, 0px))) rotate(var(--fan, 0deg)) !important;
+  /* Every card swings on one point below the screen edge, which is what makes
+     it a hand rather than three tilted rectangles. */
+  transform-origin: 50% 190%;
+
+  transition: transform 0.45s cubic-bezier(0.2, 0.9, 0.25, 1),
+              filter 0.4s ease, opacity 0.4s ease;
+}
+
+/* ── The one you earned ───────────────────────────────────────────────────
+   Lifted clear of the fan and straightened. Standing a card UP out of a hand
+   is the gesture for "this is the one" in every card game there is, so it
+   needs no label and survives being seen across a room. */
+.avatar-hand-card.is-mine {
+  transform: translateX(calc(-50% + var(--slide, 0px)))
+             translateY(-30px)
+             rotate(calc(var(--fan, 0deg) * 0.25)) !important;
+}
+
+/* ── The ones you did not ─────────────────────────────────────────────────
+   Greyed and dimmed, but NOT hidden and not blanked: the emblem and the name
+   stay legible. A locked card that shows nothing teaches nothing, and the
+   whole reason for dealing a hand rather than handing over one card is to say
+   that two other things exist and are gettable. */
+.avatar-hand-card.is-locked {
+  filter: grayscale(1) brightness(0.55) contrast(0.9);
+  opacity: 0.8;
+  cursor: default;
+}
+.avatar-hand-card.is-locked .avatar-enter-art {
+  opacity: 0.62;
+  filter: blur(0.4px);
+}
+.avatar-hand-card.is-locked .avatar-enter-label { opacity: 0.7; }
+.avatar-hand-card.is-locked .avatar-enter-slot {
+  font-size: 12px;
+  letter-spacing: 2px;
+  opacity: 0.7;
+}
+
+/* Every card the SAME box, whatever element it was built from. A button and a
+   div do not agree about box-sizing, line-height or font by default, which is
+   why the locked pair came out a different shape from the earned one. */
+.avatar-hand-card {
+  box-sizing: border-box;
+  width: 132px;
+  height: 186px;
+  font: inherit;
+  text-align: center;
+}
+
+.avatar-enter {
+  position: absolute;
+  left: 50%; bottom: 120px;
+  transform: translateX(-50%);
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding: 8px;
+  font-family: 'VT323', monospace;
+  letter-spacing: 1px;
+  text-align: center;
+  color: var(--av-ink, #dff2ff);
+  background: linear-gradient(170deg, rgba(14,30,40,0.97) 0%, rgba(6,14,20,0.98) 100%);
+  border: 2px solid var(--av-edge, #76c4e8);
+  box-shadow: 0 0 20px rgba(var(--av-glow, 90,190,255), 0.38),
+              inset 0 0 22px rgba(0,0,0,0.6);
+}
+.avatar-enter[hidden] { display: none; }
+
+.avatar-enter-head {
+  display: grid;
+  place-items: center;
+  min-height: 20px;
+}
+.avatar-enter-head canvas {
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 5px rgba(var(--av-glow, 90,190,255), 0.5));
+}
+
+/* The symbol plate. Square, inset, darker than the card — the symbol should be
+   the brightest thing on it. */
+.avatar-enter-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 6px;
+  /* Absorbs the slack now the card has a FIXED height, so three cards are the
+     same size whatever their name lengths do - a hand whose cards differ by a
+     few pixels reads as broken rather than as hand-dealt. */
+  flex: 1 1 auto;
+  min-height: 0;
+  background: radial-gradient(70% 70% at 50% 45%,
+              rgba(var(--av-glow, 90,190,255), 0.16) 0%, rgba(0,0,0,0.42) 100%);
+}
+.avatar-enter-art {
+  width: 72px; height: 72px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 7px rgba(var(--av-glow, 90,190,255), 0.65));
+}
+
+.avatar-enter-label {
+  font-size: 19px;
+  line-height: 1.1;
+  text-shadow: 0 0 8px rgba(var(--av-glow, 90,190,255), 0.55);
+}
+
+.avatar-enter-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 3px;
+  font-size: 15px;
+}
+.avatar-enter-slot { color: rgba(255,255,255,0.72); }
+
+/* Free: a slow pulse. Loud enough to be noticed on a screen the player is not
+   looking at, quiet enough not to compete with the pack they are opening. */
+.avatar-enter.is-open { animation: avatarOpen 1.7s ease-in-out infinite; }
+@keyframes avatarOpen {
+  0%, 100% { box-shadow: 0 0 20px rgba(var(--av-glow, 90,190,255), 0.34),
+                         inset 0 0 22px rgba(0,0,0,0.6); }
+  50%      { box-shadow: 0 0 34px rgba(var(--av-glow, 90,190,255), 0.8),
+                         inset 0 0 22px rgba(0,0,0,0.6); }
+}
+
+/* Taken: dead, and PARKED to the side rather than removed.
+   Removing it would mean the slot reappearing out of nowhere the moment it
+   frees, with nothing to tell a waiting player where to look. Shrunk against
+   the right edge it stays in the corner of the eye, keeps its 1/1, and grows
+   back into place when it opens — which is also the cue that it is now first
+   come first served. */
+/* Taken by someone else. The card stays IN the hand and simply goes quiet —
+   it used to shrink to a tab against the screen edge, which made sense for a
+   lone button and would now tear one card out of a fan it belongs to. */
+.avatar-enter.is-full {
+  filter: grayscale(0.7);
+  opacity: 0.82;
+  box-shadow: none;
+  animation: none;
+}
+.avatar-hand-card.is-mine.is-full {
+  /* Settles back down level with the others: the lift means "yours to take",
+     and while it is taken it is not. */
+  transform: translateX(calc(-50% + var(--slide, 0px)))
+             translateY(-8px)
+             rotate(calc(var(--fan, 0deg) * 0.6)) !important;
+}
+/* Nothing is hidden while it is taken any more — the card keeps its name and
+   its symbol and only loses its colour, because it is still sitting in a hand
+   being read alongside two others. */
+
+.avatar-enter { transition: filter 0.3s ease, opacity 0.3s ease; }
+
+/* ── The driving overlay ──────────────────────────────────────────────────
+   Covers the whole viewport. The scrim is load-bearing, not decoration: it is
+   what stops a steering thumb reaching the pack carousel underneath. */
+/* Every colour in the overlay comes from these four, set per avatar by
+   avatar.js. Defaults are BULLWARK's blue, so a body with no theme declared
+   still renders rather than falling back to black. */
+.avatar-pad {
+  position: absolute; inset: 0;
+  --av-edge: #76c4e8;          /* frame and button borders */
+  --av-glow: 90,190,255;       /* rgb triplet, for the glows */
+  --av-ink:  #dff2ff;          /* text on dark */
+  --av-dim:  #51788c;          /* cooling / disabled */
+}
+.avatar-pad[hidden] { display: none; }
+
+.avatar-scrim {
+  position: absolute; inset: 0;
+  background: radial-gradient(130% 85% at 50% 100%,
+              rgba(4,10,16,0.93) 0%, rgba(4,10,16,0.66) 55%, rgba(4,10,16,0.38) 100%);
+  backdrop-filter: blur(1.5px);
+  /* Swallows every touch that is not a control in the card below. */
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* ── The card ─────────────────────────────────────────────────────────────
+   One panel holding the whole control set, anchored to the bottom where the
+   hands are. Everything inside it is spaced tightly on purpose: loose controls
+   read as a HUD painted over the app, a tight group reads as an object. */
+/* A portrait rectangle, framed the way the pack cards are: an outer rule, an
+   inner rule a few pixels inside it, a title row, the symbol on a plate, and
+   the working parts along the bottom. The proportions are the point — the
+   overlay should read as a card the player is holding, not as a toolbar. */
+.avatar-card {
+  position: absolute;
+  left: 14px; right: 14px; bottom: 16px;
+  /* Tall enough to be a card, capped so the controls never leave the thumb's
+     reach on a short screen. */
+  height: min(60vh, 460px);
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  background: linear-gradient(170deg, rgba(14,30,40,0.97) 0%, rgba(6,14,20,0.98) 100%);
+  border: 2px solid var(--av-edge);
+  box-shadow: 0 0 24px rgba(var(--av-glow), 0.3), inset 0 0 30px rgba(0,0,0,0.6);
+}
+
+/* ── Symbol stage ─────────────────────────────────────────────────────────
+   The art plate. Takes whatever vertical room the controls do not, so the
+   symbol is as large as the screen allows and the card still fits. */
+.avatar-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  margin: 8px 4px 10px;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(70% 70% at 50% 45%, rgba(var(--av-glow), 0.14) 0%, transparent 70%),
+    rgba(4,12,18,0.6);
+}
+.avatar-emblem {
+  /* EXPLICIT size, not max-*. The source is 84x84, far smaller than the plate,
+     so a max-width only ever let it sit at its intrinsic size — a limit cannot
+     enlarge an image. object-fit keeps it square inside the box. */
+  width: 76%;
+  height: 76%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 0 12px rgba(var(--av-glow), 0.5));
+  /* The same slow breath the free-slot button uses, so the card feels powered
+     rather than printed. */
+  animation: avatarEmblem 3.4s ease-in-out infinite;
+}
+@keyframes avatarEmblem {
+  0%, 100% { filter: drop-shadow(0 0 10px rgba(120,200,250,0.35)); }
+  50%      { filter: drop-shadow(0 0 20px rgba(120,200,250,0.7)); }
+}
+
+/* The name CENTRED, with the charges and the close button floated over the row
+   rather than sharing it. Laid out as three flex items, the title sits wherever
+   the other two leave it — which is never the middle, and moves as the pip
+   count changes. Taking both out of flow fixes the name in place. */
+.avatar-card-top {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 2px;
+}
+
+.avatar-title {
+  font-family: 'VT323', monospace;
+  font-size: 24px;
+  letter-spacing: 4px;
+  color: var(--av-ink);
+  text-shadow: 0 0 9px rgba(var(--av-glow), 0.75);
+}
+
+/* Charges sit between the name and LEAVE, filling the gap, so the top row is
+   one line rather than three things with space between them. */
+.avatar-charges {
+  position: absolute;
+  left: 2px; top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.avatar-charges i {
+  display: block; width: 6px; height: 16px;
+  border-radius: 1px;
+  background: var(--av-ink);
+  box-shadow: 0 0 6px rgba(var(--av-glow), 0.7);
+}
+/* The last one pulses amber: running out ends the turn and resets the tally,
+   which is worth knowing before it happens rather than after. */
+.avatar-charges.is-last i {
+  background: #ffb45a;
+  box-shadow: 0 0 9px rgba(255,180,90,0.9);
+  animation: avatarLastPip 0.9s ease-in-out infinite;
+}
+@keyframes avatarLastPip { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Small, and unlike the spells in both colour and shape, so the button that
+   ENDS the turn can never be mistaken for one that spends a charge. */
+/* An X in the corner rather than a LEAVE button on the row.
+   The word cost the whole top strip its height and pushed the name off centre
+   for a control nobody needs to read — a cross in the top-right is the one
+   piece of interface vocabulary that needs no label at all. */
+.avatar-leave {
+  position: absolute;
+  right: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 26px; height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  line-height: 1;
+  color: #2a0d08;
+  background: #e8886a;
+  border: 2px solid #2a0d08;
+  border-radius: 4px;
+}
+
+.avatar-card-body {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── Joystick ─────────────────────────────────────────────────────────────
+   Back to the plain disc: a ring and a knob, nothing else. */
+.avatar-stick {
+  position: relative;
+  flex: 0 0 auto;
+  width: 118px; height: 118px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--av-glow), 0.4);
+  background: rgba(10,18,24,0.45);
+  touch-action: none;
+}
+.avatar-knob {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 46px; height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 50%;
+  background: var(--av-ink);
+  /* No transition: a smoothed knob lags the thumb, and the body already
+     smooths its own acceleration in Unity. */
+}
+
+/* ── Spell buttons ────────────────────────────────────────────────────────
+   Squares with a soft corner and the ability name on them. Deliberately plain
+   while the names do the work — art drops in later as a background on
+   .avatar-spell-name's parent without the layout moving. */
+/* Sized by how many buttons there are, not by a fixed square.
+   BULLWARK's third ability has to fit on the SAME row — a row that wrapped
+   would push the joystick off the card — so the squares shrink to make room
+   and stay square, which keeps the icons readable at the smaller size. */
+.avatar-spells {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  --sq: 78px;
+}
+.avatar-spells[data-count="3"] { gap: 6px; --sq: 58px; }
+
+.avatar-spell {
+  position: relative;
+  width: var(--sq); height: var(--sq);
+  flex: 0 0 auto;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(160deg, #16303f 0%, #0b1a24 100%);
+  border: 2px solid var(--av-edge);
+  border-radius: 6px;
+  box-shadow: 0 0 12px rgba(var(--av-glow), 0.3), inset 0 0 16px rgba(0,0,0,0.55);
+}
+.avatar-spell:active { transform: translateY(1px); box-shadow: 0 0 7px rgba(var(--av-glow), 0.5); }
+.avatar-spell.is-cooling { border-color: var(--av-dim); box-shadow: none; }
+
+.avatar-spell-name {
+  /* Long names wrap inside the square rather than overflowing it —
+     SPORESIPHON does not fit on one line at this size and should not try. */
+  padding: 0 4px;
+  line-height: 1.02;
+  overflow-wrap: anywhere;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  letter-spacing: 2px;
+  color: var(--av-ink);
+  pointer-events: none;
+}
+.avatar-spell.is-cooling .avatar-spell-name { color: var(--av-dim); }
+
+/* Cooldown: a wedge sweeping away under the seconds. Drawn over the button
+   rather than replacing its label, so the name a thumb was aiming at stays
+   where it was. */
+.avatar-spell-cd {
+  position: absolute; inset: 0;
+  display: grid; place-items: center;
+  border-radius: 4px;
+  font-family: 'VT323', monospace;
+  font-size: 30px;
+  color: #ffdca8;
+  text-shadow: 0 2px 0 #000;
+  background: conic-gradient(rgba(2,8,14,0.8) var(--sweep, 0deg), transparent 0deg);
+  pointer-events: none;
+}
+
+/* The runner straddles the card's top border, so he is walking ON the frame
+   rather than sitting inside the panel. */
+.avatar-runner {
+  position: absolute;
+  /* Lifted so his HOOVES land on the border rather than his belly. The source
+     is 84x84 with transparent padding below the animal, so the element has to
+     sit higher than the sprite looks like it needs. */
+  top: -70px;
+  width: 64px; height: 64px;
+  pointer-events: none;
+  /* The source is 84x84 with a lot of empty space; pixelated keeps it crisp at
+     any size rather than letting the browser smear it. */
+  image-rendering: pixelated;
+  /* One sprite, so the gait is faked here: a hop with a slight rock. On
+     something this small that reads as a trot about as well as a two-frame
+     cycle did, and costs no render loop. */
+  animation: avatarTrot 0.26s steps(2, jump-none) infinite;
+  /* Eased, because the position jumps the instant an ability fires: a figure
+     that teleports a quarter of the way across reads as a glitch, one that
+     walks reads as progress. */
+  transition: left 0.55s cubic-bezier(0.3, 0.8, 0.4, 1);
+  filter: drop-shadow(0 0 5px rgba(120,200,250,0.35));
+}
+/* On the last charge he keeps trotting AND flashes — replacing the animation
+   outright would stop him dead at the moment he most needs to look urgent. */
+.avatar-runner.is-last {
+  filter: drop-shadow(0 0 9px rgba(255,180,90,0.9));
+  animation: avatarTrot 0.26s steps(2, jump-none) infinite,
+             avatarLastPip 0.9s ease-in-out infinite;
+}
+
+@keyframes avatarTrot {
+  0%   { transform: translateY(0)    rotate(-1.5deg); }
+  100% { transform: translateY(-3px) rotate(1.5deg);  }
+}
+
+/* A spell button carrying art instead of a word. The frame, the cooldown sweep
+   and the sizing are identical to a text one, so the two sit together without
+   either looking like a different kind of control. */
+.avatar-spell--icon { padding: 4px; }
+/* The label and the countdown shrink with the square, or a three-ability row
+   has STAMPEDE wrapping to four lines and a digit taller than its button. */
+.avatar-spells[data-count="3"] .avatar-spell-name { font-size: 13px; letter-spacing: 1px; }
+.avatar-spells[data-count="3"] .avatar-spell-cd   { font-size: 24px; }
+.avatar-spell-art {
+  display: block;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+/* Dimmed with the frame while cooling, matching what the text does. */
+.avatar-spell.is-cooling .avatar-spell-art { opacity: 0.45; filter: grayscale(0.6); }
+
+/* The offer to switch streams, shown when a SECOND role fills up behind the
+   one the player already holds. Sits above the BECOME button rather than
+   replacing it — the two are different decisions and must not share a spot. */
+.spec-offer {
+  position: fixed;
+  left: 50%; bottom: 182px;
+  transform: translateX(-50%);
+  z-index: 85;
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px;
+  font-family: 'VT323', monospace;
+  font-size: 17px;
+  letter-spacing: 1px;
+  color: #0b1018;
+  background: #cfeefb;
+  border: 2px solid #0b1018;
+}
+
+/* On-screen spec debug. Deliberately ugly and in a corner nothing else uses —
+   it should never be mistaken for part of the game. */
+.spec-debug-btn {
+  position: fixed;
+  left: 6px; top: 6px;
+  z-index: 200;
+  padding: 5px 9px;
+  font-family: 'VT323', monospace;
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #06110a;
+  background: #ff7ad1;
+  border: 2px solid #06110a;
+  opacity: 0.85;
+}
+.spec-debug-btn.is-set { background: #ffd166; }

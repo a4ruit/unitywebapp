@@ -43,6 +43,18 @@ const ChoiceGrid3D = (() => {
       _renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
       _renderer.setClearColor(0x000000, 0);
       // Canvas is intentionally NOT appended to the DOM
+
+      // This is the renderer a browser reclaiming contexts kills FIRST, because
+      // it is the oldest and its canvas is not in the document. When that
+      // happened the cells kept copying a dead buffer and simply stopped
+      // updating, with nothing logged — so the flicker looked like a mystery.
+      // Now it is dropped and rebuilt on the next grid.
+      _renderer.domElement.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        console.warn('ChoiceGrid3D: WebGL context lost');
+        if (_animFrame) { cancelAnimationFrame(_animFrame); _animFrame = null; }
+        _renderer = null;
+      });
     } catch (e) {
       console.warn('ChoiceGrid3D: WebGL init failed', e);
       _renderer = null;
@@ -463,6 +475,11 @@ const ChoiceGrid3D = (() => {
       const PLATES = { 'LAZERPIG': 'laser', 'ULTRAVIOLET': 'voltage',
                        'PUFFBALL': 'shield', 'SOLARGRIP': 'shield',
                        'B.SHELLEY': 'shield',
+                       // The pack's taunt. It soaks so nothing else has to,
+                       // which is the same promise the other shields make —
+                       // and it is the clearest signal a player has that this
+                       // is a card on the BULLWARK path.
+                       'AZURELURE': 'shield',
                        'INFRAMEND': 'medic', 'BLOOMSHROOM': 'medic',
                        'BUGFIX': 'medic', 'MYCELIATHREAD': 'medic' };
       // EVERY badged card in the grid gets its plate. This used to take the

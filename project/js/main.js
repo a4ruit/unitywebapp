@@ -1073,9 +1073,162 @@ function _paintNametagRole() {
   if (!host || typeof Roles === 'undefined') return;
   host.innerHTML = '';
   host.appendChild(Roles.canvas(playerRole, 2, playerColor || '#cfeefb'));
+  _paintSpecTally(host);
   // Revealed with the tag itself, not before: on the username screen the picker
   // is already showing the symbol.
   if (playerName) host.style.display = 'block';
+}
+
+// Progress toward the role the player DECLARED, drawn as tick marks beside
+// their symbol.
+//
+// Deliberately a tally and not a bar or a number. A bar invites watching, and a
+// number invites counting — both turn a slow commitment into a task. Marks
+// accumulating next to a symbol the player already recognises as theirs read as
+// a record of what they have done, which is what it is.
+function _paintSpecTally(host) {
+  if (typeof Spec === 'undefined') return;
+
+  const counts = Spec.counts();
+  // Asked for THIS player's declared role, not the leading one — the roles no
+  // longer share a threshold, and damage needs eight where the others need five.
+  const need   = Spec.threshold(playerRole);
+  const n      = Math.min(counts[playerRole] || 0, need);
+  if (n <= 0) return;
+
+  // Drawn in real tally GROUPS of five: four upright strokes with the fifth
+  // across them, the way anyone counting on paper does it, and a new group
+  // started after each one closes.
+  //
+  // It used to draw a single group and assume the threshold was five. At eight
+  // that stalls visibly — four strokes, then three more placements with nothing
+  // changing on screen, then a cross appearing out of nowhere. Grouping keeps
+  // every placement visible, and a crossed five followed by three strokes reads
+  // as "eight" to anyone who has ever counted anything.
+  for (let start = 0; start < n; start += 5) {
+    const inGroup = Math.min(5, n - start);
+
+    const wrap = document.createElement('span');
+    wrap.className = 'spec-tally';
+    wrap.style.color = playerColor || '#cfeefb';
+
+    for (let i = 0; i < Math.min(inGroup, 4); i++)
+      wrap.appendChild(document.createElement('i'));
+
+    if (inGroup >= 5) {
+      wrap.classList.add('is-complete');
+      const cross = document.createElement('b');
+      cross.className = 'spec-tally-cross';
+      wrap.appendChild(cross);
+    }
+
+    host.appendChild(wrap);
+  }
+}
+
+// ── Spec debug keys ─────────────────────────────────────────────────────────
+// Desktop only, by nature — there is no keyboard on the device this runs on in
+// the gallery, which is exactly why it is safe to leave in: a visitor on a
+// phone cannot reach it.
+//
+//   Shift+T   fill the declared role's tally to the threshold
+//   Shift+R   clear it again
+//
+// Also exposed as window.specFill() / window.specReset() for a phone, where
+// Safari's console is the only way in.
+document.addEventListener('keydown', (e) => {
+  if (!e.shiftKey || typeof Spec === 'undefined') return;
+
+  // Never while typing. The name field is the first thing a player touches and
+  // a capital T belongs in it.
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+  if (e.code === 'KeyT') { Spec.debugFill(playerRole || 'tank'); e.preventDefault(); }
+  if (e.code === 'KeyR') { Spec.debugReset();                    e.preventDefault(); }
+});
+window.specFill  = (role) => Spec.debugFill(role || playerRole || 'tank');
+window.specReset = () => Spec.debugReset();
+
+// ── On-screen debug ─────────────────────────────────────────────────────────
+// The keys above are desktop-only, and the device this is actually tested on
+// has no keyboard. One tappable control instead: it fills the declared role's
+// tally, and once specialised the same button resets it — so a tester can get
+// into a body, out of it, and into the other one without reloading.
+//
+// Hidden behind ?dbg=1 (or localStorage.specDebug) rather than always present:
+// it hands out a body in five taps, which is not something a gallery visitor
+// should find.
+(function _buildSpecDebug() {
+  let on = false;
+  try {
+    on = !!new URLSearchParams(location.search).get('dbg')
+      || !!localStorage.getItem('specDebug');
+  } catch (e) {}
+  if (!on) return;
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.createElement('button');
+    btn.id = 'specDebugBtn';
+    btn.className = 'spec-debug-btn';
+
+    const paint = () => {
+      const spec = Spec.current();
+      btn.textContent = spec ? `DBG RESET (${spec})` : `DBG +${Spec.threshold(playerRole)} ${playerRole || 'tank'}`;
+      btn.classList.toggle('is-set', !!spec);
+    };
+
+    btn.onclick = () => {
+      if (Spec.current()) Spec.debugReset();
+      else Spec.debugFill(playerRole || 'tank');
+      paint();
+    };
+
+    document.body.appendChild(btn);
+    paint();
+
+    // Repaint on every spec change, so the label is right after a body is
+    // spent and the tally resets itself.
+    const prev = window.onSpecChanged;
+    window.onSpecChanged = function () {
+      if (typeof prev === 'function') prev();
+      paint();
+    };
+  });
+})();
+
+// Spec calls this on every counted placement.
+window.onSpecChanged = function () {
+  _paintNametagRole();
+  _paintSpecOffer();
+  try { if (typeof Avatar !== 'undefined') Avatar.refresh(); } catch (e) {}
+};
+
+// A second stream the player has also completed, offered rather than taken.
+//
+// A button and not an automatic switch: they may be mid-turn in the role they
+// already hold, and a game that silently reassigned them would be making the
+// decision the whole specialisation system exists to hand over.
+function _paintSpecOffer() {
+  if (typeof Spec === 'undefined' || typeof Roles === 'undefined') return;
+
+  let host = document.getElementById('specOffer');
+  const role = Spec.offer();
+
+  if (!role) { if (host) host.remove(); return; }
+  if (!host) {
+    host = document.createElement('button');
+    host.id = 'specOffer';
+    host.className = 'spec-offer';
+    host.onclick = () => { Spec.commit(); };
+    document.body.appendChild(host);
+  }
+
+  host.innerHTML = '';
+  host.appendChild(Roles.canvas(role, 2, playerColor || '#cfeefb'));
+  const txt = document.createElement('span');
+  txt.textContent = `SWITCH TO ${role.toUpperCase()}`;
+  host.appendChild(txt);
 }
 
 // Built rather than authored in the HTML, because the symbols are drawn from
@@ -1266,6 +1419,7 @@ function connect() {
       if (typeof Announce !== 'undefined' && Announce.handleMessage(e.data)) return;
       if (typeof Combo    !== 'undefined' && Combo.handleMessage(e.data))    return;
       if (typeof ScreenBug !== 'undefined' && ScreenBug.handleMessage(e.data)) return;
+      if (typeof Avatar   !== 'undefined' && Avatar.handle(e.data))          return;
       if (typeof Player   !== 'undefined' && Player.handleMessage(e.data))   return;
       handlePossessionMessage(e.data);
     };

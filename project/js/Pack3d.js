@@ -2315,7 +2315,11 @@ const Pack3D = (() => {
     _disposeCrtPulse();
     if (_dummyTex) { _dummyTex.dispose(); _dummyTex = null; }
     clearParticles();
-    renderer?.dispose();
+    // forceContextLoss BEFORE dispose. dispose() alone frees three.js's GPU
+    // objects and leaves the WebGL context itself alive; enough stranded
+    // contexts and the browser starts killing the oldest ones, which is what
+    // made cards flicker on phones at the playtest.
+    if (renderer) { renderer.forceContextLoss(); renderer.dispose(); renderer = null; }
   }
 
   // ─── Glitch transition helpers ─────────────────────────────────────────────

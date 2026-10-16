@@ -18,21 +18,64 @@ const Cards3D = (() => {
   let faceTex        = null;
   let animated       = false;
 
+  /// Build the WebGL context ONCE and keep it for the life of the page.
+  ///
+  /// It used to be rebuilt for every card revealed, and that leaked a context
+  /// each time: renderer.dispose() frees three.js's own GPU objects but NOT the
+  /// underlying WebGL context — only forceContextLoss() does that. Browsers cap
+  /// how many contexts can be live at once and, past the cap, kill the OLDEST
+  /// ones. The oldest here are the long-lived renderers in Pack3d and
+  /// choiceGrid3d, so a player who opened enough packs would silently have the
+  /// pack and the choice grid killed underneath them — which is the card
+  /// flickering seen at the playtest. Older phones hit it soonest because the
+  /// cap tightens under memory pressure.
+  ///
+  /// choiceGrid3d already keeps one renderer alive on purpose. This now matches
+  /// it: contexts are expensive and there is no reason to own more than one.
+  function _ensureRenderer() {
+    if (renderer) return true;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias:false, alpha:true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setClearColor(0x000000, 0);
+      renderer.domElement.style.cssText =
+        'display:block;width:100%!important;height:100%!important;image-rendering:pixelated;';
+
+      // If it is ever lost anyway — a backgrounded tab, a phone reclaiming
+      // memory — say so and rebuild on the next card. Without these the context
+      // dies silently and the canvas just stops updating, which is exactly why
+      // this went unnoticed until someone happened to be watching.
+      renderer.domElement.addEventListener('webglcontextlost', (e) => {
+        e.preventDefault();
+        console.warn('Cards3D: WebGL context lost');
+        cancelAnimationFrame(animFrame); animFrame = null;
+        scene = null;
+      });
+      renderer.domElement.addEventListener('webglcontextrestored', () => {
+        console.warn('Cards3D: WebGL context restored');
+      });
+      return true;
+    } catch (e) {
+      console.warn('Cards3D: WebGL init failed', e);
+      renderer = null;
+      return false;
+    }
+  }
+
   function init(containerId) {
     const wrap = document.getElementById(containerId);
     if (!wrap) return;
     destroy();
+    if (!_ensureRenderer()) return;
 
     const W = wrap.clientWidth  || 216;
     const H = wrap.clientHeight || 296;
 
-    renderer = new THREE.WebGLRenderer({ antialias:false, alpha:true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(W, H);
-    renderer.setClearColor(0x000000, 0);
     wrap.innerHTML = '';
+    // The SAME canvas, moved to whichever container is showing a card. Appending
+    // an existing element relocates it rather than copying, so nothing leaks.
     wrap.appendChild(renderer.domElement);
-    renderer.domElement.style.cssText = 'display:block;width:100%!important;height:100%!important;image-rendering:pixelated;';
 
     scene  = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(38, W/H, 0.1, 100);
@@ -50,7 +93,12 @@ const Cards3D = (() => {
   function showCard(card, containerId, callback) {
     const wrap = document.getElementById(containerId);
     if (!wrap) return;
-    if (!renderer) init(containerId);
+    // Re-init when there is no scene, or when the canvas is parked in some
+    // other container. Testing the RENDERER would now always pass, since it
+    // outlives destroy() on purpose.
+    if (!scene || !renderer || renderer.domElement.parentNode !== wrap)
+      init(containerId);
+    if (!scene) return;
 
     if (cardMesh) {
       scene.remove(cardMesh);
@@ -170,9 +218,23 @@ const Cards3D = (() => {
     }
     if (rarityLight) { scene?.remove(rarityLight); rarityLight = null; }
     faceTex?.dispose(); faceTex = null; faceCanvas = null;
-    renderer?.dispose(); renderer = null;
+
+    // The RENDERER SURVIVES. Everything it was drawing is thrown away, the
+    // canvas comes out of the DOM, but the context stays — see _ensureRenderer.
+    if (renderer && renderer.domElement.parentNode)
+      renderer.domElement.parentNode.removeChild(renderer.domElement);
+
     scene = null; camera = null; currentCard = null; animated = false;
   }
 
-  return { showCard, destroy };
+  /// Give the context back for good. Nothing calls this during play — it exists
+  /// because a dispose() without forceContextLoss() is the leak this whole file
+  /// was just fixed for, and leaving no correct way to release would invite the
+  /// same bug back.
+  function release() {
+    destroy();
+    if (renderer) { renderer.forceContextLoss(); renderer.dispose(); renderer = null; }
+  }
+
+  return { showCard, destroy, release };
 })();

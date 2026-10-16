@@ -28,16 +28,16 @@ const CardTextures = (() => {
     rarityY:          298,
     rarityFontSize:   12,
 
-    // ── Stats (HP left, ATK right of the symbol) ────────────────────────────
-    // Same vertical band as the artwork. Each stat is its own rarity-coloured
-    // rectangle, hugging the left / right of the symbol rather than sitting
-    // under the title.
+    // ── Stats (HP bottom-left, ATK bottom-right) ────────────────────────────
+    // Each stat is its own rarity-coloured rectangle, pinned to the lower
+    // corners now that the rarity label and rules text are gone.
+    statCenterY:      344,   // vertical centre of the stat row
     statInset:        18,    // distance from each card edge
     statGap:          5,     // space between icon and number inside a box
     statBoxPadX:      6,     // inner padding of each rectangle
     statBoxPadY:      4,
     statScale:        2,     // pixel-sprite scale (1 sprite-px → 2 canvas-px)
-    statFontSize:     20,    // slightly smaller so the boxes fit beside the art
+    statFontSize:     30,    // pf-pixelscript runs small, so larger than a mono face
     statBoxBorder:    2,     // rectangle stroke — matches the title box
 
     // Rules text (footer, under rarity)
@@ -72,8 +72,8 @@ const CardTextures = (() => {
     // text has to say the split, because a player reading 12 next to a card that
     // deals 4 a hit will think it is broken.
     flowerbush: { hp: 9,  atk: 12, rule: 'Plant. Chains to 3 foes, 4 each.' },
-    inframend:  { hp: 9,  atk: 0,  rule: 'Plant. Mends 3 friendly, 4 each.' },
-    bugfix:     { hp: 6,  atk: 2,  rule: 'Drive it. One nova: heal 6, sting 2.' },
+    inframend:  { hp: 9,  atk: 0,  heal: 4, rule: 'Plant. Mends 3 friendly, 4 each.' },
+    bugfix:     { hp: 6,  atk: 2,  heal: 6, rule: 'Drive it. One nova: heal 6, sting 2.' },
     leafstorm:  { hp: 0,  atk: 8,  rule: 'Trace a path. Hits all enemies.' },
     fungi:      { hp: 12, atk: 3,  rule: 'Plant, then draw a spore path.' },
     blueangel:  { hp: 20, atk: 2,  rule: 'Bait. Drains from range.' },
@@ -82,7 +82,8 @@ const CardTextures = (() => {
     // instead of painting spores. hp is the SHIELD's pool — see PuffShield.cs.
     puffball:   { hp: 40, atk: 3,  rule: 'Plant. Raises a shield that holds foes out.' },
     chomptrap:  { hp: 9,  atk: 5, rule: 'Lures foes in. Then SNAP.' },
-    lunarshroom:{ hp: 12, atk: 0, rule: 'Heals everything near it, tree included.' },
+    // ⚠ heal is a guess — confirm against the Unity aura value before trusting it.
+    lunarshroom:{ hp: 12, atk: 0, heal: 4, rule: 'Heals everything near it, tree included.' },
     frostcap:   { hp: 12, atk: 7, rule: 'Freezes, then slows. Shatters.' },
     lavacap:    { hp: 12, atk: 6, rule: 'Drips, burns, scorches. Bursts.' },
     frostbloom: { hp: 9,  atk: 1, rule: 'Plant. Frost orb chills what it hits.' },
@@ -94,6 +95,29 @@ const CardTextures = (() => {
                   rule: '3 shells. Long range only.' },
     solargrip:  { hp: 9,  atk: 0,
                   rule: 'Plant. Drags one foe in. HOLO: all of them.' },
+    // atk is the BOSS figure — LazerPigController.beamDamage (4) × the ×6
+    // multiplier the beam applies to FleshBoss. Everything else down the beam
+    // takes the flat 4, same as flowerbush's 12 being its boss number.
+    lazerpig:   { hp: 12, atk: 24,
+                  rule: 'Deploys a turret. One beam, straight through.' },
+    // Critter HP is NatureHealth.CritterHP. ATK is per use, not per possession —
+    // the RAM carries two missiles and the number is what one of them lands.
+    ram:        { hp: 12, atk: 10,
+                  rule: '2 missiles. Locks on from range.' },
+    ddduck:     { hp: 12, atk: 6,
+                  rule: 'Arm it, walk it in, let it go off.' },
+    cownado:    { hp: 12, atk: 5,
+                  rule: 'Steer it. Lifts what it catches, drops it hard.' },
+    // The only critter with a health pool of its own (BombshellTurret.maxHealth)
+    // rather than the shared CritterHP — it is dug in, and surviving IS the card.
+    bshelley:   { hp: 45, atk: 3,
+                  rule: 'Dug in. Shells from range, shielded at the front.' },
+    cosmeow:    { hp: 12, atk: 5,
+                  rule: 'Rides a cloud. Mind the rainbow.' },
+    // ⚠ heal is a guess. Without its own entry this inherited the generic fungi
+    // line (12/3) and showed a sword on a card that never attacks.
+    mycelia:    { hp: 12, atk: 0, heal: 6,
+                  rule: 'Links every mushroom. Mends the whole board.' },
   };
 
   /// Stats for a card, or null when it has none (critters, horror cards, the
@@ -109,6 +133,13 @@ const CardTextures = (() => {
     if (card.name === 'INFRAMEND')   return CARD_STATS.inframend;
     if (card.name === 'BUGFIX')      return CARD_STATS.bugfix;
     if (card.name === 'SOLARGRIP')   return CARD_STATS.solargrip;
+    if (card.name === 'MYCELIATHREAD') return CARD_STATS.mycelia;
+    if (card.name === 'LAZERPIG')    return CARD_STATS.lazerpig;
+    if (card.name === 'RAM')         return CARD_STATS.ram;
+    if (card.name === 'DD.DUCK')     return CARD_STATS.ddduck;
+    if (card.name === 'COWNADO')     return CARD_STATS.cownado;
+    if (card.name === 'B.SHELLEY')   return CARD_STATS.bshelley;
+    if (card.name === 'COSMEOW')     return CARD_STATS.cosmeow;
     if (card.name === 'SPORETILLERY') return CARD_STATS.tillery;
     if (card.name === 'FROSTBLOOM')  return CARD_STATS.frostbloom;
     if (card.name === 'VENOMBLOOM')  return CARD_STATS.venombloom;
@@ -3985,6 +4016,22 @@ const CardTextures = (() => {
     '.o###o.',
   ];
 
+  // Outlined cross. Same build as the heart and sword so the three read as one
+  // set, and unmistakable at 22×22 px (11×11 sprite × scale 2).
+  const HEAL_PX = [
+    '....ooo....',
+    '...o###o...',
+    '...o###o...',
+    '.ooo###ooo.',
+    'o#########o',
+    'o#########o',
+    'o#########o',
+    '.ooo###ooo.',
+    '...o###o...',
+    '...o###o...',
+    '....ooo....',
+  ];
+
   function blitPixels(ctx, ox, oy, scale, rows, palette) {
     const prev = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
@@ -4007,21 +4054,41 @@ const CardTextures = (() => {
   }
 
   function drawStatNumber(ctx, value, x, y) {
-    ctx.font         = `bold ${LAYOUT.statFontSize}px "Share Tech Mono", monospace`;
+    const text = String(value);
+    ctx.save();
+    ctx.font         = `${LAYOUT.statFontSize}px "pf-pixelscript", cursive`;
     ctx.textAlign    = 'left';
     ctx.textBaseline = 'middle';
-    ctx.lineWidth    = 4;
-    ctx.strokeStyle  = 'rgba(0,0,0,0.92)';
-    ctx.strokeText(String(value), x, y);
-    ctx.fillStyle    = '#ffffff';
-    ctx.fillText(String(value), x, y);
+
+    // Backlight first: a soft gold pool behind the glyph, painted as a blurred
+    // copy of the number itself rather than a rectangle. A box would read as
+    // the plate that was just taken off these corners; a halo keeps the shape.
+    ctx.shadowColor = 'rgba(255,200,90,0.95)';
+    ctx.fillStyle   = '#ffd96b';
+    for (const blur of [18, 10, 5]) {
+      ctx.shadowBlur = blur;
+      ctx.fillText(text, x, y);
+    }
+    ctx.shadowBlur  = 0;
+    ctx.shadowColor = 'transparent';
+
+    // Dark outline over the glow, so the digits stay sharp against whatever
+    // artwork is behind them and the halo never eats their edges.
+    ctx.lineWidth   = 4;
+    ctx.lineJoin    = 'round';
+    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+    ctx.strokeText(text, x, y);
+
+    ctx.fillStyle = '#ffe9a8';   // a touch lighter than the halo, so it reads lit
+    ctx.fillText(text, x, y);
+    ctx.restore();
     ctx.textBaseline = 'alphabetic';
   }
 
-  /// HP on the left of the symbol, ATK on the right, vertically centred with
-  /// the art. Number sits next to its icon so a two-digit value (Blue Angel's
-  /// 20) never has to live inside the sprite.
-  function drawCardStats(ctx, stats, borderColor) {
+  /// HP bottom-left, ATK bottom-right — or a heal cross in the right corner on
+  /// cards that mend rather than hit. Number sits next to its icon so a
+  /// two-digit value (Blue Angel's 20) never has to live inside the sprite.
+  function drawCardStats(ctx, stats) {
     if (!stats) return;
 
     const s    = LAYOUT.statScale;
@@ -4030,21 +4097,16 @@ const CardTextures = (() => {
     const padY = LAYOUT.statBoxPadY;
     const heart = spriteSize(HEART_PX, s);
     const sword = spriteSize(SWORD_PX, s);
+    const cross = spriteSize(HEAL_PX, s);
     const boxH  = Math.max(heart.h, sword.h) + padY * 2;
-    const y     = LAYOUT.symbolCenterY - boxH / 2;
-    const stroke = borderColor || '#8bc28b';
+    const y     = LAYOUT.statCenterY - boxH / 2;
 
     ctx.save();
-    ctx.font = `bold ${LAYOUT.statFontSize}px "Share Tech Mono", monospace`;
+    // Must match drawStatNumber's font — this one only measures.
+    ctx.font = `${LAYOUT.statFontSize}px "pf-pixelscript", cursive`;
 
     const paint = (x, value, icon, iconW, iconH, palette) => {
       const w = iconW + gap + ctx.measureText(String(value)).width + padX * 2;
-      ctx.fillStyle = 'rgba(10,16,10,0.88)';
-      ctx.fillRect(x, y, w, boxH);
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth   = LAYOUT.statBoxBorder;
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, boxH - 1);
-
       const iconX = x + padX;
       const iconY = y + (boxH - iconH) / 2;
       blitPixels(ctx, iconX, iconY, s, icon, palette);
@@ -4059,12 +4121,28 @@ const CardTextures = (() => {
       });
     }
 
-    const atkW = sword.w + gap + ctx.measureText(String(stats.atk)).width + padX * 2;
-    paint(256 - LAYOUT.statInset - atkW, stats.atk, SWORD_PX, sword.w, sword.h, {
-      '#': '#f0e6c8',
-      'H': '#c07038',
-      'o': '#1a1208',
+    // The right side says what the card DOES — a cross where it mends, a sword
+    // where it hits, and both where it does both (Bugfix). Cards that do
+    // neither (Solargrip drags, it doesn't fight) show nothing rather than a 0.
+    const right = [];
+    if (stats.heal > 0) right.push({
+      value: stats.heal, icon: HEAL_PX, size: cross,
+      palette: { '#': '#7fdc8a', 'o': '#06200c' },
     });
+    if (stats.atk > 0) right.push({
+      value: stats.atk, icon: SWORD_PX, size: sword,
+      palette: { '#': '#f0e6c8', 'H': '#c07038', 'o': '#1a1208' },
+    });
+
+    // Laid out right to left so the sword always owns the corner, whether or
+    // not a heal sits beside it.
+    let edge = 256 - LAYOUT.statInset;
+    for (let i = right.length - 1; i >= 0; i--) {
+      const r = right[i];
+      const w = r.size.w + gap + ctx.measureText(String(r.value)).width + padX * 2;
+      paint(edge - w, r.value, r.icon, r.size.w, r.size.h, r.palette);
+      edge -= w;
+    }
 
     ctx.restore();
     ctx.textAlign = 'center';
@@ -4076,17 +4154,10 @@ const CardTextures = (() => {
     // opts.labelColor overrides the rarity-derived colour. Used by cards whose
     // frame doesn't match their rarity tier (e.g. corrupted Fleshlings, which are
     // rarity 'common' but wear the grey flesh frame instead of the green one).
-    let nameColor, rarityColor;
-    if (opts.labelColor) {
-      nameColor   = opts.labelColor;
-      rarityColor = `rgba(${hexToRgb(opts.labelColor)},0.7)`;
-    } else if (rarity === 'legendary-alpha') {
-      nameColor   = rainbow(t, 30);
-      rarityColor = rainbow(t, 90);
-    } else {
-      nameColor   = cfg.border;
-      rarityColor = `rgba(${hexToRgb(cfg.border)},0.7)`;
-    }
+    let nameColor;
+    if (opts.labelColor)                 nameColor = opts.labelColor;
+    else if (rarity === 'legendary-alpha') nameColor = rainbow(t, 30);
+    else                                   nameColor = cfg.border;
 
     // ── TITLE BOX (top of card, beveled pixel border — MTG style) ────────────
     // Tweak position/size via LAYOUT.titleBox at the top of this file.
@@ -4140,61 +4211,14 @@ const CardTextures = (() => {
     ctx.shadowBlur = 0;
     ctx.textBaseline = 'alphabetic';
 
-    // ── RARITY label (below the symbol) ─────────────────────────────────────
-    ctx.font = `${LAYOUT.rarityFontSize}px "Share Tech Mono", monospace`;
-    ctx.fillStyle = rarityColor;
-    ctx.fillText(rarity.toUpperCase(), 128, LAYOUT.rarityY);
-
     const stats = cardStats(card);
 
     // Footer (stats + rules) is skipped on compact renders such as the
     // collection grid — none of it is legible at that size.
     if (!opts.hideFlavor) {
 
-    // ── STATS — HP left of the symbol, ATK right, same row as the art
-    drawCardStats(ctx, stats, nameColor);
-
-    // ── DESCRIPTION — just the text. No plate, no border. The old boxed panel
-    // was fighting the icons for the same strip of the card.
-    const descSize = LAYOUT.descFontSize;
-    const lh       = LAYOUT.descLineHeight;
-    ctx.font = `${descSize}px "Share Tech Mono", monospace`;
-
-    // Rules text where the card has any, flavour where it doesn't.
-    //
-    // A card that now does measurable damage should say what it does. The
-    // flavour line stays on cards with no mechanics of their own (critters,
-    // horror pulls, the direct-spawn tiers), where atmosphere is all there is
-    // to communicate.
-    const bodyText = (stats && stats.rule) ? stats.rule : card.desc;
-
-    const words = (bodyText || '').split(' ');
-    const lines = [];
-    let line = '';
-    words.forEach(w => {
-      const test = line ? line + ' ' + w : w;
-      if (ctx.measureText(test).width > LAYOUT.descMaxWidth && line) {
-        lines.push(line); line = w;
-      } else { line = test; }
-    });
-    if (line) lines.push(line);
-
-    if (lines.length > LAYOUT.descMaxLines) {
-      lines.length = LAYOUT.descMaxLines;
-      lines[LAYOUT.descMaxLines - 1] =
-        lines[LAYOUT.descMaxLines - 1].replace(/\s*\S*$/, '…');
-      console.warn('[cardTextures] Description too long for', card.name,
-                   '— truncated. Keep rules under ~66 characters.');
-    }
-
-    ctx.font        = `${descSize}px "Share Tech Mono", monospace`;
-    ctx.fillStyle   = 'rgba(242,238,226,0.97)';
-    ctx.textAlign   = 'center';
-    ctx.shadowColor = 'rgba(0,0,0,0.85)';
-    ctx.shadowBlur  = 2;
-    let lineY = LAYOUT.descStartY;
-    lines.forEach(l => { ctx.fillText(l, 128, lineY); lineY += lh; });
-    ctx.shadowBlur = 0;
+    // ── STATS — HP bottom-left, ATK bottom-right
+    drawCardStats(ctx, stats);
 
     } // end hideFlavor skip
   }

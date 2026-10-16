@@ -85,7 +85,33 @@ const Spec = (() => {
   // and a slow one — at gallery pace a player might place a dozen things all
   // session, so this is a real commitment rather than a formality. Worth
   // re-tuning against real placement counts once you have them.
-  const THRESHOLD = 7;
+  // Five, not seven.
+  //
+  // Seven was tuned when crossing it only changed pack weighting, which is a
+  // nearly invisible payoff — most tiers hold one card, so a specialised pack
+  // looks much like an unspecialised one. Now that it unlocks a BODY on the
+  // field, the threshold has to be reachable at gallery pace, where a player
+  // may only place eight or ten things in total.
+  //
+  // It is also exactly one tally group, which is why the tick marks can cross
+  // the way a real tally does.
+  const THRESHOLD = 5;
+
+  // Per-role overrides, because the roles are not equally easy to fill.
+  //
+  // DAMAGE is the cheap one. Far more cards read as damage than as tank or
+  // heal, so a player doing nothing in particular drifts into it — and a role
+  // you fall into by accident is not a commitment, which is the only thing this
+  // system is actually trying to measure. Eight makes it cost about as much
+  // intent as the other two do at five, rather than arriving unbidden.
+  //
+  // This is a CARD-POOL correction, not a balance one. If the pools ever even
+  // out, this should go back to five rather than the number being tuned further.
+  const ROLE_THRESHOLD = {
+    damage: 8,
+  };
+
+  function need(role) { return ROLE_THRESHOLD[role] || THRESHOLD; }
 
   // How much likelier an on-role card is once specialised.
   //
@@ -102,6 +128,9 @@ const Spec = (() => {
   const ON_ROLE_TIER_WEIGHT = 1.45;
 
   const _counts = { tank: 0, medic: 0, damage: 0, saboteur: 0 };
+  // A second stream the player has since filled and may switch to. Null until
+  // one completes behind the one they already hold.
+  let   _offer  = null;
   let   _spec   = null;   // one of the four streams, once a threshold is crossed
 
   function cardRole(card) {
@@ -110,16 +139,38 @@ const Spec = (() => {
   }
 
   function current()    { return _spec; }
+  /// A role they have ALSO completed and could move to, or null.
+  function offer()      { return _offer; }
+
+  /// Take the offered stream. Their counts are untouched — they earned both,
+  /// and a player who switches back and forth has genuinely played both ways.
+  function commit() {
+    if (!_offer) return;
+    _spec  = _offer;
+    _offer = null;
+    _announce(_spec);
+    _paint();
+    try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); } catch (e) {}
+  }
   function isSaboteur() { return _spec === 'saboteur'; }
   function counts()  { return { ..._counts }; }
-  function threshold() { return THRESHOLD; }
+  /// The threshold for a given role — or for the leading one when not told,
+  /// which is what the tally drawing wants.
+  function threshold(role) {
+    if (role) return need(role);
+    let best = null, n = 0;
+    for (const k in _counts) if (_counts[k] > n) { n = _counts[k]; best = k; }
+    return need(best || _spec);
+  }
 
   /// How far along the player is toward their leading role, 0..1. Drives the
   /// low-key visual tell without needing a number on screen.
   function progress() {
-    let best = 0;
-    for (const k in _counts) if (_counts[k] > best) best = _counts[k];
-    return Math.min(1, best / THRESHOLD);
+    // Measured against the leading ROLE's own threshold, not a shared one —
+    // otherwise a damage player at 5 of 8 would show as finished.
+    let best = 0, lead = null;
+    for (const k in _counts) if (_counts[k] > best) { best = _counts[k]; lead = k; }
+    return Math.min(1, best / need(lead));
   }
 
   // ── Recording ──────────────────────────────────────────────────────────────
@@ -137,15 +188,31 @@ const Spec = (() => {
 
     _counts[role]++;
 
-    // First past the post claims the player. A stream is not re-evaluated once
-    // it is set — a medic who later dabbles is still a medic, and the whole
-    // point of the threshold is that it recognises a commitment rather than
-    // tracking a running total.
-    if (!_spec && _counts[role] >= THRESHOLD) {
+    // Counting NEVER stops.
+    //
+    // It used to freeze the moment a stream was claimed, on the reasoning that
+    // first-past-the-post recognises a commitment. That was right when the only
+    // prize was pack weighting and wrong now that it is a body: a player who has
+    // earned BULLWARK keeps placing for the rest of the session, and freezing
+    // their counters meant every one of those cards was worth nothing. It also
+    // left them stuck in a role they might have finished with.
+    //
+    // So a second stream can still fill up behind the first. Reaching the
+    // threshold OFFERS that role rather than taking it — switching out from
+    // under someone mid-turn would be the game making the decision.
+    if (!_spec && _counts[role] >= need(role)) {
       _spec = role;
       _announce(role);
+    } else if (_spec && role !== _spec && _counts[role] >= need(role)) {
+      if (_offer !== role) { _offer = role; _announce(role); }
     }
     _paint();
+
+    // Let the rest of the app react without spec.js needing to know what a
+    // nametag or an avatar button is. Guarded, because a throwing listener
+    // must not take a placement down with it.
+    try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); }
+    catch (e) { console.warn('[spec] listener failed', e); }
   }
 
   // ── Seeding ────────────────────────────────────────────────────────────────
@@ -209,6 +276,62 @@ const Spec = (() => {
     setTimeout(() => b.classList.remove('spec-just-tripped'), 2600);
   }
 
+  // ── Debug ──────────────────────────────────────────────────────────────────
+
+  /// Fill a role's tally straight to the threshold.
+  ///
+  /// Goes through the same trip-and-announce path a real run of placements
+  /// does, rather than just assigning _spec — otherwise the sound, the body
+  /// class and the onSpecChanged listeners never fire, and the thing under test
+  /// is reached by a route no player can take.
+  ///
+  /// Refuses once a stream is claimed, for the same reason record() does: first
+  /// past the post is the rule, and a debug key that quietly rewrote it would
+  /// hide the one behaviour most worth checking.
+  function debugFill(role) {
+    role = role || 'tank';
+    if (!(role in _counts)) { console.warn('[spec] no such role', role); return; }
+    if (_spec) { console.warn('[spec] already specialised as', _spec); return; }
+
+    const want = need(role) - _counts[role];
+    for (let i = 0; i < want; i++) {
+      _counts[role]++;
+      if (!_spec && _counts[role] >= need(role)) { _spec = role; _announce(role); }
+    }
+    _paint();
+    try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); } catch (e) {}
+    console.log('[spec] debug-filled', role, _counts);
+  }
+
+  /// Hand the role back to the room.
+  ///
+  /// Called when an avatar spends its last charge. Clears the counts as well as
+  /// the stream, so the player starts the climb again rather than re-unlocking
+  /// the body on their next single placement — the threshold is what makes
+  /// holding the role mean something, and a reset that skipped it would make
+  /// the charge limit cosmetic.
+  ///
+  /// Their packs go back to unweighted at the same time, which is correct: they
+  /// are not a tank again until they have played like one again.
+  function release() {
+    for (const k in _counts) _counts[k] = 0;
+    _spec  = null;
+    _offer = null;
+    _paint();
+    try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); } catch (e) {}
+  }
+
+  /// Back to nothing, so the trip can be watched more than once per reload.
+  function debugReset() {
+    for (const k in _counts) _counts[k] = 0;
+    _spec  = null;
+    _offer = null;
+    _paint();
+    try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); } catch (e) {}
+    console.log('[spec] reset');
+  }
+
   return { record, current, isSaboteur, counts, progress, threshold,
-           cardRole, weight, tierWeight };
+           cardRole, weight, tierWeight, offer, commit, release,
+           debugFill, debugReset };
 })();

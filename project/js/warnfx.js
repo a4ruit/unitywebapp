@@ -1,5 +1,6 @@
 // warnfx.js — hazard plates that hang off a card's top-right corner.
 //   LAZERPIG      → laser radiation
+//   GLITCHLING    → flammable, in red and white
 //   ULTRAVIOLET → high voltage
 //   Puffball       → shield in a blue sign disc (defensive)
 //   SOLARGRIP      → the same shield: it holds rather than hits
@@ -16,7 +17,7 @@
 //
 //   WarnFX.start([{getRect, kind}, ...])   several plates at once
 //   WarnFX.start(getRect, kind)             one, the original form
-//       kind: 'laser' | 'voltage' | 'shield' | 'medic'
+//       kind: 'laser' | 'voltage' | 'shield' | 'medic' | 'fire'
 //       getRect() -> {left,top,width,height,locked} or null
 //   WarnFX.stop()
 //
@@ -141,7 +142,35 @@ const WarnFX = (() => {
     '.......KKKKK.......',
   ];
 
-  const PAL = { K: '#120c04', Y: '#f2c21a', B: '#1f5fa6', W: '#f4f6fa' };
+  // GHS02, flammable. The only DIAMOND plate and the only one outside the
+  // deck's yellow and blue — the others describe what a card does for you, this
+  // one marks a threat, so it borrows the shape and palette that already means
+  // exactly that everywhere else. 19x19 like the rest, so the pixel density
+  // matches when it sits beside the laser sign.
+  ART.fire = [
+    'WWWWWWWWWRWWWWWWWWW',
+    'WWWWWWWWRRRWWWWWWWW',
+    'WWWWWWWRRRRRWWWWWWW',
+    'WWWWWWRRRWRRRWWWWWW',
+    'WWWWWRRRWKWRRRWWWWW',
+    'WWWWRRRWKKKWRRRWWWW',
+    'WWWRRRWWKKKKWRRRWWW',
+    'WWRRRWWKKKKKWWRRRWW',
+    'WRRRWWKKKKKKKWWRRRW',
+    'RRRWWWKKKKKKKWWWRRR',
+    'WRRRWWWKKKKKWWWRRRW',
+    'WWRRRWWWKKKWWWRRRWW',
+    'WWWRRRWKKKKKWRRRWWW',
+    'WWWWRRRWWWWWRRRWWWW',
+    'WWWWWRRRWWWRRRWWWWW',
+    'WWWWWWRRRWRRRWWWWWW',
+    'WWWWWWWRRRRRWWWWWWW',
+    'WWWWWWWWRRRWWWWWWWW',
+    'WWWWWWWWWRWWWWWWWWW',
+  ];
+
+  const PAL = { K: '#120c04', Y: '#f2c21a', B: '#1f5fa6', W: '#f4f6fa',
+                R: '#d8211c' };
 
   // Hand-drawn plates override the procedural art once they have loaded.
   const IMG = {};
