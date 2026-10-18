@@ -405,7 +405,19 @@ const Avatar = (() => {
       cd.className = 'avatar-spell-cd';
       btn.appendChild(cd);
 
-      btn.onclick = () => _ability(spell.id);
+      // Fired on the TOUCH, not on a click. A click is only delivered once the
+      // browser has decided the gesture was a tap, and while the other thumb is
+      // working the stick — which preventDefaults every touchmove — that
+      // decision never arrives: abilities simply did not fire while moving.
+      // preventDefault on touchstart also suppresses the synthetic mousedown,
+      // so the two paths cannot both spend a charge.
+      const fire = (e) => {
+        e.preventDefault();
+        if (btn.disabled) return;
+        _ability(spell.id);
+      };
+      btn.addEventListener('touchstart', fire, { passive: false });
+      btn.addEventListener('mousedown',  fire);
       _ui.spells.appendChild(btn);
     });
   }
@@ -993,5 +1005,6 @@ const Avatar = (() => {
 
   document.addEventListener('DOMContentLoaded', _build);
 
-  return { refresh, handle, enter, exit, available, isOut: () => _out };
+  return { refresh, handle, enter, exit, available, isOut: () => _out,
+           openSwap: _openSwap };
 })();

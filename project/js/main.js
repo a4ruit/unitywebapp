@@ -1078,6 +1078,11 @@ function _paintNametagRole() {
   host.innerHTML = '';
   host.appendChild(Roles.canvas(playerRole, 2, playerColor || '#cfeefb'));
   _paintSpecTally(host);
+  // The symbol is the role, so it is also the way to change it — the cards are
+  // the other way in, and they only exist once something has been earned.
+  host.style.cursor = 'pointer';
+  host.title = 'change role';
+  host.onclick = () => { try { Avatar.openSwap(); } catch (e) {} };
   // Revealed with the tag itself, not before: on the username screen the picker
   // is already showing the symbol.
   if (playerName) host.style.display = 'block';

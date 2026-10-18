@@ -4993,6 +4993,8 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
   width: var(--sq); height: var(--sq);
   flex: 0 0 auto;
   padding: 0;
+  /* The other thumb is on the stick; this one must not be read as a scroll. */
+  touch-action: none;
   display: grid;
   place-items: center;
   background: linear-gradient(160deg, #16303f 0%, #0b1a24 100%);
