@@ -4436,7 +4436,10 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
      page and leave no evidence. */
   pointer-events: none !important;
 }
-.avatar-hand-dim.is-on { opacity: 1; }
+/* Resting scrim, held for as long as the cards are up. */
+.avatar-hand-dim.is-on { opacity: 0.8; }
+/* The deal itself, for a second. */
+.avatar-hand-dim.is-deep { opacity: 1; }
 
 /* The cards arrive from below the screen edge, fanning out as they rise —
    dealt, rather than appearing. Staggered per card by --deal, with the earned
@@ -4470,8 +4473,131 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
   width: 300px;
   height: 196px;
   pointer-events: none;
+  /* How far down the hand slides when tucked. Enough that the top edge of the
+     cards still clears the screen bottom — the peek IS the affordance, so it
+     has to be a visible slice of card rather than a sliver. */
+  --tuck: 226px;
+  /* Tucking shrinks as well as drops, so the peek sits clear of the category
+     row underneath it rather than covering two of the three buttons. */
+  transform-origin: 50% 100%;
+  transition: transform 0.34s cubic-bezier(0.2, 0.9, 0.25, 1);
 }
 .avatar-hand[hidden] { display: none; }
+
+/* ── Role swapper ─────────────────────────────────────────────────────────
+   Over everything, including the driving overlay, because it is reachable
+   from the hand and the hand sits above the carousel. */
+.avatar-swap {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(2px);
+}
+.avatar-swap[hidden] { display: none; }
+
+.avatar-swap-sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 22px 16px;
+  background: #061018;
+  border: 1px solid var(--pc, #8fd4f5);
+  box-shadow: 0 0 24px rgba(0, 0, 0, 0.8), 0 0 18px -6px var(--pc, #8fd4f5);
+}
+.avatar-swap-label {
+  font-family: 'lo-res', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: var(--pc, #8fd4f5);
+  text-transform: lowercase;
+}
+.avatar-swap-picks { display: flex; gap: 8px; }
+.avatar-swap-note {
+  font-family: 'lo-res', sans-serif;
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  color: var(--pc, #8fd4f5);
+  opacity: 0.55;
+  text-transform: uppercase;
+}
+.avatar-swap-close {
+  position: absolute;
+  top: 4px; right: 6px;
+  width: 24px; height: 24px;
+  background: none;
+  border: none;
+  color: var(--pc, #8fd4f5);
+  font-size: 19px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* Tucked: pushed down to a peek. Not hidden — a hand that vanishes is a
+   feature nobody finds again, and the whole reason the cards exist is to say
+   the other streams are there. */
+.avatar-hand.is-tucked {
+  transform: translateX(-50%) translateY(var(--tuck)) scale(0.56);
+}
+/* Dragging: the transition is off so the hand tracks the finger exactly, and
+   --drag carries the live offset. */
+.avatar-hand.is-dragging {
+  transition: none;
+  transform: translateX(-50%) translateY(var(--drag, 0px));
+}
+
+/* The grip. Sits above the fan and is the one part of the hand that is always
+   tappable, including while tucked, where the cards themselves are mostly off
+   the bottom of the screen. */
+.avatar-hand-grip {
+  position: absolute;
+  left: 50%;
+  /* Clear of the card tops — down at the fan's edge it was lost in the art
+     behind it. */
+  top: -62px;
+  transform: translateX(-50%);
+  width: 64px;
+  height: 32px;
+  /* Above the cards. The grip is the first child, so without this the fan
+     paints straight over it. */
+  z-index: 5;
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  display: grid;
+  place-items: center;
+}
+/* A chevron, in the colour of the card it belongs to, pointing the way the
+   hand will travel. */
+.avatar-hand-grip::before {
+  content: '';
+  width: 13px; height: 13px;
+  margin-top: -3px;   /* the rotated square's own bulk sits low */
+  border-right:  3px solid var(--av-edge, #7ec8fa);
+  border-bottom: 3px solid var(--av-edge, #7ec8fa);
+  transform: rotate(45deg);
+  /* Its own dark halo, now that nothing sits behind it. */
+  filter: drop-shadow(0 0 5px rgba(0, 0, 0, 0.95))
+          drop-shadow(0 0 7px rgba(var(--av-glow, 120,200,250), 0.7));
+}
+.avatar-hand.is-tucked .avatar-hand-grip::before {
+  margin-top: 3px;
+  transform: rotate(-135deg);
+}
+/* Tucked, the whole hand is scaled down — the grip scales back up, because it
+   is the only way out of that state and has to stay a thumb-sized target. */
+.avatar-hand.is-tucked .avatar-hand-grip {
+  transform: translateX(-50%) scale(1.8);
+  animation: avatarGripHint 2.2s ease-in-out infinite;
+}
+@keyframes avatarGripHint {
+  0%, 100% { transform: translateX(-50%) scale(1.8) translateY(0); }
+  50%      { transform: translateX(-50%) scale(1.8) translateY(-4px); }
+}
 
 .avatar-hand-card {
   /* Overrides the lone-button geometry the same rule still carries. */
@@ -4717,30 +4843,31 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
   width: 94%;
   height: 94%;
   pointer-events: none;
-  /* The dash offsets are measured from 3 o'clock; this starts the first
-     segment at the top, where a count is read from. */
-  transform: rotate(-90deg);
   overflow: visible;
+  /* The glow belongs to the RING, not to each cell. Per-rect drop-shadows put
+     a halo around every square, which draws the grid back in and makes
+     neighbouring cells read as separate tiles instead of one shape. */
+  filter: drop-shadow(0 0 5px rgba(var(--av-glow), 0.8));
 }
-.avatar-ring circle {
-  fill: none;
-  stroke: var(--av-edge, #76c4e8);
-  stroke-width: 5;
-  stroke-linecap: round;
-  filter: drop-shadow(0 0 5px rgba(var(--av-glow), 0.85));
-  transition: stroke 0.25s ease, opacity 0.25s ease;
+/* Cells, not strokes — the ring is rasterised onto a grid in _paintCharges so
+   it stair-steps the way a circle drawn out of squares does. crispEdges keeps
+   the browser from softening the one thing the whole approach is for. */
+.avatar-ring rect {
+  fill: var(--av-edge, #76c4e8);
+  shape-rendering: crispEdges;
+  transition: fill 0.25s ease, opacity 0.25s ease;
 }
-/* Spent arcs stay in place, dimmed. A ring that loses segments changes shape
+/* Spent cells stay in place, dimmed. A ring that loses segments changes shape
    as it empties, which leaves nothing to read the remainder against. */
-.avatar-ring circle.is-spent {
-  stroke: rgba(255,255,255,0.13);
+.avatar-ring rect.is-spent {
+  fill: rgba(255,255,255,0.13);
   filter: none;
 }
 /* Last charge goes amber and breathes — running out ends the turn and resets
    the tally, which is worth knowing before it happens. */
-.avatar-ring.is-last circle:not(.is-spent) {
-  stroke: #ffb45a;
-  filter: drop-shadow(0 0 10px rgba(255,180,90,0.95));
+.avatar-ring.is-last rect:not(.is-spent) {
+  fill: #ffb45a;
+  filter: drop-shadow(0 0 8px rgba(255,180,90,0.95));
   animation: avatarRingLast 0.9s ease-in-out infinite;
 }
 @keyframes avatarRingLast { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }

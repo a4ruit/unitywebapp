@@ -28,6 +28,7 @@ const Avatar = (() => {
   let _slotUsed = 0, _slotCap = 1;   // room-wide occupancy, broadcast by Unity
   let _role = null;           // which stream's body is currently held
   let _dealt = false;         // the reveal has played; it only ever plays once
+  let _tucked = false;        // the hand is pushed down to a peek
   let _x = 0, _y = 0;
   let _lastX = 0, _lastY = 0, _lastSend = 0;
 
@@ -138,7 +139,24 @@ const Avatar = (() => {
       <!-- The hand. Three cards, always all three, with the earned one dealt
            to the centre - see the dealing order note in refresh(). -->
       <div id="avatar-hand-dim" class="avatar-hand-dim"></div>
-      <div id="avatar-hand" class="avatar-hand" hidden></div>
+      <div id="avatar-hand" class="avatar-hand" hidden>
+        <div id="avatar-hand-grip" class="avatar-hand-grip"
+             role="button" aria-label="Show or hide your cards"></div>
+      </div>
+
+      <!-- Role swapper. Opened by tapping a card you have NOT earned, which is
+           the only gesture those cards ever had available — they were inert
+           and still showed a whole other stream, which reads as a thing you
+           ought to be able to touch. -->
+      <div id="avatar-swap" class="avatar-swap" hidden>
+        <div class="avatar-swap-sheet" role="dialog" aria-label="Change role">
+          <button id="avatar-swap-close" class="avatar-swap-close"
+                  aria-label="Close">&times;</button>
+          <span class="avatar-swap-label">role:</span>
+          <div id="avatar-swap-picks" class="avatar-swap-picks"></div>
+          <span class="avatar-swap-note"></span>
+        </div>
+      </div>
       <div id="avatar-pad" class="avatar-pad" hidden>
         <div class="avatar-scrim"></div>
 
@@ -191,6 +209,11 @@ const Avatar = (() => {
     _ui = {
       root,
       hand:  root.querySelector('#avatar-hand'),
+      grip:  root.querySelector('#avatar-hand-grip'),
+      swap:      root.querySelector('#avatar-swap'),
+      swapPicks: root.querySelector('#avatar-swap-picks'),
+      swapClose: root.querySelector('#avatar-swap-close'),
+      swapNote:  root.querySelector('.avatar-swap-note'),
       dim:   root.querySelector('#avatar-hand-dim'),
       pad:   root.querySelector('#avatar-pad'),
       stick: root.querySelector('#avatar-stick'),
@@ -205,6 +228,20 @@ const Avatar = (() => {
     _ui.exit.onclick = exit;
 
     _wireStick();
+    _wireTuck();
+
+    // Three ways out, because a modal with one is a modal somebody gets stuck
+    // in: the X, the backdrop, and Escape.
+    if (_ui.swapClose) _ui.swapClose.onclick = _closeSwap;
+    if (_ui.swap) {
+      _ui.swap.addEventListener('click', (e) => {
+        if (e.target === _ui.swap) _closeSwap();
+      });
+    }
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && _ui.swap && !_ui.swap.hidden) _closeSwap();
+    });
+
     refresh();
   }
 
@@ -379,32 +416,202 @@ const Avatar = (() => {
   /// "two left" without reading, the same way the tally works. Spent ones stay
   /// in place rather than disappearing, so the row does not shrink and move
   /// under a thumb that is already travelling toward a button.
+  // ── Tucking the hand ──────────────────────────────────────────────────────
+  //
+  // The hand sits over the pack carousel, and once a player has their card it
+  // is mostly in the way — especially while somebody else holds the body, when
+  // none of it can be used. Dragging it down leaves a peek, which is enough to
+  // remember it is there without it covering anything.
+
+  const TUCK_PX    = 226;   // must match --tuck in the stylesheet
+  const TUCK_GRAB  = 40;    // px of travel before a drag counts as a drag
+  const TAP_SLOP   = 8;     // px of travel still treated as a tap
+
+  function _setTuck(on) {
+    _tucked = !!on;
+    if (!_ui || !_ui.hand) return;
+    _ui.hand.classList.toggle('is-tucked', _tucked);
+    _ui.hand.style.removeProperty('--drag');
+    _paintDim();
+  }
+
+  // The scrim behind the hand. On for as long as the cards are up: they sit
+  // over the pack carousel, and at full brightness the two read as one pile.
+  // Tucking takes it away with them.
+  function _paintDim() {
+    if (!_ui || !_ui.dim || !_ui.hand) return;
+    const up = !_ui.hand.hidden && !_tucked;
+    _ui.dim.classList.toggle('is-on', up);
+  }
+
+  function _wireTuck() {
+    const hand = _ui && _ui.hand;
+    const grip = _ui && _ui.grip;
+    if (!hand || !grip) return;
+
+    let startY = 0, dy = 0, dragging = false;
+
+    const move = (e) => {
+      dy = e.clientY - startY;
+      if (!dragging && Math.abs(dy) > TAP_SLOP) {
+        dragging = true;
+        hand.classList.add('is-dragging');
+      }
+      if (!dragging) return;
+      // Clamped to the two resting states, so the hand cannot be parked
+      // halfway or dragged off the top of the screen.
+      const at = Math.min(TUCK_PX, Math.max(0, (_tucked ? TUCK_PX : 0) + dy));
+      hand.style.setProperty('--drag', `${at}px`);
+    };
+
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      window.removeEventListener('pointercancel', up);
+      hand.classList.remove('is-dragging');
+      hand.style.removeProperty('--drag');
+
+      // A tap toggles. A drag commits only once it has travelled far enough to
+      // be a deliberate pull — a short tug springs back, which is what tells
+      // you the gesture exists.
+      if (!dragging)                       _setTuck(!_tucked);
+      else if (_tucked  && dy < -TUCK_GRAB) _setTuck(false);
+      else if (!_tucked && dy >  TUCK_GRAB) _setTuck(true);
+      else                                  _setTuck(_tucked);
+    };
+
+    grip.addEventListener('pointerdown', (e) => {
+      startY = e.clientY; dy = 0; dragging = false;
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+      e.preventDefault();
+    });
+
+    // A tucked card is mostly off the bottom of the screen, so whatever sliver
+    // is reachable should bring the hand back rather than spend a turn.
+    hand.addEventListener('click', (e) => {
+      if (!_tucked) return;
+      e.preventDefault();
+      e.stopPropagation();
+      _setTuck(false);
+    }, true);
+  }
+
+  // ── Role swapper ──────────────────────────────────────────────────────────
+  //
+  // Just the role row from the join screen, floated over everything. Rebuilt
+  // from Roles each time rather than cloning the original markup, because the
+  // join screen's picker is gone by the time this is reachable.
+  //
+  // Switching is deliberately cheap and deliberately costly at once: it costs
+  // nothing to press, and it resets the stream you were building. A player who
+  // changes their mind halfway should be able to, and should not arrive at the
+  // new card having been carried most of the way there by the old one.
+
+  function _openSwap() {
+    if (!_ui || !_ui.swap) return;
+    _buildSwapPicks();
+    // The window wears the player's own colour, same as their tag and their
+    // symbols — it is a window about who they are.
+    const colour = (typeof playerColor !== 'undefined' && playerColor) || '#8fd4f5';
+    _ui.swap.style.setProperty('--pc', colour);
+    _ui.swap.hidden = false;
+  }
+
+  function _closeSwap() {
+    if (_ui && _ui.swap) _ui.swap.hidden = true;
+  }
+
+  function _buildSwapPicks() {
+    const host = _ui && _ui.swapPicks;
+    if (!host || typeof Roles === 'undefined') return;
+    host.innerHTML = '';
+
+    const now = (typeof playerRole !== 'undefined' && playerRole) ? playerRole : null;
+    const colour = (typeof playerColor !== 'undefined' && playerColor) || '#cfeefb';
+
+    Roles.list().forEach(id => {
+      const meta = Roles.meta(id);
+      const btn  = document.createElement('button');
+      btn.type         = 'button';
+      btn.className    = 'name-role-pick' + (id === now ? ' selected' : '');
+      btn.dataset.role = id;
+      btn.style.color  = colour;
+      btn.setAttribute('aria-label', meta.label.toLowerCase());
+      btn.appendChild(Roles.canvas(id, 3, colour));
+
+      btn.onclick = () => {
+        if (id === now) { _closeSwap(); return; }
+        // Reuses the join screen's own handler, so the nametag, the body class
+        // and the broadcast all happen the one way they already do.
+        try { selectPlayerRole(btn); } catch (e) {}
+        // The counters go with it. Keeping them would let a player bank
+        // progress in one stream and cash it in another, and the whole point
+        // of the number is that it measures a commitment.
+        try { if (typeof Spec !== 'undefined') Spec.release(); } catch (e) {}
+        _closeSwap();
+        refresh();
+      };
+
+      host.appendChild(btn);
+    });
+
+    if (_ui.swapNote) {
+      _ui.swapNote.textContent = now
+        ? 'resets progress'
+        : '';
+    }
+  }
+
   function _paintCharges() {
     if (!_ui || !_ui.ring) return;
 
     const max = Math.max(1, _chargesMax || _charges);
-    const R   = 44;
-    const C   = 2 * Math.PI * R;
-    // A fixed gap in user units, so the breaks stay the same width whether the
-    // body has two charges or six. Scaled down for high counts, where a 7-unit
-    // gap would eat most of a short segment.
-    const gap = max > 6 ? 4 : 7;
-    const seg = C / max;
+
+    // Rasterised onto a grid rather than stroked as arcs.
+    //
+    // A stroked circle is smooth at any width, and a smooth curve is the one
+    // thing in this app that is not made of pixels. Walking a coarse grid and
+    // keeping the cells that land inside the band gives the stair-stepping a
+    // circle has when something actually draws it out of squares.
+    const CELLS = 23;                 // grid resolution across the viewBox
+    const cell  = 100 / CELLS;
+    const rIn   = 40, rOut = 45;      // the band, in viewBox units — ~1 cell thick
+    // Gap between segments, as a fraction of a full turn. Narrower when there
+    // are many charges, or the breaks eat the segments.
+    const gapTurn = max > 6 ? 0.016 : 0.028;
 
     const NS = 'http://www.w3.org/2000/svg';
     _ui.ring.innerHTML = '';
 
-    for (let i = 0; i < max; i++) {
-      const arc = document.createElementNS(NS, 'circle');
-      arc.setAttribute('cx', '50');
-      arc.setAttribute('cy', '50');
-      arc.setAttribute('r', String(R));
-      arc.setAttribute('stroke-dasharray', `${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}`);
-      arc.setAttribute('stroke-dashoffset', `${(-i * seg).toFixed(2)}`);
-      // Spent segments STAY, dimmed. A ring that loses arcs changes shape as it
-      // empties, and then there is nothing to compare the remainder against.
-      if (i >= _charges) arc.setAttribute('class', 'is-spent');
-      _ui.ring.appendChild(arc);
+    for (let gy = 0; gy < CELLS; gy++) {
+      for (let gx = 0; gx < CELLS; gx++) {
+        const dx = (gx + 0.5) * cell - 50;
+        const dy = (gy + 0.5) * cell - 50;
+        const d  = Math.sqrt(dx * dx + dy * dy);
+        if (d < rIn || d > rOut) continue;
+
+        // Clockwise from twelve o'clock, which is where a count is read from.
+        let turn = Math.atan2(dx, -dy) / (Math.PI * 2);
+        if (turn < 0) turn += 1;
+
+        const pos = turn * max;
+        const idx = Math.floor(pos) % max;
+        // The break sits at the START of each segment, so the first one begins
+        // cleanly at the top instead of straddling it.
+        if (pos - Math.floor(pos) < gapTurn * max) continue;
+
+        const px = document.createElementNS(NS, 'rect');
+        px.setAttribute('x', (gx * cell).toFixed(2));
+        px.setAttribute('y', (gy * cell).toFixed(2));
+        px.setAttribute('width',  cell.toFixed(2));
+        px.setAttribute('height', cell.toFixed(2));
+        // Spent cells STAY, dimmed. A ring that loses segments changes shape as
+        // it empties, and then there is nothing to read the remainder against.
+        if (idx >= _charges) px.setAttribute('class', 'is-spent');
+        _ui.ring.appendChild(px);
+      }
     }
 
     _ui.ring.classList.toggle('is-last', _charges === 1);
@@ -427,6 +634,7 @@ const Avatar = (() => {
 
     if (_out) {
       _ui.hand.hidden = true;
+      _paintDim();
       _ui.pad.hidden   = false;
       _paintCharges();
       _placeRunner();
@@ -439,9 +647,10 @@ const Avatar = (() => {
     // with nothing unlocked would be a permanent advertisement for a feature
     // most players never reach, and the tally beside their symbol is already
     // doing that job quietly.
-    if (!a) { _ui.hand.hidden = true; return; }
+    if (!a) { _ui.hand.hidden = true; _paintDim(); return; }
 
     _ui.hand.hidden = false;
+    _paintDim();
     const full = _slotUsed >= _slotCap;
 
     // ── The deal ─────────────────────────────────────────────────────────────
@@ -461,15 +670,24 @@ const Avatar = (() => {
     if (!_dealt) {
       _dealt = true;
       _ui.hand.classList.add('is-dealing');
+      // Deeper for the deal itself, then back to the resting scrim.
       if (_ui.dim) {
-        _ui.dim.classList.add('is-on');
-        setTimeout(() => _ui.dim.classList.remove('is-on'), 1500);
+        _ui.dim.classList.add('is-deep');
+        setTimeout(() => _ui.dim && _ui.dim.classList.remove('is-deep'), 1500);
       }
       setTimeout(() => _ui.hand && _ui.hand.classList.remove('is-dealing'), 1400);
       try { if (typeof Sound !== 'undefined') Sound.play('star'); } catch (e) {}
     }
 
-    _ui.hand.innerHTML = '';
+    // Everything except the grip, which is part of the furniture rather than
+    // part of the deal.
+    Array.from(_ui.hand.children).forEach(c => {
+      if (c !== _ui.grip) c.remove();
+    });
+
+    // Nothing tucks the hand on its own. It opens maximised and stays however
+    // the player last left it — a panel that moves by itself is one they have
+    // to check on, which is the opposite of getting out of the way.
 
     // ── Dealing order ────────────────────────────────────────────────────────
     // YOURS IS ALWAYS THE MIDDLE CARD, whichever stream it came from.
@@ -530,6 +748,12 @@ const Avatar = (() => {
         card.style.setProperty('--av-glow', t.glow);
         card.style.setProperty('--av-ink',  t.ink);
         card.style.setProperty('--av-dim',  t.dim);
+        // The grip is a sibling of the cards, so it takes the EARNED card's
+        // colour from the hand itself.
+        if (mine && _ui.hand) {
+          _ui.hand.style.setProperty('--av-edge', t.edge);
+          _ui.hand.style.setProperty('--av-glow', t.glow);
+        }
       }
 
       card.classList.toggle('is-mine',   mine);
@@ -583,6 +807,13 @@ const Avatar = (() => {
       if (mine) {
         card.disabled = full || _busy;
         card.onclick  = enter;
+      } else {
+        // The cards you did not take are the swap. They already show the other
+        // streams, so they are the obvious place to reach for when you want
+        // one of them — and before this they were the only thing on the screen
+        // that looked pressable and did nothing.
+        card.style.cursor = 'pointer';
+        card.onclick = _openSwap;
       }
 
       _ui.hand.appendChild(card);

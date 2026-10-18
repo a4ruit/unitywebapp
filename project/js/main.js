@@ -1063,6 +1063,10 @@ function selectPlayerRole(btn) {
   document.querySelectorAll('.name-role-pick').forEach(b => b.classList.remove('selected'));
   btn.classList.add('selected');
   _paintNametagRole();
+  // Push it to Unity. The swapper can be opened at any point, including mid
+  // possession, so the projection's roster and overhead symbols would otherwise
+  // keep showing the role this player had when they first entered.
+  sendSetName();
 }
 
 // The symbol under the player's own name tag on the pack screen. It is the same
