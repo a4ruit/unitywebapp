@@ -79,6 +79,26 @@ const Avatar = (() => {
         { id: 'rend',  label: 'REND',  art: 'assets/xswipe.png'     },
       ],
     },
+
+    // The SABOTEUR takes the boss that is already standing on the field rather
+    // than being given a body of its own. Everything downstream of the card is
+    // identical — same controller, same stick, same ability row — because the
+    // point of the card is that this is the same KIND of thing as the other
+    // three, claimed by going the other way.
+    //
+    // Abilities are placeholders. The boss has two of its own in Unity (it
+    // calls in glitchlings, and it teleports), and these are the slots they
+    // will land in.
+    saboteur: {
+      name: 'THE FLESH', ready: true, solo: true,
+      // Borrowing the FLESH pack's symbol until this one has art of its own.
+      emblem: 'assets/flesh-symbol.png',
+      theme: { edge: '#e8484c', glow: '232,72,76', ink: '#ffdede', dim: '#8c3a3c' },
+      spells: [
+        { id: 'summon', label: 'SUMMON', art: 'assets/taunt.png'  },
+        { id: 'hop',    label: 'HOP',    art: 'assets/charge.png' },
+      ],
+    },
   };
 
   // The three streams. Declaration order only — the dealt order puts the
@@ -142,6 +162,15 @@ const Avatar = (() => {
                what makes the overlay read as a CARD the player is holding
                rather than a control bar stuck to the bottom of the app. -->
           <div class="avatar-stage">
+            <!-- Charges, as a ring around the symbol.
+                 They used to be 6px slivers in the top-left corner, beside the
+                 name and the close button, and players finished sessions
+                 without noticing they had any. The symbol is the one thing on
+                 this card everybody already looks at, so the count lives on it
+                 now. Segments rather than a dial: the number is small and the
+                 question is "how many taps left", which you read off discrete
+                 arcs without counting. -->
+            <svg class="avatar-ring" id="avatar-ring" viewBox="0 0 100 100" aria-hidden="true"></svg>
             <img class="avatar-emblem" src="assets/bullwarksymbol.png" alt="">
           </div>
 
@@ -169,6 +198,7 @@ const Avatar = (() => {
       spells: root.querySelector('#avatar-spells'),
       exit:  root.querySelector('#avatar-exit'),
       pips:  root.querySelector('#avatar-charges'),
+      ring:  root.querySelector('#avatar-ring'),
       run:   root.querySelector('#avatar-runner'),
     };
 
@@ -350,13 +380,39 @@ const Avatar = (() => {
   /// in place rather than disappearing, so the row does not shrink and move
   /// under a thumb that is already travelling toward a button.
   function _paintCharges() {
-    if (!_ui || !_ui.pips) return;
-    _ui.pips.innerHTML = '';
-    for (let i = 0; i < _charges; i++) {
-      const pip = document.createElement('i');
-      _ui.pips.appendChild(pip);
+    if (!_ui || !_ui.ring) return;
+
+    const max = Math.max(1, _chargesMax || _charges);
+    const R   = 44;
+    const C   = 2 * Math.PI * R;
+    // A fixed gap in user units, so the breaks stay the same width whether the
+    // body has two charges or six. Scaled down for high counts, where a 7-unit
+    // gap would eat most of a short segment.
+    const gap = max > 6 ? 4 : 7;
+    const seg = C / max;
+
+    const NS = 'http://www.w3.org/2000/svg';
+    _ui.ring.innerHTML = '';
+
+    for (let i = 0; i < max; i++) {
+      const arc = document.createElementNS(NS, 'circle');
+      arc.setAttribute('cx', '50');
+      arc.setAttribute('cy', '50');
+      arc.setAttribute('r', String(R));
+      arc.setAttribute('stroke-dasharray', `${(seg - gap).toFixed(2)} ${(C - seg + gap).toFixed(2)}`);
+      arc.setAttribute('stroke-dashoffset', `${(-i * seg).toFixed(2)}`);
+      // Spent segments STAY, dimmed. A ring that loses arcs changes shape as it
+      // empties, and then there is nothing to compare the remainder against.
+      if (i >= _charges) arc.setAttribute('class', 'is-spent');
+      _ui.ring.appendChild(arc);
     }
-    _ui.pips.classList.toggle('is-last', _charges === 1);
+
+    _ui.ring.classList.toggle('is-last', _charges === 1);
+    _ui.ring.classList.toggle('is-out',  _charges === 0);
+
+    // The old pip row is gone from the top bar; keep it empty rather than
+    // removing the node, since refresh() and the Unity handler both poke it.
+    if (_ui.pips) _ui.pips.innerHTML = '';
   }
 
   /// Show or hide the entry button. Safe to call as often as you like.
@@ -436,10 +492,16 @@ const Avatar = (() => {
     // other streams exist, and it does it without a menu or a word.
     const spec   = _spec();
     const others = HAND.filter(r => r !== spec);
+    // A SOLO stream deals one card and no alternatives. The three nature paths
+    // are a choice between streams, so showing the two not taken is the whole
+    // point of a hand; the saboteur is a choice between playing the game and
+    // playing against it, and the cards it was choosing between are the hand
+    // this player walked away from.
+    const solo   = AVATARS[spec] && AVATARS[spec].solo;
     // Falls back to the declared order if the earned stream somehow is not one
     // of the three, rather than dealing a hand with a hole in it.
-    const dealt  = HAND.includes(spec)
-                 ? [others[0], spec, others[1]]
+    const dealt  = solo              ? [spec]
+                 : HAND.includes(spec) ? [others[0], spec, others[1]]
                  : HAND.slice();
 
     dealt.forEach((role, i) => {

@@ -122,10 +122,18 @@ const Spec = (() => {
   // share of every pack.
   const ON_ROLE_WEIGHT = 2.0;
 
-  // A tier that contains an on-role card is only nudged, not forced: this
+  // A tier that contains an on-role card is nudged rather than forced: this
   // decides how OFTEN you are offered the slot your card lives in, which is a
   // much blunter instrument than which card fills it.
-  const ON_ROLE_TIER_WEIGHT = 1.45;
+  //
+  // Raised from 1.45 once seeding started at join rather than at specialisation.
+  // TANK and MEDIC hold four cards each against DAMAGE's sixteen, so without a
+  // real push a player who asks for the shield is offered one about a sixth of
+  // the time and never reaches five in a session. This is the number to tune if
+  // the streams still finish at different speeds — it carries most of the
+  // effect, because most tiers hold a single card and weighting inside a tier
+  // can do nothing there.
+  const ON_ROLE_TIER_WEIGHT = 2.2;
 
   const _counts = { tank: 0, medic: 0, damage: 0, saboteur: 0 };
   // A second stream the player has since filled and may switch to. Null until
@@ -137,6 +145,25 @@ const Spec = (() => {
     if (!card || card.corrupted) return null;
     return CARD_ROLE[card.name] || null;
   }
+
+  /// The role the player picked on the join screen, or null.
+  ///
+  /// SABOTEUR is excluded deliberately: no card carries it, so there is nothing
+  /// to seed toward and nothing to count. That stream is still reached the way
+  /// it always was, by flipping to the horror packs.
+  ///
+  /// `playerRole` is a top-level `let` in main.js, so it never lands on window —
+  /// hence the bare identifier behind a typeof guard.
+  function declared() {
+    try {
+      const r = typeof playerRole !== 'undefined' ? playerRole : null;
+      return (r === 'tank' || r === 'medic' || r === 'damage') ? r : null;
+    } catch (e) { return null; }
+  }
+
+  /// The role the packs lean toward: the one they have earned, or failing that
+  /// the one they asked for.
+  function seedRole() { return _spec || declared(); }
 
   function current()    { return _spec; }
   /// A role they have ALSO completed and could move to, or null.
@@ -166,8 +193,13 @@ const Spec = (() => {
   /// How far along the player is toward their leading role, 0..1. Drives the
   /// low-key visual tell without needing a number on screen.
   function progress() {
-    // Measured against the leading ROLE's own threshold, not a shared one —
-    // otherwise a damage player at 5 of 8 would show as finished.
+    // Toward the role they are actually working on, which is the declared one
+    // until they earn it. Tracking whichever counter happens to be highest
+    // would fill a tank player's tell with damage placements they can no
+    // longer specialise into.
+    const want = seedRole();
+    if (want) return Math.min(1, (_counts[want] || 0) / need(want));
+
     let best = 0, lead = null;
     for (const k in _counts) if (_counts[k] > best) { best = _counts[k]; lead = k; }
     return Math.min(1, best / need(lead));
@@ -200,10 +232,24 @@ const Spec = (() => {
     // So a second stream can still fill up behind the first. Reaching the
     // threshold OFFERS that role rather than taking it — switching out from
     // under someone mid-turn would be the game making the decision.
-    if (!_spec && _counts[role] >= need(role)) {
+    // Only the role they ASKED for can claim them.
+    //
+    // It used to be first-past-the-post across all three, which sounds fair and
+    // was not: damage holds 16 of the 24 tagged cards, so it filled in about a
+    // dozen placements while tank and medic needed thirty. At gallery pace that
+    // made damage the only reachable stream, and every player in a session came
+    // away with the same card no matter which symbol they had chosen.
+    //
+    // SABOTEUR is exempt because it is claimed by flipping to the horror packs
+    // rather than by picking it on the join screen.
+    const want = declared();
+    if (!_spec && _counts[role] >= need(role) &&
+        (role === 'saboteur' || role === want)) {
       _spec = role;
       _announce(role);
     } else if (_spec && role !== _spec && _counts[role] >= need(role)) {
+      // Still offered, so a player who drifts into another stream can move to
+      // it. The declared role gets first claim, not sole claim.
       if (_offer !== role) { _offer = role; _announce(role); }
     }
     _paint();
@@ -228,8 +274,9 @@ const Spec = (() => {
   /// more than one card — NATURE rare (ULTRAVIOLET / INFRAMEND) and CRITTER
   /// uncommon (DD.DUCK / BUGFIX) are the two real forks in the build today.
   function weight(card) {
-    if (!_spec) return 1;
-    return cardRole(card) === _spec ? ON_ROLE_WEIGHT : 1;
+    const want = seedRole();
+    if (!want) return 1;
+    return cardRole(card) === want ? ON_ROLE_WEIGHT : 1;
   }
 
   /// Weight for a whole rarity tier, so a specialised player meets the tier
@@ -237,9 +284,10 @@ const Spec = (() => {
   /// is what carries the effect — seeding within a tier can do nothing when the
   /// tier has only one occupant.
   function tierWeight(pool, tier) {
-    if (!_spec || !Array.isArray(pool)) return 1;
+    const want = seedRole();
+    if (!want || !Array.isArray(pool)) return 1;
     for (let i = 0; i < pool.length; i++) {
-      if (pool[i].rarity === tier && cardRole(pool[i]) === _spec) return ON_ROLE_TIER_WEIGHT;
+      if (pool[i].rarity === tier && cardRole(pool[i]) === want) return ON_ROLE_TIER_WEIGHT;
     }
     return 1;
   }
@@ -333,5 +381,5 @@ const Spec = (() => {
 
   return { record, current, isSaboteur, counts, progress, threshold,
            cardRole, weight, tierWeight, offer, commit, release,
-           debugFill, debugReset };
+           declared, seedRole, debugFill, debugReset };
 })();

@@ -4708,12 +4708,50 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
     radial-gradient(70% 70% at 50% 45%, rgba(var(--av-glow), 0.14) 0%, transparent 70%),
     rgba(4,12,18,0.6);
 }
+/* ── Charge ring ──────────────────────────────────────────────────────────
+   Sits ON the symbol rather than beside it. Both are placed by the stage's
+   grid, so they land in the same cell and the ring is sized to the plate
+   rather than to the art inside it. */
+.avatar-ring {
+  grid-area: 1 / 1;
+  width: 94%;
+  height: 94%;
+  pointer-events: none;
+  /* The dash offsets are measured from 3 o'clock; this starts the first
+     segment at the top, where a count is read from. */
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.avatar-ring circle {
+  fill: none;
+  stroke: var(--av-edge, #76c4e8);
+  stroke-width: 5;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 5px rgba(var(--av-glow), 0.85));
+  transition: stroke 0.25s ease, opacity 0.25s ease;
+}
+/* Spent arcs stay in place, dimmed. A ring that loses segments changes shape
+   as it empties, which leaves nothing to read the remainder against. */
+.avatar-ring circle.is-spent {
+  stroke: rgba(255,255,255,0.13);
+  filter: none;
+}
+/* Last charge goes amber and breathes — running out ends the turn and resets
+   the tally, which is worth knowing before it happens. */
+.avatar-ring.is-last circle:not(.is-spent) {
+  stroke: #ffb45a;
+  filter: drop-shadow(0 0 10px rgba(255,180,90,0.95));
+  animation: avatarRingLast 0.9s ease-in-out infinite;
+}
+@keyframes avatarRingLast { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
 .avatar-emblem {
+  grid-area: 1 / 1;
   /* EXPLICIT size, not max-*. The source is 84x84, far smaller than the plate,
      so a max-width only ever let it sit at its intrinsic size — a limit cannot
      enlarge an image. object-fit keeps it square inside the box. */
-  width: 76%;
-  height: 76%;
+  width: 60%;
+  height: 60%;
   object-fit: contain;
   image-rendering: pixelated;
   filter: drop-shadow(0 0 12px rgba(var(--av-glow), 0.5));
@@ -4748,30 +4786,9 @@ body.spec-just-tripped .bg-grid::after { animation: specTrip 2.4s ease-out; }
   text-shadow: 0 0 9px rgba(var(--av-glow), 0.75);
 }
 
-/* Charges sit between the name and LEAVE, filling the gap, so the top row is
-   one line rather than three things with space between them. */
-.avatar-charges {
-  position: absolute;
-  left: 2px; top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-.avatar-charges i {
-  display: block; width: 6px; height: 16px;
-  border-radius: 1px;
-  background: var(--av-ink);
-  box-shadow: 0 0 6px rgba(var(--av-glow), 0.7);
-}
-/* The last one pulses amber: running out ends the turn and resets the tally,
-   which is worth knowing before it happens rather than after. */
-.avatar-charges.is-last i {
-  background: #ffb45a;
-  box-shadow: 0 0 9px rgba(255,180,90,0.9);
-  animation: avatarLastPip 0.9s ease-in-out infinite;
-}
-@keyframes avatarLastPip { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+/* Empty now — the count moved onto the symbol as a ring. Kept as a node
+   because refresh() and the Unity charge handler both still address it. */
+.avatar-charges { display: none; }
 
 /* Small, and unlike the spells in both colour and shape, so the button that
    ENDS the turn can never be mistaken for one that spends a charge. */

@@ -857,14 +857,12 @@ function _buildUI() {
     #poss-serpent-btn:active { background: rgba(40,220,130,0.35); }
     #poss-serpent-btn.poss-hidden { display: none; }
 
-    /* ── Inhabit buttons overlay the CAM WINDOW (shown before the camera
-       activates) so players can't miss them on the pack screen. They centre
-       on the cam window; multiple stack vertically if several creatures are
-       available at once. A gentle glow-pulse draws the eye. ── */
+    /* ── Inhabit buttons sit ON the CAM screen (shown before the camera
+       activates) so they read as part of the window rather than as something
+       hovering near it. A gentle glow-pulse draws the eye. ── */
     #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn, #poss-serpent-btn, #poss-box-btn, #poss-pig-btn, #poss-swarm-btn, #poss-turtle-btn {
       bottom: auto;
-      top: 50%;
-      z-index: 12;                       /* above the cam window + card frame */
+      top: auto;
       font-family: 'Pixelify Sans', 'lo-res', sans-serif;
       font-size: 17px;
       letter-spacing: 0.04em;
@@ -873,15 +871,30 @@ function _buildUI() {
       background-color: rgba(6, 16, 12, 0.82);
       animation: poss-inhabit-pulse 1.5s ease-in-out infinite;
     }
-    #poss-btn         { transform: translate(-50%, calc(-50% + 30px)); }  /* sheep   — lowest */
-    #poss-duck-btn    { transform: translate(-50%, -50%); }               /* duck    — centre */
-    #poss-fox-btn     { transform: translate(-50%, calc(-50% - 30px)); }  /* fox     — upper  */
-    #poss-seagull-btn { transform: translate(-50%, calc(-50% - 60px)); }  /* seagull — upper  */
-    #poss-serpent-btn { transform: translate(-50%, calc(-50% - 90px)); }  /* serpent — upper  */
-    #poss-box-btn     { transform: translate(-50%, calc(-50% - 120px)); } /* box     — top    */
-    #poss-pig-btn     { transform: translate(-50%, calc(-50% - 150px)); } /* lazerpig — top   */
-    #poss-swarm-btn   { transform: translate(-50%, calc(-50% - 180px)); } /* bugfix   — top    */
-    #poss-turtle-btn  { transform: translate(-50%, calc(-50% - 210px)); } /* buffering — top  */
+    /* The stack fills the LCD and centres whatever is in it, so the ladder of
+       per-button offsets is gone. pointer-events are off on the container and
+       back on for the buttons, so the dead space around them does not eat taps
+       meant for the window. */
+    #poss-inhabit-stack {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 14px;
+      z-index: 12;
+      pointer-events: none;
+    }
+    #poss-inhabit-stack > button {
+      position: static;
+      transform: none;
+      pointer-events: auto;
+      max-width: 100%;
+      white-space: normal;
+      text-align: center;
+    }
     @keyframes poss-inhabit-pulse {
       0%, 100% { box-shadow: 0 0 10px rgba(0,0,0,0.55); }
       50%      { box-shadow: 0 0 18px 2px rgba(255,255,255,0.22), 0 0 10px rgba(0,0,0,0.55); }
@@ -1547,9 +1560,9 @@ function _buildUI() {
     /* No z-index here: it is the first child, so DOM order already puts it
        under every control. Giving it one lifted it over the joystick, FIRE and
        RELEASE, which is why an active session looked live but ignored input. */
-    #poss-btn, #poss-duck-btn, #poss-fox-btn, #poss-seagull-btn,
-    #poss-serpent-btn, #poss-box-btn, #poss-pig-btn, #poss-swarm-btn,
-    #poss-turtle-btn { z-index: 20; }
+    /* The buttons are inside the window now, so they stack within it rather
+       than against it — a z-index of 20 here would be measured against
+       poss-root and is meaningless from inside poss-video-wrap. */
     #poss-video-wrap { z-index: 10; }
 
     /* ── Placement controls row — Game Boy layout: joystick LEFT, PLACE RIGHT.
@@ -1995,15 +2008,6 @@ function _buildUI() {
     <!-- Block overlay — first in DOM = lowest stacking order within poss-root.
          All buttons/joystick rendered on top; background page blocked below. -->
     <div id="poss-block-overlay"></div>
-    <button id="poss-box-btn">Inhabit the Blind Box</button>
-    <button id="poss-serpent-btn">Ride COSMEOW</button>
-    <button id="poss-pig-btn">Ride the LAZERPIG</button>
-    <button id="poss-swarm-btn">Conjure the BUGFIX</button>
-    <button id="poss-turtle-btn">DEPLOY B.SHELLEY</button>
-    <button id="poss-seagull-btn">Inhabit a seagull</button>
-    <button id="poss-fox-btn">Ride the COWNADO</button>
-    <button id="poss-duck-btn">Inhabit a duck</button>
-    <button id="poss-btn">Inhabit a sheep</button>
     <div id="poss-timer">INHABITING — <span id="poss-secs">30</span>s</div>
     <div id="poss-eaten">EATEN — <span id="poss-eaten-count">0</span></div>
     <div id="poss-video-wrap">
@@ -2031,6 +2035,25 @@ function _buildUI() {
             <div id="poss-video-label">
               <div>CONNECTING<span class="dots"><span>.</span><span>.</span><span>.</span></span></div>
               <div id="poss-loading-bar"></div>
+            </div>
+
+            <!-- Inhabit buttons live INSIDE the LCD, stacked in a flex column.
+                 They used to be siblings of the window on a hardcoded ladder of
+                 -30px steps, so LAZERPIG sat 150px up and floated clear above
+                 the frame looking like a title rather than a control. Stacking
+                 them here means one button centres itself, several share the
+                 screen evenly, and none of it depends on which creatures happen
+                 to be available. -->
+            <div id="poss-inhabit-stack">
+              <button id="poss-box-btn">Inhabit the Blind Box</button>
+              <button id="poss-serpent-btn">Ride COSMEOW</button>
+              <button id="poss-pig-btn">Ride the LAZERPIG</button>
+              <button id="poss-swarm-btn">Conjure the BUGFIX</button>
+              <button id="poss-turtle-btn">DEPLOY B.SHELLEY</button>
+              <button id="poss-seagull-btn">Inhabit a seagull</button>
+              <button id="poss-fox-btn">Ride the COWNADO</button>
+              <button id="poss-duck-btn">Inhabit a duck</button>
+              <button id="poss-btn">Inhabit a sheep</button>
             </div>
           </div>
 
