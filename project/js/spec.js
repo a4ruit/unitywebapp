@@ -111,7 +111,39 @@ const Spec = (() => {
     damage: 8,
   };
 
-  function need(role) { return ROLE_THRESHOLD[role] || THRESHOLD; }
+  // ── Saboteur ───────────────────────────────────────────────────────────────
+  // Not a placement count at all. A saboteur is a CORRUPTED player, so the
+  // stream is held by this phone's corruption level crossing into the horror
+  // phase and is given up when they are cleansed. Counting horror placements
+  // instead meant a player could be fully corrupted and still not be one, and
+  // could stay one after being cleansed — both of which read as the game
+  // ignoring the thing it just put on screen.
+  let _corruption = 0;
+  let _corruptNeed = 8;   // overwritten by the first syncCorruption
+
+  function corrupted() { return _corruption >= _corruptNeed; }
+
+  function need(role) {
+    if (role === 'saboteur') return _corruptNeed;
+    return ROLE_THRESHOLD[role] || THRESHOLD;
+  }
+
+  /// Called from updatePersonalPhase whenever this phone's corruption moves.
+  function syncCorruption(level, threshold) {
+    _corruption = Math.max(0, Number(level) || 0);
+    if (threshold > 0) _corruptNeed = threshold;
+    _counts.saboteur = _corruption;
+
+    const was = _spec;
+    if (corrupted()) { _spec = 'saboteur'; _offer = null; }
+    else if (_spec === 'saboteur') { _spec = null; }
+
+    if (_spec !== was && _spec) _announce(_spec);
+    _paint();
+    if (_spec !== was) {
+      try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); } catch (e) {}
+    }
+  }
 
   // How much likelier an on-role card is once specialised.
   //
@@ -215,7 +247,10 @@ const Spec = (() => {
   /// and stops there: a horror card never advances tank, medic or damage, even
   /// when what it does on the field resembles one of them.
   function record(card, horror) {
-    const role = horror ? 'saboteur' : cardRole(card);
+    // Horror placements are not what makes a saboteur — corruption is, and
+    // syncCorruption owns that counter. Nothing to record here.
+    if (horror) return;
+    const role = cardRole(card);
     if (!role) return;
 
     _counts[role]++;
@@ -243,8 +278,7 @@ const Spec = (() => {
     // SABOTEUR is exempt because it is claimed by flipping to the horror packs
     // rather than by picking it on the join screen.
     const want = declared();
-    if (!_spec && _counts[role] >= need(role) &&
-        (role === 'saboteur' || role === want)) {
+    if (!_spec && _counts[role] >= need(role) && role === want) {
       _spec = role;
       _announce(role);
     } else if (_spec && role !== _spec && _counts[role] >= need(role)) {
@@ -365,6 +399,9 @@ const Spec = (() => {
     for (const k in _counts) _counts[k] = 0;
     _spec  = null;
     _offer = null;
+    // Corruption is not a turn and is not spent — a player who is still
+    // corrupted is still a saboteur. What limits them is the boss's charges.
+    if (corrupted()) { _spec = 'saboteur'; _counts.saboteur = _corruption; }
     _paint();
     try { if (typeof window.onSpecChanged === 'function') window.onSpecChanged(); } catch (e) {}
   }
@@ -381,5 +418,6 @@ const Spec = (() => {
 
   return { record, current, isSaboteur, counts, progress, threshold,
            cardRole, weight, tierWeight, offer, commit, release,
-           declared, seedRole, debugFill, debugReset };
+           declared, seedRole, syncCorruption, corrupted,
+           debugFill, debugReset };
 })();

@@ -118,13 +118,94 @@ const CardTextures = (() => {
     // line (12/3) and showed a sword on a card that never attacks.
     mycelia:    { hp: 12, atk: 0, heal: 6,
                   rule: 'Links every mushroom. Mends the whole board.' },
+
+    // ── HORROR ────────────────────────────────────────────────────────────
+    // The three corrupted pools had no numbers at all, which made every one of
+    // them read as scenery next to a nature card that says what it costs.
+    //
+    // FLESH is a HEAL pool and nothing else. Its cards are limbs: they fly to
+    // the boss and raise its maxHP permanently (FleshBoss.LimbHPForRarity), so
+    // the number on the card is what the boss gains, and they have no body of
+    // their own to be killed — hence no HP corner.
+    spamrot:    { hp: 0,  atk: 0, heal: 4,
+                  rule: 'One weaver, one limb. The boss grows.' },
+    doomelia:   { hp: 0,  atk: 0, heal: 6,
+                  rule: 'A bigger limb. Kill the weaver to stop it.' },
+    triflesh:   { hp: 0,  atk: 0, heal: 5,
+                  rule: '3 weavers, one rite. Split between them.' },
+    glitchlimb: { hp: 0,  atk: 0, heal: 14,
+                  rule: 'Grafts, then flails. Spires where it lands.' },
+    organ:      { hp: 0,  atk: 0, heal: 16,
+                  rule: 'A limb with a purpose. Nobody says which.' },
+    tendril:    { hp: 0,  atk: 0, heal: 12,
+                  rule: '3 tendrils, 4 each. All one host.' },
+    theflesh:   { hp: 0,  atk: 0, heal: 22,
+                  rule: 'The whole body, handed over at once.' },
+
+    // SCOURGE is the only horror pool that fights the nature board directly.
+    // Every card is a STRUCTURE with its own HP, so both corners are real:
+    // ATK is one pulse against one plant, not a total.
+    glitchelisk:  { hp: 10, atk: 3,
+                    rule: 'Beams the nearest plant. Corrupts the screen.' },
+    circuitspire: { hp: 12, atk: 2,
+                    rule: 'Chews everything standing near it.' },
+    datapylon:    { hp: 15, atk: 3,
+                    rule: 'Burns the ground it draws its feed through.' },
+    // ATK is the glitchling it pushes out, since the tower itself never swings.
+    ziggurat:     { hp: 20, atk: 3,
+                    rule: 'One at a time. Sends a biter every few seconds.' },
+    // BlightNode: a rot field that ticks. The alpha is the same node, wider,
+    // with a pair of biters already standing in it.
+    blight:       { hp: 6,  atk: 1,
+                    rule: 'A rot field. Nothing plants inside it.' },
+    thebloom:     { hp: 6,  atk: 1,
+                    rule: 'A wider rot, with biters already in it.' },
+
+    // RITUAL's bottom four tiers are DOORWAYS: the card's numbers belong to the
+    // thing that walks out, which is what a player has to deal with.
+    glitchling:   { hp: 2,  atk: 3,
+                    rule: 'One door. Something small comes through.' },
+    glitchworm:   { hp: 6,  atk: 1,
+                    rule: 'Burrows. Only hittable while surfaced.' },
+    // ⚠ GLITCHGOYLE is unbuilt in Unity — the rite currently walks out a
+    // glitchling, so these are the glitchling's numbers until it exists.
+    glitchgoyle:  { hp: 2,  atk: 3,
+                    rule: 'A taller door. Two weavers to cut it.' },
+    glitchbeast:  { hp: 12, atk: 6,
+                    rule: 'Horns first. Splits into three when it falls.' },
+    // The top tiers are acolyte processions. HP is one acolyte — they are
+    // killed individually on the walk — and HEAL is the whole offering.
+    summoning:    { hp: 3,  atk: 0, heal: 36,
+                    rule: '4 acolytes, 9 each. Kill them before they arrive.' },
+    theentity:    { hp: 3,  atk: 0, heal: 60,
+                    rule: '6 acolytes, 10 each. The full rite.' },
   };
 
   /// Stats for a card, or null when it has none (critters, horror cards, the
   /// direct-spawn tiers). Returning null rather than zeroes matters — a "0 ATK"
   /// corner on a sheep reads as a bug rather than as "this isn't a weapon".
+  // Horror cards carry no `placement` at all — they are spawn commands rather
+  // than things the player puts down — so they are looked up by name.
+  const HORROR_STATS = {
+    'SPAMROT': 'spamrot', 'DOOMELIA': 'doomelia', 'TRIFLESH': 'triflesh',
+    'GLITCHLIMB™': 'glitchlimb', 'UNNAMED ORGAN': 'organ',
+    'TENDRIL CLUSTER': 'tendril', 'THE FLESH': 'theflesh',
+
+    'GLITCHELISK': 'glitchelisk', 'CIRCUITSPIRE': 'circuitspire',
+    'DATAPYLON': 'datapylon', 'THE ZIGGURAT': 'ziggurat',
+    'HOST EVENT': 'blight', 'PROPAGATION CLUSTER': 'blight',
+    'THE BLOOM': 'thebloom',
+
+    'GLITCHLING': 'glitchling', 'GLITCHWORM': 'glitchworm',
+    'GLITCHGOYLE': 'glitchgoyle', 'GLITCHBEAST': 'glitchbeast',
+    'THE SUMMONING': 'summoning', 'THE ENTITY': 'theentity',
+  };
+
   function cardStats(card) {
     if (!card) return null;
+    // Uppercased because several horror names are title case in the pools.
+    const horror = card.name && HORROR_STATS[card.name.toUpperCase()];
+    if (horror) return CARD_STATS[horror];
     if (card.ability === 'leafstorm') return CARD_STATS.leafstorm;
     if (card.name === 'PUFFBALL')    return CARD_STATS.puffball;
     if (card.name === 'FROSTCAP')    return CARD_STATS.frostcap;
@@ -4690,7 +4771,12 @@ const CardTextures = (() => {
     const isNature = cardIsNaturePhase();
     const packType = typeof window !== 'undefined' ? window.activePackType : 'garbage';
     const isHorror = parseInt(document.body?.dataset?.corruption || '0') >= (window.HORROR_THRESHOLD ?? 15);
-    const isFlesh  = packType === 'garbage' && isHorror;
+    // Every horror pack, not just FLESH. SCOURGE and RITUAL were left out when
+    // this was written and fell through to the procedural frame, so two of the
+    // three corrupted pools looked unfinished beside the one that had art.
+    const isFlesh  = isHorror && (packType === 'garbage' ||
+                                  packType === 'ewaste'  ||
+                                  packType === 'adpack');
     let skinKey    = isNature && card.rarity === 'common'   ? 'nature-common'
                    : isNature && card.rarity === 'uncommon' ? 'nature-uncommon'
                    : isNature && card.rarity === 'rare'     ? 'nature-rare'

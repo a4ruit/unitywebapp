@@ -377,6 +377,8 @@ function updatePersonalPhase() {
   document.body.dataset.corruption = Math.min(level, CORRUPTION_MAX);
   // Toggle pristine-phase CSS class (drives tab + carousel styling)
   document.body.classList.toggle('pristine-phase', isPristine);
+  // Being corrupted IS the saboteur stream — and being cleansed ends it.
+  try { if (typeof Spec !== 'undefined') Spec.syncCorruption(level, HORROR_THRESHOLD); } catch (e) {}
   // Keep the 6-way pack theme class in sync whenever phase changes
   syncPackThemeClass();
   // Update pack tab labels / icons (NATURE↔FLESH, CRITTER↔SCOURGE, FUNGI↔RITUAL)
