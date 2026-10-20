@@ -42,7 +42,14 @@ const Roles = (() => {
       '...OOOOO...',
       '...........',
     ],
+    // Crossed swords. Blades are HIGHLIGHT so they stay near-white over any
+    // background; the hilts are FILL, which is what takes the player's tag
+    // colour — the one part of the symbol that is theirs.
     damage: [
+    // The original crossed swords, with the HILT taken from
+    // assets/damagerole.png: a block tucked against the outside of each blade,
+    // then two pixels stepping out and down. Hilts are FILL, so they are the
+    // part that wears the player's tag colour.
       '...........',
       '..H.....H..',
       '...H...H...',
@@ -50,9 +57,9 @@ const Roles = (() => {
       '.....H.....',
       '....H.H....',
       '...H...H...',
-      '..H.....H..',
+      '.FH.....HF.',
       '.FF.....FF.',
-      '.F.......F.',
+      'F.........F',
       '...........',
     ],
     saboteur: [
@@ -86,11 +93,18 @@ const Roles = (() => {
   // Draws one symbol into a canvas, in the player's own colour. The outline is
   // near-black and the highlight near-white, so the symbol survives being drawn
   // over grass, over the boss's glitch, or over a white flash.
+  // Every symbol occupies the same BOX, whatever its own grid is. DAMAGE is
+  // drawn on 21 cells rather than 11, so sizing off the grid made it almost
+  // twice the size of the other three in the same row.
+  const BOX = 11;
+
   function draw(ctx, id, x, y, px, colour) {
     const grid = art(id);
     const fill = colour || '#ffffff';
     const line = '#0a0a12';
     const hi   = '#ffffff';
+    const box  = BOX * px;
+    const cell = box / grid.length;
 
     for (let r = 0; r < grid.length; r++) {
       const row = grid[r];
@@ -98,17 +112,18 @@ const Roles = (() => {
         const ch = row[c];
         if (ch === '.') continue;
         ctx.fillStyle = ch === 'O' ? line : (ch === 'H' ? hi : fill);
-        ctx.fillRect(x + c * px, y + r * px, px, px);
+        // Ceiled, so neighbouring cells meet rather than leaving seams when
+        // the cell size is fractional.
+        ctx.fillRect(x + c * cell, y + r * cell, Math.ceil(cell), Math.ceil(cell));
       }
     }
   }
 
   // A standalone canvas of one symbol, for buttons and the keepsake poster.
   function canvas(id, px, colour) {
-    const grid = art(id);
     const c = document.createElement('canvas');
-    c.width  = grid[0].length * px;
-    c.height = grid.length * px;
+    c.width  = BOX * px;
+    c.height = BOX * px;
     const g = c.getContext('2d');
     g.imageSmoothingEnabled = false;
     draw(g, id, 0, 0, px, colour);

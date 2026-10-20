@@ -597,6 +597,13 @@ const Avatar = (() => {
     const NS = 'http://www.w3.org/2000/svg';
     _ui.ring.innerHTML = '';
 
+    // ── Collect the ring, THEN cut it ────────────────────────────────────────
+    // Cutting by angle gave every segment a different number of pixels: a 60°
+    // wedge across a diagonal holds more grid cells than one across an axis, so
+    // some charges were visibly chunkier than others on the same ring. Walking
+    // the band in order and splitting it into equal RUNS of cells means each
+    // charge is the same weight of pixels wherever it sits.
+    const ring = [];
     for (let gy = 0; gy < CELLS; gy++) {
       for (let gx = 0; gx < CELLS; gx++) {
         const dx = (gx + 0.5) * cell - 50;
@@ -607,24 +614,32 @@ const Avatar = (() => {
         // Clockwise from twelve o'clock, which is where a count is read from.
         let turn = Math.atan2(dx, -dy) / (Math.PI * 2);
         if (turn < 0) turn += 1;
-
-        const pos = turn * max;
-        const idx = Math.floor(pos) % max;
-        // The break sits at the START of each segment, so the first one begins
-        // cleanly at the top instead of straddling it.
-        if (pos - Math.floor(pos) < gapTurn * max) continue;
-
-        const px = document.createElementNS(NS, 'rect');
-        px.setAttribute('x', (gx * cell).toFixed(2));
-        px.setAttribute('y', (gy * cell).toFixed(2));
-        px.setAttribute('width',  cell.toFixed(2));
-        px.setAttribute('height', cell.toFixed(2));
-        // Spent cells STAY, dimmed. A ring that loses segments changes shape as
-        // it empties, and then there is nothing to read the remainder against.
-        if (idx >= _charges) px.setAttribute('class', 'is-spent');
-        _ui.ring.appendChild(px);
+        ring.push({ gx, gy, turn });
       }
     }
+    ring.sort((a, b) => a.turn - b.turn);
+
+    const per = ring.length / max;
+    // At least one cell of break, however few pixels a segment has.
+    const gap = Math.max(1, Math.round(gapTurn * ring.length));
+
+    ring.forEach((c, i) => {
+      const idx   = Math.min(max - 1, Math.floor(i / per));
+      const intoS = i - Math.floor(idx * per);
+      // The break sits at the START of each segment, so the first one begins
+      // cleanly at the top instead of straddling it.
+      if (intoS < gap) return;
+
+      const px = document.createElementNS(NS, 'rect');
+      px.setAttribute('x', (c.gx * cell).toFixed(2));
+      px.setAttribute('y', (c.gy * cell).toFixed(2));
+      px.setAttribute('width',  cell.toFixed(2));
+      px.setAttribute('height', cell.toFixed(2));
+      // Spent cells STAY, dimmed. A ring that loses segments changes shape as
+      // it empties, and then there is nothing to read the remainder against.
+      if (idx >= _charges) px.setAttribute('class', 'is-spent');
+      _ui.ring.appendChild(px);
+    });
 
     _ui.ring.classList.toggle('is-last', _charges === 1);
     _ui.ring.classList.toggle('is-out',  _charges === 0);

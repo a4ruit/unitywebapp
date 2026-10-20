@@ -95,9 +95,9 @@ const CardTextures = (() => {
                   rule: '3 shells. Long range only.' },
     solargrip:  { hp: 9,  atk: 0,
                   rule: 'Plant. Drags one foe in. HOLO: all of them.' },
-    // atk is the BOSS figure — LazerPigController.beamDamage (4) × the ×6
-    // multiplier the beam applies to FleshBoss. Everything else down the beam
-    // takes the flat 4, same as flowerbush's 12 being its boss number.
+    // atk is LazerPigController.beamDamage, and now everything in the beam
+    // actually takes it. It used to be the boss figure only — 4 × a ×6 boss
+    // multiplier — so the card said 24 and a glitchling took 4.
     lazerpig:   { hp: 12, atk: 24,
                   rule: 'Deploys a turret. One beam, straight through.' },
     // Critter HP is NatureHealth.CritterHP. ATK is per use, not per possession —
@@ -196,7 +196,10 @@ const CardTextures = (() => {
     'HOST EVENT': 'blight', 'PROPAGATION CLUSTER': 'blight',
     'THE BLOOM': 'thebloom',
 
-    'GLITCHLING': 'glitchling', 'GLITCHWORM': 'glitchworm',
+    // GLITCHLING is deliberately absent: its corners render with a gold disc
+    // behind the digits on the flesh frame, so it shows no stats until that is
+    // fixed. Its numbers are 2 HP / 3 ATK when it comes back.
+    'GLITCHWORM': 'glitchworm',
     'GLITCHGOYLE': 'glitchgoyle', 'GLITCHBEAST': 'glitchbeast',
     'THE SUMMONING': 'summoning', 'THE ENTITY': 'theentity',
   };
@@ -4144,12 +4147,13 @@ const CardTextures = (() => {
     // Backlight first: a soft gold pool behind the glyph, painted as a blurred
     // copy of the number itself rather than a rectangle. A box would read as
     // the plate that was just taken off these corners; a halo keeps the shape.
-    ctx.shadowColor = 'rgba(255,200,90,0.95)';
+    // ONE pass, and a tight one. Three stacked blurs built up a solid gold disc
+    // behind the digit on any card with a black face — it stopped reading as a
+    // backlight and started reading as a token the number was printed on.
+    ctx.shadowColor = 'rgba(255,200,90,0.55)';
+    ctx.shadowBlur  = 6;
     ctx.fillStyle   = '#ffd96b';
-    for (const blur of [18, 10, 5]) {
-      ctx.shadowBlur = blur;
-      ctx.fillText(text, x, y);
-    }
+    ctx.fillText(text, x, y);
     ctx.shadowBlur  = 0;
     ctx.shadowColor = 'transparent';
 
