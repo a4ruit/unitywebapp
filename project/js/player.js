@@ -307,6 +307,51 @@ const Player = (() => {
   let _bolt = 0, _shroom = 0, _stackBump = null;
 
   // ── Loot picker ─────────────────────────────────────────────────────────────
+  // Pixel icons: . empty, a main, b shade, c highlight
+  const _PIX_BOLT = [
+    '......aaa...',
+    '.....aac....',
+    '....aac.....',
+    '...aac......',
+    '..aaaaaaa...',
+    '.....aab....',
+    '....aab.....',
+    '...aab......',
+    '..aab.......',
+    '..ab........',
+  ];
+  const _PIX_SHROOM = [
+    '....aaaa....',
+    '..aaccaaaa..',
+    '.aacaaaacaa.',
+    'aaaaaaaaaaaa',
+    'abacaabaacab',
+    '.bbbbbbbbbb.',
+    '....cccc....',
+    '....cbbc....',
+    '....cbbc....',
+    '...cccccc...',
+  ];
+  function _pixSvg(rows, pal) {
+    let r = '';
+    rows.forEach((row, y) => [...row].forEach((ch, x) => {
+      if (pal[ch]) r += `<rect x="${x}" y="${y}" width="1" height="1" fill="${pal[ch]}"/>`;
+    }));
+    return `<svg class="tarot-art" viewBox="0 0 12 10" shape-rendering="crispEdges">${r}</svg>`;
+  }
+  function _tarot(kind, numeral, rows, name, desc, have) {
+    const pal = kind === 'bolt'
+      ? { a: '#ffe95c', b: '#c98a1a', c: '#fffbd0' }
+      : { a: '#ff5f86', b: '#a8304f', c: '#fff1e0' };
+    return `<button class="tarot tarot--${kind}" data-k="${kind}">` +
+             `<span class="tarot-num">${numeral}</span>` +
+             `<span class="tarot-window">${_pixSvg(rows, pal)}</span>` +
+             `<span class="tarot-name">${name}</span>` +
+             `<span class="tarot-desc">${desc}</span>` +
+             `<span class="tarot-have">${have > 0 ? 'x' + have + ' HELD' : '&nbsp;'}</span>` +
+           `</button>`;
+  }
+
   function _openLootPicker(lootId) {
     document.getElementById('lootPicker')?.remove();
     const el = document.createElement('div');
@@ -317,16 +362,12 @@ const Player = (() => {
         `<div class="loot-picker-title">LOOT CLAIMED</div>` +
         `<div class="loot-picker-sub">choose one</div>` +
         `<div class="loot-picker-row">` +
-          `<button class="loot-opt loot-opt--bolt" data-k="bolt">` +
-            `<span class="loot-opt-sym">ϟ</span><span class="loot-opt-name">BOLTWIND</span>` +
-            `<span class="loot-opt-desc">+12% speed</span><span class="loot-opt-have">have x${_bolt}</span></button>` +
-          `<button class="loot-opt loot-opt--shroom" data-k="shroom">` +
-            `<span class="loot-opt-sym">♣</span><span class="loot-opt-name">GIGANTASHROOM</span>` +
-            `<span class="loot-opt-desc">+10% size</span><span class="loot-opt-have">have x${_shroom}</span></button>` +
+          _tarot('bolt',   'XVII', _PIX_BOLT,   'BOLTWIND',      '+12% SPEED', _bolt) +
+          _tarot('shroom', 'IX',   _PIX_SHROOM, 'GIGANTASHROOM', '+10% SIZE',  _shroom) +
         `</div>` +
       `</div>`;
     el.addEventListener('click', e => {
-      const b = e.target.closest('.loot-opt');
+      const b = e.target.closest('.tarot');
       if (!b) return;
       send(`loot_pick|${CLIENT_ID}|${lootId}|${b.dataset.k}`);
       el.remove();

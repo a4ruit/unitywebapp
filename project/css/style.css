@@ -4114,30 +4114,61 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .loot-picker-box {
   width: 100%; max-width: 360px;
   background: rgba(14, 18, 26, 0.97);
-  border: 1px solid rgba(255, 200, 90, 0.6);
-  box-shadow: 0 0 24px rgba(255, 190, 70, 0.3);
-  border-radius: 4px; padding: 16px;
+  border: 2px solid rgba(255, 200, 90, 0.6);
+  border-radius: 0; padding: 18px 16px 22px;
   font-family: 'lo-res', monospace; text-align: center;
   animation: buffChipBump 0.45s steps(5);
 }
 .loot-picker-title { color: #ffd36a; font-size: 16px; letter-spacing: 0.12em; }
 .loot-picker-sub { color: rgba(255,255,255,0.6); font-size: 9px; margin: 4px 0 14px; letter-spacing: 0.1em; }
 .loot-picker-row { display: flex; gap: 10px; }
-.loot-opt {
-  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 14px 6px; background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.25); border-radius: 3px;
-  font-family: inherit; color: #fff; cursor: pointer;
+.loot-picker-row { justify-content: center; gap: 14px; }
+
+/* Pixel tarot: hard stepped borders, no radius, no blur */
+.tarot {
+  --ink: #ffe95c; --deep: #6b4a0e;
+  width: 128px; aspect-ratio: 2 / 3.2;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 8px 6px 6px;
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 4px),
+    #15101f;
+  border: 0; border-radius: 0;
+  box-shadow:
+    0 0 0 2px #0a0710,
+    0 0 0 4px var(--ink),
+    0 0 0 6px #0a0710,
+    inset 0 0 0 2px var(--deep),
+    6px 6px 0 6px rgba(0,0,0,0.45);
+  font-family: 'lo-res', monospace; color: #fff; cursor: pointer;
+  image-rendering: pixelated;
+  animation: tarotDeal 0.4s steps(4) both;
 }
-.loot-opt:active { transform: scale(0.96); }
-.loot-opt-sym { font-size: 28px; }
-.loot-opt-name { font-size: 10px; letter-spacing: 0.08em; }
-.loot-opt-desc { font-size: 9px; color: rgba(255,255,255,0.75); }
-.loot-opt-have { font-size: 8px; color: rgba(255,255,255,0.45); }
-.loot-opt--bolt { border-color: rgba(255, 233, 92, 0.6); }
-.loot-opt--bolt .loot-opt-sym { color: #ffe95c; text-shadow: 0 0 10px rgba(255,233,92,0.8); }
-.loot-opt--shroom { border-color: rgba(255, 111, 145, 0.6); }
-.loot-opt--shroom .loot-opt-sym { color: #ff6f91; text-shadow: 0 0 10px rgba(255,111,145,0.8); }
+.tarot--shroom { --ink: #ff5f86; --deep: #5e1a2c; animation-delay: 0.08s; }
+.tarot:active { transform: translate(2px, 2px); box-shadow:
+    0 0 0 2px #0a0710, 0 0 0 4px var(--ink), 0 0 0 6px #0a0710,
+    inset 0 0 0 2px var(--deep), 3px 3px 0 6px rgba(0,0,0,0.45); }
+
+.tarot-num { font-size: 9px; letter-spacing: 0.2em; color: var(--ink); }
+.tarot-window {
+  flex: 1; width: 100%; margin: 6px 0;
+  display: flex; align-items: center; justify-content: center;
+  background: #0a0710;
+  box-shadow: inset 0 0 0 2px var(--deep);
+}
+.tarot-art { width: 78%; height: auto; filter: drop-shadow(0 0 4px var(--ink)); }
+.tarot-name {
+  width: 100%; padding: 3px 0;
+  background: var(--ink); color: #0a0710;
+  font-size: 8px; letter-spacing: 0.06em;
+}
+.tarot-desc { margin-top: 5px; font-size: 8px; color: rgba(255,255,255,0.85); }
+.tarot-have { margin-top: 2px; font-size: 7px; color: rgba(255,255,255,0.45); }
+
+@keyframes tarotDeal {
+  0%   { transform: translateY(24px) rotate(-6deg); opacity: 0; }
+  100% { transform: none; opacity: 1; }
+}
 
 /* ── Main task (Soul Tree objective) ──────────────────────────────────────────
    Top of the TASKS panel. Styled to sit WITH the existing rows, not in a box of
