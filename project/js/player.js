@@ -268,7 +268,7 @@ const Player = (() => {
     if (typeof msg === 'string' && msg.startsWith('loot_claim|')) {
       const l = msg.split('|');
       console.log('[loot] claim', l[1], l[1] === CLIENT_ID ? '(me)' : '');
-      if (l[1] === CLIENT_ID) _openLootPicker(l[2]);
+      if (l[1] === CLIENT_ID && navigator.vibrate) navigator.vibrate(l[4] === 'shroom' ? [30, 40, 60] : 40);
       return true;
     }
     if (typeof msg === 'string' && msg.startsWith('loot_gone|')) return true;
