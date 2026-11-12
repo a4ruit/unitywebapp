@@ -264,6 +264,27 @@ const Player = (() => {
       return true;
     }
 
+    // loot_claim|clientId|lootId|name — someone touched loot on the big screen.
+    if (typeof msg === 'string' && msg.startsWith('loot_claim|')) {
+      const l = msg.split('|');
+      console.log('[loot] claim', l[1], l[1] === CLIENT_ID ? '(me)' : '');
+      if (l[1] === CLIENT_ID) _openLootPicker(l[2]);
+      return true;
+    }
+    if (typeof msg === 'string' && msg.startsWith('loot_gone|')) return true;
+
+    // buff_stacks|clientId|bolt|shroom
+    if (typeof msg === 'string' && msg.startsWith('buff_stacks|')) {
+      const s = msg.split('|');
+      if (s[1] === CLIENT_ID) {
+        const nb = parseInt(s[2]) || 0, ns = parseInt(s[3]) || 0;
+        _stackBump = nb > _bolt ? 'bolt' : ns > _shroom ? 'shroom' : null;
+        _bolt = nb; _shroom = ns;
+        _renderBuffRail();
+      }
+      return true;
+    }
+
     if (typeof msg !== 'string' || !msg.startsWith('room_mods|')) return false;
     const p = msg.split('|');
     _roomMoveMult = parseFloat(p[1]) || 1;
@@ -283,6 +304,36 @@ const Player = (() => {
   let _lastBuffMult = 1;
   let _bigUntil     = 0;     // epoch ms the BIG BUFF expires
   let _buffTicker   = null;
+  let _bolt = 0, _shroom = 0, _stackBump = null;
+
+  // ── Loot picker ─────────────────────────────────────────────────────────────
+  function _openLootPicker(lootId) {
+    document.getElementById('lootPicker')?.remove();
+    const el = document.createElement('div');
+    el.id = 'lootPicker';
+    el.className = 'loot-picker';
+    el.innerHTML =
+      `<div class="loot-picker-box">` +
+        `<div class="loot-picker-title">LOOT CLAIMED</div>` +
+        `<div class="loot-picker-sub">choose one</div>` +
+        `<div class="loot-picker-row">` +
+          `<button class="loot-opt loot-opt--bolt" data-k="bolt">` +
+            `<span class="loot-opt-sym">ϟ</span><span class="loot-opt-name">BOLTWIND</span>` +
+            `<span class="loot-opt-desc">+12% speed</span><span class="loot-opt-have">have x${_bolt}</span></button>` +
+          `<button class="loot-opt loot-opt--shroom" data-k="shroom">` +
+            `<span class="loot-opt-sym">♣</span><span class="loot-opt-name">GIGANTASHROOM</span>` +
+            `<span class="loot-opt-desc">+10% size</span><span class="loot-opt-have">have x${_shroom}</span></button>` +
+        `</div>` +
+      `</div>`;
+    el.addEventListener('click', e => {
+      const b = e.target.closest('.loot-opt');
+      if (!b) return;
+      send(`loot_pick|${CLIENT_ID}|${lootId}|${b.dataset.k}`);
+      el.remove();
+    });
+    document.body.appendChild(el);
+    if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
+  }
 
   // Chips stack in the rail, so a player carrying both the room's speed bonus
   // and their own purchase sees two. They are deliberately different kinds of
@@ -315,6 +366,22 @@ const Player = (() => {
           `<span class="buff-chip-val">${bigLeft}s</span>` +
         `</div>`);
     }
+
+    if (_bolt > 0) {
+      chips.push(
+        `<div class="buff-chip buff-chip--bolt${_stackBump === 'bolt' ? ' buff-chip--bump' : ''}" title="Boltwind">` +
+          `<span class="buff-chip-sym">ϟ</span>` +
+          `<span class="buff-chip-val">x${_bolt}</span>` +
+        `</div>`);
+    }
+    if (_shroom > 0) {
+      chips.push(
+        `<div class="buff-chip buff-chip--shroom${_stackBump === 'shroom' ? ' buff-chip--bump' : ''}" title="Gigantashroom">` +
+          `<span class="buff-chip-sym">♣</span>` +
+          `<span class="buff-chip-val">x${_shroom}</span>` +
+        `</div>`);
+    }
+    _stackBump = null;
 
     rail.innerHTML = chips.join('');
     rail.classList.toggle('buff-rail--open', chips.length > 0);
