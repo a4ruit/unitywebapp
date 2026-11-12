@@ -1538,6 +1538,27 @@ function _buildUI() {
       justify-content: center;
     }
     #poss-place-overlay.place-steer #poss-place-card { margin-bottom: 150px; }
+    /* Controls take the chosen card's rarity colour (--pc, set from JS) */
+    #poss-place-overlay.place-steer #poss-place {
+      background: color-mix(in srgb, var(--pc) 18%, transparent);
+      border-color: var(--pc); color: var(--pc);
+      text-shadow: 0 0 8px color-mix(in srgb, var(--pc) 70%, transparent);
+      box-shadow: 0 0 12px color-mix(in srgb, var(--pc) 40%, transparent);
+    }
+    #poss-place-overlay.place-steer #poss-place:active {
+      background: color-mix(in srgb, var(--pc) 45%, transparent);
+    }
+    #poss-place-overlay.place-steer #poss-joy-knob {
+      background: color-mix(in srgb, var(--pc) 50%, transparent);
+      border-color: var(--pc);
+    }
+    #poss-place-overlay.place-steer #poss-joy-bg {
+      border-color: color-mix(in srgb, var(--pc) 35%, transparent);
+    }
+    #poss-place-overlay.place-steer .poss-joy-arrow {
+      color: color-mix(in srgb, var(--pc) 60%, transparent);
+      text-shadow: 0 0 4px color-mix(in srgb, var(--pc) 50%, transparent);
+    }
 
     /* ── Placement mini-map — live top-down with an X tracking the preview ── */
     #poss-place-minimap {
@@ -3275,6 +3296,8 @@ function _startPlaceCardFace() {
     return;
   }
   if (_defaultFrameSrc === null) _defaultFrameSrc = img.getAttribute('src');
+  const pc = card.corrupted ? '#9a9a9a' : (CardTextures.getCfg(card.rarity).border || '#50dc8c');
+  _ui.placeOverlay.style.setProperty('--pc', pc);
   const out = document.createElement('canvas');
   const t0 = performance.now();
   let last = 0;

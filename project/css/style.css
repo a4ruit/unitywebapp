@@ -4141,11 +4141,11 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .tarot--shroom { animation-delay: 0.08s; }
 .tarot::before {
   content: ''; position: absolute; inset: 0; z-index: -1;
-  background: url('../assets/epic-card.png') center / 100% 100% no-repeat;
+  background: url('../assets/common-card.png') center / 100% 100% no-repeat;
   image-rendering: pixelated;
 }
-.tarot--bolt::before   { filter: hue-rotate(140deg) saturate(1.6) brightness(1.35); }
-.tarot--shroom::before { filter: hue-rotate(75deg)  saturate(1.5) brightness(1.1); }
+.tarot--bolt::before   { filter: hue-rotate(-65deg) saturate(1.6) brightness(1.3); }
+.tarot--shroom::before { filter: hue-rotate(-120deg) saturate(1.8) brightness(1.05); }
 .tarot--bolt   .tarot-name { color: #fff3b0; text-shadow: 0 0 6px rgba(255, 220, 60, 0.75); }
 .tarot--shroom .tarot-name { color: #ffd0d0; text-shadow: 0 0 6px rgba(255, 60, 60, 0.75); }
 .tarot:active { transform: translate(2px, 2px); filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.45)); }
@@ -4158,8 +4158,8 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 }
 .tarot-art { width: 78%; height: auto; filter: drop-shadow(0 0 4px var(--ink)); }
 .tarot-name {
-  font-family: 'pf-pixelscript', cursive;
-  font-size: 15px; line-height: 1; color: #f0d8ff;
+  font-family: 'Pixelify Sans', 'lo-res', sans-serif;
+  font-size: 13px; line-height: 1; color: #f0d8ff; letter-spacing: 0.04em;
   text-shadow: 0 0 6px rgba(196, 92, 255, 0.7);
   white-space: nowrap;
 }
