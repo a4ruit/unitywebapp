@@ -1532,11 +1532,12 @@ function _buildUI() {
     #poss-place-overlay.place-steer #poss-place-ammo,
     #poss-place-overlay.place-steer #poss-place-card-backdrop { display: none; }
     #poss-place-overlay.place-steer #poss-place-card-frame { z-index: 0; }
-    #poss-place-overlay.place-steer #poss-place-card { width: min(80vw, 300px, 40vh); }
+    #poss-place-overlay.place-steer #poss-place-card { width: min(72vw, 280px, 42vh); }
     #poss-place-overlay.place-steer #poss-place-card-content {
-      z-index: 3; top: auto; bottom: 5%; left: 9%; right: 9%;
-      height: 26%; justify-content: center;
+      z-index: 3; top: calc(100% + 14px); bottom: auto; left: 0; right: 0;
+      justify-content: center;
     }
+    #poss-place-overlay.place-steer #poss-place-card { margin-bottom: 150px; }
 
     /* ── Placement mini-map — live top-down with an X tracking the preview ── */
     #poss-place-minimap {
@@ -3257,26 +3258,13 @@ function _drawSporeMinimap() {
   }
 }
 
-// The placement window is the chosen card, extended below its stats row by
-// tiling a plain band of the frame, so the controls sit inside its border.
-const PLACE_EXTRA = 170;                       // px of card space added for controls
-const PLACE_SLICE = { band: [300, 316], cut: 366 };
+// The placement window is the chosen card exactly as dealt (native 256x384);
+// the controls sit beneath it.
 let _cardFaceRaf = null, _defaultFrameSrc = null;
 
 function _composePlaceFrame(card, t, out) {
-  const face = document.createElement('canvas');
-  face.width = 256; face.height = 384;
-  CardTextures.buildFace(card, face, t);
-  out.width = 256; out.height = 384 + PLACE_EXTRA;
-  const ctx = out.getContext('2d');
-  ctx.imageSmoothingEnabled = false;
-  const { band: [b0, b1], cut } = PLACE_SLICE, bh = b1 - b0;
-  ctx.drawImage(face, 0, 0, 256, cut, 0, 0, 256, cut);
-  for (let y = 0; y < PLACE_EXTRA; y += bh) {
-    const h = Math.min(bh, PLACE_EXTRA - y);
-    ctx.drawImage(face, 0, b0, 256, h, 0, cut + y, 256, h);
-  }
-  ctx.drawImage(face, 0, cut, 256, 384 - cut, 0, cut + PLACE_EXTRA, 256, 384 - cut);
+  out.width = 256; out.height = 384;
+  CardTextures.buildFace(card, out, t);
 }
 
 function _startPlaceCardFace() {
