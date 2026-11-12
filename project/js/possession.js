@@ -1523,8 +1523,20 @@ function _buildUI() {
       aspect-ratio: 2 / 3;
       image-rendering: pixelated;
     }
-    #poss-place-overlay.place-steer #poss-place-minimap { display: none; }
-    #poss-place-overlay.place-steer #poss-place-cardface { display: block; }
+    /* Steered: the window IS the chosen card (title, symbol, stats baked in),
+       stretched downward to make room for the controls. */
+    #poss-place-overlay.place-steer #poss-place-minimap,
+    #poss-place-overlay.place-steer #poss-place-cardface,
+    #poss-place-overlay.place-steer #poss-place-card-header,
+    #poss-place-overlay.place-steer #poss-place-hint,
+    #poss-place-overlay.place-steer #poss-place-ammo,
+    #poss-place-overlay.place-steer #poss-place-card-backdrop { display: none; }
+    #poss-place-overlay.place-steer #poss-place-card-frame { z-index: 0; }
+    #poss-place-overlay.place-steer #poss-place-card { width: min(80vw, 300px, 40vh); }
+    #poss-place-overlay.place-steer #poss-place-card-content {
+      z-index: 3; top: auto; bottom: 5%; left: 9%; right: 9%;
+      height: 26%; justify-content: center;
+    }
 
     /* ── Placement mini-map — live top-down with an X tracking the preview ── */
     #poss-place-minimap {
@@ -2117,7 +2129,7 @@ function _buildUI() {
                Only shown for tap-to-drop cards, which are the ones with charges. -->
           <div id="poss-place-ammo"></div>
           <!-- nudge the player to look up at the projection while they steer -->
-          <div id="poss-place-hint">▲ look up at installation screen</div>
+          <div id="poss-place-hint"></div>
           <!-- controls row: joystick appended LEFT, PLACE button appended RIGHT -->
           <div id="poss-place-controls"></div>
         </div>
@@ -2184,6 +2196,7 @@ function _buildUI() {
     placeMinimap:     root.querySelector('#poss-place-minimap'),
     placeCardFace:    root.querySelector('#poss-place-cardface'),
     placeHint:        root.querySelector('#poss-place-hint'),
+    placeCardFrame:   root.querySelector('#poss-place-card-frame'),
     placeAmmo:        root.querySelector('#poss-place-ammo'),
     placeControls:    root.querySelector('#poss-place-controls'),
     blockOverlay:     root.querySelector('#poss-block-overlay'),
@@ -3244,24 +3257,55 @@ function _drawSporeMinimap() {
   }
 }
 
-let _cardFaceRaf = null;
+// The placement window is the chosen card, extended below its stats row by
+// tiling a plain band of the frame, so the controls sit inside its border.
+const PLACE_EXTRA = 170;                       // px of card space added for controls
+const PLACE_SLICE = { band: [300, 316], cut: 366 };
+let _cardFaceRaf = null, _defaultFrameSrc = null;
+
+function _composePlaceFrame(card, t, out) {
+  const face = document.createElement('canvas');
+  face.width = 256; face.height = 384;
+  CardTextures.buildFace(card, face, t);
+  out.width = 256; out.height = 384 + PLACE_EXTRA;
+  const ctx = out.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+  const { band: [b0, b1], cut } = PLACE_SLICE, bh = b1 - b0;
+  ctx.drawImage(face, 0, 0, 256, cut, 0, 0, 256, cut);
+  for (let y = 0; y < PLACE_EXTRA; y += bh) {
+    const h = Math.min(bh, PLACE_EXTRA - y);
+    ctx.drawImage(face, 0, b0, 256, h, 0, cut + y, 256, h);
+  }
+  ctx.drawImage(face, 0, cut, 256, 384 - cut, 0, cut + PLACE_EXTRA, 256, 384 - cut);
+}
+
 function _startPlaceCardFace() {
   _stopPlaceCardFace();
-  const cv = _ui && _ui.placeCardFace, card = window._placingCard;
-  if (!cv || !card || typeof CardTextures === 'undefined') {
-    _ui && _ui.placeOverlay.classList.remove('place-steer');   // fall back to the map
+  const img = _ui && _ui.placeCardFrame, card = window._placingCard;
+  if (!img || !card || typeof CardTextures === 'undefined') {
+    _ui && _ui.placeOverlay.classList.remove('place-steer');   // fall back to the old window
     return;
   }
+  if (_defaultFrameSrc === null) _defaultFrameSrc = img.getAttribute('src');
+  const out = document.createElement('canvas');
   const t0 = performance.now();
-  const draw = () => {
-    try { CardTextures.buildFace(card, cv, (performance.now() - t0) / 1000); } catch (e) { return; }
-    if (CardTextures.isAnimatedCard(card)) _cardFaceRaf = requestAnimationFrame(draw);
+  let last = 0;
+  const draw = (now) => {
+    try { _composePlaceFrame(card, (performance.now() - t0) / 1000, out); } catch (e) { return; }
+    img.src = out.toDataURL();
+    if (CardTextures.isAnimatedCard(card)) {
+      _cardFaceRaf = requestAnimationFrame(function tick(n) {
+        if (n - last < 120) { _cardFaceRaf = requestAnimationFrame(tick); return; }
+        last = n; draw(n);
+      });
+    }
   };
-  draw();
+  draw(0);
 }
 function _stopPlaceCardFace() {
   if (_cardFaceRaf) cancelAnimationFrame(_cardFaceRaf);
   _cardFaceRaf = null;
+  if (_defaultFrameSrc !== null && _ui && _ui.placeCardFrame) _ui.placeCardFrame.src = _defaultFrameSrc;
 }
 
 function _onPlacementGranted(cardName, cardType, ammo) {
@@ -3363,7 +3407,7 @@ function _applyPlaceMode(cardName, ammo) {
     _placeTarget.appendChild(_ui.place);
     _ui.joyZone.style.display = 'flex';
     _ui.place.style.display   = 'flex';
-    if (_ui.placeHint) _ui.placeHint.textContent = '▲ look up at installation screen';
+    if (_ui.placeHint) _ui.placeHint.textContent = '';
 
     // Stream joystick to Unity as placement_move at up to 20 fps — gated by
     // the dirty-flag helpers so idle ticks don't waste WS bandwidth.
