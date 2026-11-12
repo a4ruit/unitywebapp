@@ -2115,6 +2115,7 @@ function dropCard(card) {
   // shimmer — and, for Thornwire, grant a prismatic pull its extra charges.
   if (card.placement && typeof CLIENT_ID !== 'undefined') {
     const placeFinish = card.variant === 'holo' ? 'holo' : '';
+    window._placingCard = card;
     send(`placement_request|${CLIENT_ID}|${card.placement}|${card.rarity}|${card.name}|${placeFinish}`);
     resetToPackScreen();
     return;

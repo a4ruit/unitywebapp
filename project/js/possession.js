@@ -1516,6 +1516,16 @@ function _buildUI() {
     }
     .poss-ammo-label { opacity: 0.75; }
 
+    /* Steered placements show the chosen card instead of the map */
+    #poss-place-cardface {
+      display: none;
+      height: 40%; max-height: 190px; width: auto;
+      aspect-ratio: 2 / 3;
+      image-rendering: pixelated;
+    }
+    #poss-place-overlay.place-steer #poss-place-minimap { display: none; }
+    #poss-place-overlay.place-steer #poss-place-cardface { display: block; }
+
     /* ── Placement mini-map — live top-down with an X tracking the preview ── */
     #poss-place-minimap {
       width: auto;
@@ -2102,6 +2112,7 @@ function _buildUI() {
           <div id="poss-place-card-header">WILDFLOWER<br>PLACEMENT</div>
           <!-- live mini-map of the Unity world; X tracks the preview in real time -->
           <canvas id="poss-place-minimap" width="162" height="222"></canvas>
+          <canvas id="poss-place-cardface" width="256" height="384"></canvas>
           <!-- ammo pips — one circle per charge; filled = available, hollow = spent.
                Only shown for tap-to-drop cards, which are the ones with charges. -->
           <div id="poss-place-ammo"></div>
@@ -2171,6 +2182,7 @@ function _buildUI() {
     placeCardContent: root.querySelector('#poss-place-card-content'),
     placeCardHeader:  root.querySelector('#poss-place-card-header'),
     placeMinimap:     root.querySelector('#poss-place-minimap'),
+    placeCardFace:    root.querySelector('#poss-place-cardface'),
     placeHint:        root.querySelector('#poss-place-hint'),
     placeAmmo:        root.querySelector('#poss-place-ammo'),
     placeControls:    root.querySelector('#poss-place-controls'),
@@ -3232,6 +3244,26 @@ function _drawSporeMinimap() {
   }
 }
 
+let _cardFaceRaf = null;
+function _startPlaceCardFace() {
+  _stopPlaceCardFace();
+  const cv = _ui && _ui.placeCardFace, card = window._placingCard;
+  if (!cv || !card || typeof CardTextures === 'undefined') {
+    _ui && _ui.placeOverlay.classList.remove('place-steer');   // fall back to the map
+    return;
+  }
+  const t0 = performance.now();
+  const draw = () => {
+    try { CardTextures.buildFace(card, cv, (performance.now() - t0) / 1000); } catch (e) { return; }
+    if (CardTextures.isAnimatedCard(card)) _cardFaceRaf = requestAnimationFrame(draw);
+  };
+  draw();
+}
+function _stopPlaceCardFace() {
+  if (_cardFaceRaf) cancelAnimationFrame(_cardFaceRaf);
+  _cardFaceRaf = null;
+}
+
 function _onPlacementGranted(cardName, cardType, ammo) {
   // Belt and braces on the shared joystick. Placement does not own the armed
   // state and must never start holding it, whatever happened in the session
@@ -3306,6 +3338,8 @@ function _applyPlaceMode(cardName, ammo) {
     // would only be dead weight. Hide them and arm the minimap for taps.
     // The .place-tap class enlarges the card + map to spore-panel legibility.
     _ui.placeOverlay.classList.add('place-tap');
+    _ui.placeOverlay.classList.remove('place-steer');
+    _stopPlaceCardFace();
     _ui.joyZone.style.display = 'none';
     _ui.place.style.display   = 'none';
     if (_ui.placeMinimap) {
@@ -3319,6 +3353,8 @@ function _applyPlaceMode(cardName, ammo) {
     }
   } else {
     _ui.placeOverlay.classList.remove('place-tap');
+    _ui.placeOverlay.classList.add('place-steer');
+    _startPlaceCardFace();
     // Move joystick (left) + PLACE button (right) into the controls row so
     // they sit side-by-side Game Boy-style inside the framed placement modal.
     // They retain all existing event listeners after the DOM move.
@@ -3356,6 +3392,7 @@ function _onPlacementDone() {
   // Re-arm tap mode for the next session and disarm the map.
   _placeTapMode   = false;
   _placeCardType  = '';
+  _stopPlaceCardFace();
   _placeAmmoTotal = 1;
   _placeAmmoLeft  = 1;
   if (_ui && _ui.placeMinimap) {
