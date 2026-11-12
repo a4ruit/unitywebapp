@@ -342,13 +342,10 @@ const Player = (() => {
   function _tarot(kind, numeral, rows, name, desc, have) {
     const pal = kind === 'bolt'
       ? { a: '#ffe95c', b: '#c98a1a', c: '#fffbd0' }
-      : { a: '#ff5f86', b: '#a8304f', c: '#fff1e0' };
+      : { a: '#ff3b3b', b: '#a01c1c', c: '#fff1e0' };
     return `<button class="tarot tarot--${kind}" data-k="${kind}">` +
-             `<span class="tarot-num">${numeral}</span>` +
              `<span class="tarot-window">${_pixSvg(rows, pal)}</span>` +
              `<span class="tarot-name">${name}</span>` +
-             `<span class="tarot-desc">${desc}</span>` +
-             `<span class="tarot-have">${have > 0 ? 'x' + have + ' HELD' : '&nbsp;'}</span>` +
            `</button>`;
   }
 
@@ -359,18 +356,26 @@ const Player = (() => {
     el.className = 'loot-picker';
     el.innerHTML =
       `<div class="loot-picker-box">` +
-        `<div class="loot-picker-title">LOOT CLAIMED</div>` +
-        `<div class="loot-picker-sub">choose one</div>` +
         `<div class="loot-picker-row">` +
-          _tarot('bolt',   'XVII', _PIX_BOLT,   'BOLTWIND',      '+12% SPEED', _bolt) +
-          _tarot('shroom', 'IX',   _PIX_SHROOM, 'GIGANTASHROOM', '+10% SIZE',  _shroom) +
+          _tarot('bolt',   'XVII', _PIX_BOLT,   'Boltwind',      '', _bolt) +
+          _tarot('shroom', 'IX',   _PIX_SHROOM, 'Gigantashroom', '',  _shroom) +
         `</div>` +
       `</div>`;
-    el.addEventListener('click', e => {
+    // The picker opens mid-drag; a finger already down must lift and tap again.
+    const openedAt = performance.now();
+    let armed = null, chosen = false;
+    el.addEventListener('pointerdown', e => {
+      armed = performance.now() - openedAt > 450 ? e.target.closest('.tarot') : null;
+    });
+    el.addEventListener('pointerup', e => {
       const b = e.target.closest('.tarot');
-      if (!b) return;
+      if (chosen || !b || b !== armed) return;
+      chosen = true;
       send(`loot_pick|${CLIENT_ID}|${lootId}|${b.dataset.k}`);
-      el.remove();
+      b.classList.add('tarot--chosen');
+      el.classList.add('loot-picker--closing');
+      if (navigator.vibrate) navigator.vibrate(b.dataset.k === 'shroom' ? [30, 40, 60, 40, 90] : 30);
+      setTimeout(() => el.remove(), 650);
     });
     document.body.appendChild(el);
     if (navigator.vibrate) navigator.vibrate([40, 30, 40]);

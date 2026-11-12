@@ -4102,7 +4102,7 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .buff-chip--bolt { border-color: rgba(255, 235, 110, 0.55); color: rgba(255, 245, 190, 0.92); }
 .buff-chip--bolt .buff-chip-sym { color: #ffe95c; text-shadow: 0 0 6px rgba(255, 233, 92, 0.75); }
 .buff-chip--shroom { border-color: rgba(230, 110, 140, 0.55); color: rgba(255, 210, 220, 0.92); }
-.buff-chip--shroom .buff-chip-sym { color: #ff6f91; text-shadow: 0 0 6px rgba(255, 111, 145, 0.75); }
+.buff-chip--shroom .buff-chip-sym { color: #ff3b3b; text-shadow: 0 0 6px rgba(255, 59, 59, 0.75); }
 
 /* ── Loot picker ── */
 .loot-picker {
@@ -4114,8 +4114,8 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 .loot-picker-box {
   width: 100%; max-width: 360px;
   background: rgba(14, 18, 26, 0.97);
-  border: 2px solid rgba(255, 200, 90, 0.6);
-  border-radius: 0; padding: 18px 16px 22px;
+  border: 0; background: transparent;
+  border-radius: 0; padding: 0;
   font-family: 'lo-res', monospace; text-align: center;
   animation: buffChipBump 0.45s steps(5);
 }
@@ -4126,44 +4126,59 @@ body:has(#screen-horror-spin:not(.hidden))::before {
 
 /* Pixel tarot: hard stepped borders, no radius, no blur */
 .tarot {
-  --ink: #ffe95c; --deep: #6b4a0e;
-  width: 128px; aspect-ratio: 2 / 3.2;
+  --ink: #c45cff; --deep: #4a1a66;
+  width: 128px; aspect-ratio: 2 / 3;
   display: flex; flex-direction: column; align-items: center;
-  padding: 8px 6px 6px;
-  background:
-    repeating-linear-gradient(45deg, rgba(255,255,255,0.025) 0 2px, transparent 2px 4px),
-    #15101f;
+  padding: 14% 13% 11%;
+  position: relative; isolation: isolate; background: none;
   border: 0; border-radius: 0;
-  box-shadow:
-    0 0 0 2px #0a0710,
-    0 0 0 4px var(--ink),
-    0 0 0 6px #0a0710,
-    inset 0 0 0 2px var(--deep),
-    6px 6px 0 6px rgba(0,0,0,0.45);
+  box-shadow: none;
+  filter: drop-shadow(5px 5px 0 rgba(0,0,0,0.45));
   font-family: 'lo-res', monospace; color: #fff; cursor: pointer;
   image-rendering: pixelated;
   animation: tarotDeal 0.4s steps(4) both;
 }
-.tarot--shroom { --ink: #ff5f86; --deep: #5e1a2c; animation-delay: 0.08s; }
-.tarot:active { transform: translate(2px, 2px); box-shadow:
-    0 0 0 2px #0a0710, 0 0 0 4px var(--ink), 0 0 0 6px #0a0710,
-    inset 0 0 0 2px var(--deep), 3px 3px 0 6px rgba(0,0,0,0.45); }
+.tarot--shroom { animation-delay: 0.08s; }
+.tarot::before {
+  content: ''; position: absolute; inset: 0; z-index: -1;
+  background: url('../assets/epic-card.png') center / 100% 100% no-repeat;
+  image-rendering: pixelated;
+}
+.tarot--bolt::before   { filter: hue-rotate(140deg) saturate(1.6) brightness(1.35); }
+.tarot--shroom::before { filter: hue-rotate(75deg)  saturate(1.5) brightness(1.1); }
+.tarot--bolt   .tarot-name { color: #fff3b0; text-shadow: 0 0 6px rgba(255, 220, 60, 0.75); }
+.tarot--shroom .tarot-name { color: #ffd0d0; text-shadow: 0 0 6px rgba(255, 60, 60, 0.75); }
+.tarot:active { transform: translate(2px, 2px); filter: drop-shadow(2px 2px 0 rgba(0,0,0,0.45)); }
 
 .tarot-num { font-size: 9px; letter-spacing: 0.2em; color: var(--ink); }
 .tarot-window {
-  flex: 1; width: 100%; margin: 6px 0;
+  flex: 1; width: 100%; margin: 4px 0;
   display: flex; align-items: center; justify-content: center;
-  background: #0a0710;
-  box-shadow: inset 0 0 0 2px var(--deep);
+  background: transparent;
 }
 .tarot-art { width: 78%; height: auto; filter: drop-shadow(0 0 4px var(--ink)); }
 .tarot-name {
-  width: 100%; padding: 3px 0;
-  background: var(--ink); color: #0a0710;
-  font-size: 8px; letter-spacing: 0.06em;
+  font-family: 'pf-pixelscript', cursive;
+  font-size: 15px; line-height: 1; color: #f0d8ff;
+  text-shadow: 0 0 6px rgba(196, 92, 255, 0.7);
+  white-space: nowrap;
 }
 .tarot-desc { margin-top: 5px; font-size: 8px; color: rgba(255,255,255,0.85); }
 .tarot-have { margin-top: 2px; font-size: 7px; color: rgba(255,255,255,0.45); }
+
+.loot-picker--closing .tarot:not(.tarot--chosen) { opacity: 0; transition: opacity 0.15s steps(3); }
+.tarot--chosen { animation: tarotPicked 0.6s steps(6) forwards; }
+.tarot--shroom.tarot--chosen { animation: tarotGrow 0.65s steps(1) forwards; }
+@keyframes tarotPicked {
+  0% { transform: scale(1); } 40% { transform: scale(1.12); } 100% { transform: scale(1.12); opacity: 0; }
+}
+/* Mario-style: flicker between sizes, then settle bigger */
+@keyframes tarotGrow {
+  0%  { transform: scale(1); }    12% { transform: scale(1.18); }
+  24% { transform: scale(1); }    36% { transform: scale(1.18); }
+  48% { transform: scale(1.04); } 60% { transform: scale(1.3); }
+  85% { transform: scale(1.3); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; }
+}
 
 @keyframes tarotDeal {
   0%   { transform: translateY(24px) rotate(-6deg); opacity: 0; }
